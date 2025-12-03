@@ -7,6 +7,7 @@ import OwnerAppointments from './pages/OwnerAppointments';
 import OwnerClients from './pages/OwnerClients';
 import OwnerBarbers from './pages/OwnerBarbers';
 import OwnerServices from './pages/OwnerServices';
+import OwnerSettings from './pages/OwnerSettings';
 import BarberToday from './pages/BarberToday';
 import Book from './pages/Book';
 
@@ -57,6 +58,7 @@ function AppRoutes() {
       <Route path="/owner/clients" element={<ProtectedRoute allowedRole="OWNER"><OwnerClients /></ProtectedRoute>} />
       <Route path="/owner/barbers" element={<ProtectedRoute allowedRole="OWNER"><OwnerBarbers /></ProtectedRoute>} />
       <Route path="/owner/services" element={<ProtectedRoute allowedRole="OWNER"><OwnerServices /></ProtectedRoute>} />
+      <Route path="/owner/settings" element={<ProtectedRoute allowedRole="OWNER"><OwnerSettings /></ProtectedRoute>} />
 
       <Route path="/barber/today" element={<ProtectedRoute allowedRole="BARBER"><BarberToday /></ProtectedRoute>} />
 

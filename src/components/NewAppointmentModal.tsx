@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
+import { getAvailableTimeSlots, type TimeSlot } from '../lib/availability';
 
 type Client = {
   id: string;
@@ -36,6 +37,8 @@ export default function NewAppointmentModal({ onClose, onSuccess }: Props) {
   const [selectedBarber, setSelectedBarber] = useState('');
   const [appointmentDate, setAppointmentDate] = useState('');
   const [appointmentTime, setAppointmentTime] = useState('');
+  const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
   const [showNewClient, setShowNewClient] = useState(false);
   const [newClientFirstName, setNewClientFirstName] = useState('');
   const [newClientLastName, setNewClientLastName] = useState('');
@@ -52,6 +55,41 @@ export default function NewAppointmentModal({ onClose, onSuccess }: Props) {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (selectedService && selectedBarber && appointmentDate) {
+      loadAvailableSlots();
+    } else {
+      setAvailableSlots([]);
+      setAppointmentTime('');
+    }
+  }, [selectedService, selectedBarber, appointmentDate]);
+
+  const loadAvailableSlots = async () => {
+    if (!selectedService || !selectedBarber || !appointmentDate) return;
+
+    setLoadingSlots(true);
+    try {
+      const service = services.find(s => s.id === selectedService);
+      if (!service) return;
+
+      const slots = await getAvailableTimeSlots(
+        appointmentDate,
+        service.duration_minutes,
+        selectedBarber
+      );
+
+      setAvailableSlots(slots);
+      if (slots.length === 0) {
+        setAppointmentTime('');
+      }
+    } catch (error) {
+      console.error('Error loading available slots:', error);
+      setAvailableSlots([]);
+    } finally {
+      setLoadingSlots(false);
+    }
+  };
 
   const loadData = async () => {
     const [clientsRes, servicesRes, barbersRes] = await Promise.all([
@@ -301,12 +339,33 @@ export default function NewAppointmentModal({ onClose, onSuccess }: Props) {
           <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
             {t.time}
           </label>
-          <input
-            type="time"
-            value={appointmentTime}
-            onChange={(e) => setAppointmentTime(e.target.value)}
-            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-          />
+          {loadingSlots ? (
+            <p style={{ fontSize: '14px', color: '#666' }}>{t.loading}</p>
+          ) : availableSlots.length === 0 && selectedService && selectedBarber && appointmentDate ? (
+            <p style={{ fontSize: '14px', color: '#dc3545' }}>
+              {language === 'en'
+                ? 'No available times for this barber on this date.'
+                : 'No hay horarios disponibles para este barbero en esta fecha.'}
+            </p>
+          ) : (
+            <select
+              value={appointmentTime}
+              onChange={(e) => setAppointmentTime(e.target.value)}
+              disabled={availableSlots.length === 0}
+              style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+            >
+              <option value="">
+                {availableSlots.length === 0
+                  ? (language === 'en' ? 'Select date, service & barber first' : 'Selecciona fecha, servicio y barbero primero')
+                  : (language === 'en' ? 'Select a time' : 'Selecciona una hora')}
+              </option>
+              {availableSlots.map((slot) => (
+                <option key={slot.start} value={slot.start}>
+                  {slot.start} - {slot.end}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
