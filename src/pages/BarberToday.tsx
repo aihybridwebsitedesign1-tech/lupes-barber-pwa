@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -17,6 +18,7 @@ export default function BarberToday() {
   const [loading, setLoading] = useState(true);
   const { language, t } = useLanguage();
   const { userData } = useAuth();
+  const navigate = useNavigate();
 
   const loadAppointments = async () => {
     if (!userData) return;
@@ -154,7 +156,17 @@ export default function BarberToday() {
                 </tr>
               ) : (
                 appointments.map((apt) => (
-                  <tr key={apt.id} style={{ borderBottom: '1px solid #eee' }}>
+                  <tr
+                    key={apt.id}
+                    onClick={() => navigate(`/barber/appointments/${apt.id}`)}
+                    style={{
+                      borderBottom: '1px solid #eee',
+                      cursor: 'pointer',
+                      transition: 'background-color 0.2s',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9f9f9'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
                     <td style={{ padding: '1rem', fontSize: '14px' }}>{formatTime(apt.scheduled_start)}</td>
                     <td style={{ padding: '1rem', fontSize: '14px' }}>
                       {apt.client ? `${apt.client.first_name} ${apt.client.last_name}` : 'N/A'}

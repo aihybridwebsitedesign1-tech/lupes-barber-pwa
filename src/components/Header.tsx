@@ -39,6 +39,9 @@ export default function Header() {
                   <Link to="/owner/services" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 1rem' }}>
                     {t.services}
                   </Link>
+                  <Link to="/owner/products" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 1rem' }}>
+                    {language === 'en' ? 'Products' : 'Productos'}
+                  </Link>
                   <Link to="/owner/settings" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 1rem' }}>
                     {language === 'en' ? 'Settings' : 'Configuración'}
                   </Link>

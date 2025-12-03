@@ -501,7 +501,17 @@ export default function ClientDetail() {
               </thead>
               <tbody>
                 {appointments.map((apt) => (
-                  <tr key={apt.id} style={{ borderBottom: '1px solid #eee' }}>
+                  <tr
+                    key={apt.id}
+                    onClick={() => navigate(`/owner/appointments/${apt.id}`)}
+                    style={{
+                      borderBottom: '1px solid #eee',
+                      cursor: 'pointer',
+                      transition: 'background-color 0.2s',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9f9f9'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
                     <td style={{ padding: '0.75rem', fontSize: '14px' }}>{formatDate(apt.scheduled_start)}</td>
                     <td style={{ padding: '0.75rem', fontSize: '14px' }}>{apt.barber_name}</td>
                     <td style={{ padding: '0.75rem', fontSize: '14px' }}>{apt.service_name}</td>

@@ -727,6 +727,136 @@ No TypeScript errors
 
 ---
 
+## Wiring & Navigation
+
+### Routes Implemented
+
+#### Owner Routes
+- `/owner/appointments` - Full appointments list with status and date filters
+- `/owner/appointments/:appointmentId` - Appointment detail view
+- `/owner/clients` - Clients list with search
+- `/owner/clients/:clientId` - Client detail view
+- `/owner/products` - Products CMS
+- `/owner/today` - Today's appointments dashboard
+
+#### Barber Routes
+- `/barber/today` - Today's appointments dashboard
+- `/barber/appointments/:appointmentId` - Appointment detail view (own appointments only)
+
+### Navigation Connections
+
+#### AppointmentDetail Accessible From:
+
+**Owner Access:**
+1. **OwnerToday** (`/owner/today`)
+   - Click any appointment row → navigates to `/owner/appointments/:id`
+   - Hover effect on rows for visual feedback
+
+2. **OwnerAppointments** (`/owner/appointments`)
+   - "View" button in Actions column → navigates to `/owner/appointments/:id`
+   - Filters: Status (All/Booked/Completed/No-show/Cancelled)
+   - Filters: Date Range (Today/Next 7 days/Last 30 days/All time)
+   - Table shows: Date/Time, Barber, Client, Service, Status, Payment
+
+3. **ClientDetail** (`/owner/clients/:clientId`)
+   - Visit History section → click any appointment row → navigates to `/owner/appointments/:id`
+   - Shows complete appointment history for the client
+
+**Barber Access:**
+1. **BarberToday** (`/barber/today`)
+   - Click any appointment row → navigates to `/barber/appointments/:id`
+   - Only shows appointments where `barber_id = current_user.id`
+   - Hover effect on rows for visual feedback
+
+#### Products CMS Accessible From:
+
+**Owner Navigation Bar:**
+- Header navigation includes "Products" link
+- Navigation order: Today | Appointments | Clients | Barbers | Services | **Products** | Settings
+- Available on all owner pages via header
+
+#### ClientDetail Accessible From:
+
+**Owner:**
+1. **OwnerClients** (`/owner/clients`)
+   - Click any client row → navigates to `/owner/clients/:id`
+   - "View" button → navigates to `/owner/clients/:id`
+   - Search by name or phone
+
+### AppointmentDetail Features
+
+The AppointmentDetail component is shared between owner and barber routes with role-based feature visibility:
+
+**Common Features (Owner & Barber):**
+- View full appointment information
+- Client details with phone link
+- Service and barber information
+- Status management (Mark Completed, Mark No-Show, Cancel)
+- Actual duration tracking
+- Transformation photo upload (50MB limit, completed appointments only)
+
+**Owner-Only Features:**
+- Products section (add/remove products with live totals)
+- Payment recording UI
+- Full payment math with tax, tips, processing fees
+- Payment summary display
+
+**Barber Restrictions:**
+- Cannot see products section
+- Cannot record payments
+- Can only access appointments where they are assigned
+
+### Image Upload Limits
+
+**Unified 50MB Limit Across All Features:**
+
+1. **Services** (`/owner/services`)
+   - ServiceModal file upload: 50MB max
+   - Error: "File size must be less than 50MB"
+   - Formats: JPG, JPEG, PNG, WEBP
+
+2. **Products** (`/owner/products`)
+   - ProductModal file upload: 50MB max
+   - Error: "File size must be less than 50MB"
+   - Formats: JPG, JPEG, PNG, WEBP
+
+3. **Transformation Photos** (AppointmentDetail)
+   - File upload: 50MB max
+   - Error: "File size must be less than 50MB"
+   - Formats: JPG, JPEG, PNG, WEBP
+   - Only for completed appointments
+
+### OwnerAppointments Page Features
+
+The `/owner/appointments` page provides comprehensive appointment management:
+
+**Filters:**
+- **Status Filter:** All Statuses / Booked / Completed / No-Show / Cancelled
+- **Date Filter:** All Time / Today / Next 7 Days / Last 30 Days
+
+**Table Columns:**
+- Date/Time (formatted based on language)
+- Barber (shows "Unassigned" if no barber)
+- Client (full name)
+- Service (language-aware name)
+- Status (colored badge)
+- Payment (Paid/Unpaid badge with color)
+- Actions (View button)
+
+**Behavior:**
+- Sorted by `scheduled_start` descending (newest first)
+- Real-time filtering without page reload
+- Status badges use consistent colors:
+  - Completed: Green (#d4edda)
+  - Booked: Yellow (#fff3cd)
+  - No-show: Red (#f8d7da)
+  - Cancelled: Red (#f8d7da)
+- Payment badges:
+  - Paid: Green (#d4edda)
+  - Unpaid: Red (#f8d7da)
+
+---
+
 ## Summary
 
 ### ✅ Implemented Features
