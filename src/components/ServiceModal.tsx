@@ -30,6 +30,9 @@ export default function ServiceModal({ service, onClose, onSuccess }: Props) {
   const [imageUrl, setImageUrl] = useState('');
   const [active, setActive] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const { language, t } = useLanguage();
 
   useEffect(() => {
@@ -44,6 +47,102 @@ export default function ServiceModal({ service, onClose, onSuccess }: Props) {
       setActive(service.active);
     }
   }, [service]);
+
+  const handleImageUpload = async () => {
+    if (!selectedFile) {
+      alert(language === 'en' ? 'Please select a file first' : 'Por favor selecciona un archivo primero');
+      return;
+    }
+
+    if (selectedFile.size > 5 * 1024 * 1024) {
+      alert(language === 'en' ? 'File size must be less than 5MB' : 'El tamaño del archivo debe ser menor a 5MB');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const fileId = service?.id || crypto.randomUUID();
+      const timestamp = Date.now();
+      const filePath = `services/${fileId}/${timestamp}_${selectedFile.name}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('service-images')
+        .upload(filePath, selectedFile, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('service-images')
+        .getPublicUrl(filePath);
+
+      setImageUrl(publicUrl);
+      setSelectedFile(null);
+      alert(language === 'en' ? 'Image uploaded successfully!' : '¡Imagen subida exitosamente!');
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      alert(language === 'en' ? 'Error uploading image' : 'Error al subir imagen');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!service) return;
+
+    setDeleting(true);
+    try {
+      const { count, error: countError } = await supabase
+        .from('appointments')
+        .select('*', { count: 'exact', head: true })
+        .eq('service_id', service.id);
+
+      if (countError) throw countError;
+
+      if (count && count > 0) {
+        alert(
+          language === 'en'
+            ? 'This service has been used in past appointments and cannot be deleted. You can deactivate it instead to hide it from booking.'
+            : 'Este servicio ha sido usado en citas anteriores y no puede ser eliminado. Puedes desactivarlo en su lugar para ocultarlo de las reservas.'
+        );
+        setDeleting(false);
+        return;
+      }
+
+      const confirmed = confirm(
+        language === 'en'
+          ? 'Are you sure you want to permanently delete this service? This cannot be undone.'
+          : '¿Estás seguro de que quieres eliminar permanentemente este servicio? Esto no se puede deshacer.'
+      );
+
+      if (!confirmed) {
+        setDeleting(false);
+        return;
+      }
+
+      const { error: deleteError } = await supabase
+        .from('services')
+        .delete()
+        .eq('id', service.id);
+
+      if (deleteError) throw deleteError;
+
+      alert(
+        language === 'en'
+          ? 'Service deleted successfully!'
+          : '¡Servicio eliminado exitosamente!'
+      );
+      onSuccess();
+      onClose();
+    } catch (error) {
+      console.error('Error deleting service:', error);
+      alert(language === 'en' ? 'Error deleting service' : 'Error al eliminar servicio');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!nameEn || !price || !duration) {
@@ -207,8 +306,63 @@ export default function ServiceModal({ service, onClose, onSuccess }: Props) {
             value={imageUrl}
             onChange={(e) => setImageUrl(e.target.value)}
             placeholder="https://..."
-            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+            style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', marginBottom: '0.5rem' }}
           />
+
+          <div style={{ marginTop: '0.5rem', padding: '1rem', backgroundColor: '#f9f9f9', borderRadius: '4px' }}>
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '13px', fontWeight: '500' }}>
+                  {language === 'en' ? 'Or upload from device:' : 'O subir desde dispositivo:'}
+                </label>
+                <input
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.webp"
+                  onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                  style={{ fontSize: '13px' }}
+                />
+                <button
+                  onClick={handleImageUpload}
+                  disabled={uploading || !selectedFile}
+                  style={{
+                    marginTop: '0.5rem',
+                    padding: '6px 12px',
+                    backgroundColor: uploading ? '#ccc' : '#000',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: (uploading || !selectedFile) ? 'not-allowed' : 'pointer',
+                    fontSize: '12px',
+                  }}
+                >
+                  {uploading ? (language === 'en' ? 'Uploading...' : 'Subiendo...') : (language === 'en' ? 'Upload Image' : 'Subir Imagen')}
+                </button>
+                <div style={{ marginTop: '0.25rem', fontSize: '11px', color: '#666' }}>
+                  {language === 'en' ? 'Max 5MB. JPG, PNG, WEBP' : 'Máx 5MB. JPG, PNG, WEBP'}
+                </div>
+              </div>
+
+              <div style={{ width: '120px' }}>
+                <div style={{ fontSize: '13px', fontWeight: '500', marginBottom: '0.5rem' }}>
+                  {language === 'en' ? 'Preview:' : 'Vista previa:'}
+                </div>
+                {imageUrl ? (
+                  <img
+                    src={imageUrl}
+                    alt="Preview"
+                    style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px', border: '1px solid #ddd' }}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <div style={{ width: '100%', height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e9ecef', borderRadius: '4px', fontSize: '11px', color: '#6c757d', textAlign: 'center', padding: '0.5rem' }}>
+                    {language === 'en' ? 'No image yet' : 'Sin imagen'}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
 
         <div style={{ marginBottom: '1.5rem' }}>
@@ -225,36 +379,59 @@ export default function ServiceModal({ service, onClose, onSuccess }: Props) {
           </label>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-          <button
-            onClick={onClose}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: '#f5f5f5',
-              color: '#000',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '14px',
-            }}
-          >
-            {t.cancel}
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: '#000',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: saving ? 'not-allowed' : 'pointer',
-              fontSize: '14px',
-            }}
-          >
-            {saving ? t.loading : t.save}
-          </button>
+        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'space-between' }}>
+          <div>
+            {isEdit && (
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: deleting ? '#ccc' : '#dc3545',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: deleting ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                }}
+              >
+                {deleting
+                  ? (language === 'en' ? 'Deleting...' : 'Eliminando...')
+                  : (language === 'en' ? 'Delete Service' : 'Eliminar Servicio')}
+              </button>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button
+              onClick={onClose}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: '#f5f5f5',
+                color: '#000',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '14px',
+              }}
+            >
+              {t.cancel}
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: '#000',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: saving ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+              }}
+            >
+              {saving ? t.loading : t.save}
+            </button>
+          </div>
         </div>
       </div>
     </div>

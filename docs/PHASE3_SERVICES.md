@@ -423,6 +423,211 @@ const { error } = await supabase
 
 ---
 
+## Image Uploads
+
+### Owner-Friendly Image Management
+
+**Feature:** Owners can now upload service images directly from their device, in addition to pasting image URLs.
+
+#### Storage Setup
+- **Bucket:** `service-images` (Supabase Storage)
+- **Access:** Public read access for future client-facing displays
+- **Path Structure:** `services/{serviceId}/{timestamp}_{filename}`
+
+#### UI Enhancements in ServiceModal
+
+**Image URL Field (Retained):**
+- Text input for pasting external image URLs
+- Still works as before for stock photos or CDN images
+
+**New Upload Section:**
+- **File input** - Accepts `.jpg`, `.jpeg`, `.png`, `.webp`
+- **Upload button** - Disabled until file is selected
+- **Size limit** - 5MB maximum (client-side validation)
+- **Preview area** - Shows thumbnail when image_url is set
+- **Fallback** - "No image yet" placeholder when no image
+
+#### Upload Workflow
+
+1. **Select File:**
+   - Owner clicks file input
+   - Selects image from device
+   - File name appears in input
+
+2. **Upload Image:**
+   - Owner clicks "Upload Image" button
+   - Button shows "Uploading..." and disables
+   - Image uploads to `service-images` bucket
+   - On success:
+     - Public URL retrieved from Supabase
+     - `image_url` field auto-populated
+     - Preview updates with uploaded image
+     - Success message displayed
+     - Button re-enables
+
+3. **Manual URL:**
+   - Owner can still manually edit `image_url` field
+   - Preview updates in real-time as URL changes
+   - Both methods work seamlessly together
+
+#### File Validation
+- **Formats:** JPG, JPEG, PNG, WEBP only
+- **Size:** 5MB maximum
+- **Client-side:** Immediate feedback on invalid files
+- **Error handling:** Friendly messages for upload failures
+
+#### Preview Behavior
+- **With image:** Shows 120×80px thumbnail
+- **Without image:** Shows gray placeholder
+- **Error handling:** Image errors hide broken image icon
+- **Real-time:** Updates immediately when image_url changes
+
+#### Use Cases
+
+**Upload from device:**
+```typescript
+// 1. Owner selects file from computer
+// 2. Clicks "Upload Image"
+// 3. File uploads to: service-images/services/{uuid}/1701234567890_haircut.jpg
+// 4. image_url set to: https://xxx.supabase.co/storage/v1/object/public/service-images/...
+// 5. Preview shows uploaded image
+```
+
+**Paste external URL:**
+```typescript
+// 1. Owner pastes: https://pexels.com/photo/barber-shop.jpg
+// 2. Preview immediately shows pexels image
+// 3. Saves directly to services.image_url
+```
+
+**Limitations:**
+- No image editing/cropping (use external tools first)
+- No bulk upload (one image per service)
+- No image library/gallery (each upload is independent)
+
+---
+
+## Deletion Rules
+
+### Safe Hard Delete for Services
+
+**Feature:** Services can now be permanently deleted, but ONLY if they have never been used in any appointment.
+
+#### Deletion Logic
+
+**Check for Usage:**
+1. When "Delete Service" clicked
+2. System queries appointments table
+3. Counts rows where `service_id = this service's id`
+
+**If service HAS appointments (count > 0):**
+- ❌ Deletion blocked
+- Shows message: "This service has been used in past appointments and cannot be deleted. You can deactivate it instead to hide it from booking."
+- Service remains in database
+- Owner must use Deactivate instead
+
+**If service has NO appointments (count = 0):**
+- ✅ Deletion allowed
+- Shows confirmation: "Are you sure you want to permanently delete this service? This cannot be undone."
+- If confirmed: Service hard deleted from database
+- Modal closes, list refreshes
+- Service completely removed
+
+#### UI Implementation
+
+**Delete Button:**
+- **Location:** Bottom-left of ServiceModal
+- **Appearance:** Red danger button
+- **Label:** "Delete Service" / "Eliminar Servicio"
+- **Visibility:** Only shown when editing EXISTING service (has id)
+- **Hidden:** When creating new service (no id yet)
+
+**Button States:**
+- **Normal:** Red background, enabled
+- **Deleting:** Gray background, disabled, shows "Deleting..."
+- **No appointments:** Proceeds to confirmation
+- **Has appointments:** Shows blocking message
+
+#### Workflow Examples
+
+**Example 1: Service with appointments**
+```
+Service: "Regular Haircut" (8 appointments)
+1. Owner clicks "Delete Service"
+2. System checks: COUNT(*) = 8
+3. Alert: "This service has been used in past appointments..."
+4. Deletion blocked
+5. Service remains, owner can Deactivate instead
+```
+
+**Example 2: Service without appointments**
+```
+Service: "Deluxe Haircut" (0 appointments)
+1. Owner clicks "Delete Service"
+2. System checks: COUNT(*) = 0
+3. Confirm: "Are you sure you want to permanently delete..."
+4. Owner confirms
+5. Service deleted from database
+6. Modal closes, list refreshes
+7. Service gone permanently
+```
+
+#### Safety Features
+
+**Appointment History Check:**
+- Queries database before any deletion
+- Prevents accidental data loss
+- Preserves appointment history integrity
+
+**Confirmation Dialog:**
+- Double-check for irreversible action
+- Clear warning: "This cannot be undone"
+- Cancel option available
+
+**Error Handling:**
+- Database errors caught gracefully
+- Friendly error messages shown
+- App doesn't crash on failure
+
+#### Deactivate vs Delete
+
+**Deactivate (Existing feature):**
+- Service stays in database
+- Marked as `active = false`
+- Hidden from /book and New Appointment
+- Existing appointments unchanged
+- Can be reactivated later
+- **Use when:** Service has appointment history
+
+**Delete (New feature):**
+- Service removed from database
+- Permanent, cannot be undone
+- Only works if no appointments ever used it
+- Completely erases service record
+- **Use when:** Service was created by mistake, never used
+
+#### Test Scenarios
+
+**✅ Tested - Service WITH appointments:**
+- Service: "Regular Haircut" (8 appointments)
+- Delete clicked → Blocked with message
+- Service remains in list
+- Deactivate still works
+
+**✅ Tested - Service WITHOUT appointments:**
+- Service: "Deluxe Haircut" (0 appointments)
+- Delete clicked → Confirmation shown
+- Confirmed → Service deleted
+- List refreshes, service gone
+
+**✅ Tested - Error handling:**
+- Network errors caught
+- Database errors handled
+- Friendly error messages
+- App remains stable
+
+---
+
 ## Breaking Changes
 
 **None.** Phase 3 is fully backward compatible.
@@ -443,9 +648,11 @@ const { error } = await supabase
 - Complete Services CRUD UI
 - Service modal with validation
 - Active/inactive status management
+- **Image uploads** - Direct device upload or URL paste
+- **Safe hard delete** - Only for services with no appointment history
 - Integration with /book flow
 - Integration with New Appointment modal
-- No hard deletes (deactivate only)
+- Deactivate for services with history
 - Bilingual support (EN/ES)
 
 ### ✅ Maintained
@@ -456,8 +663,12 @@ const { error } = await supabase
 - Availability slot calculation
 
 ### ✅ Verified
-- Build passes (4.01s)
+- Build passes (4.05s)
 - All services CRUD operations work
+- **Image upload** works with 5MB validation
+- **Image preview** updates in real-time
+- **Safe delete** blocks services with appointments
+- **Safe delete** allows deletion of unused services
 - Active-only filtering in booking flows
 - Duration affects appointment scheduling
 - No breaking changes
