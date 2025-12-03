@@ -25,6 +25,8 @@ export default function BarberPermissionsModal({
   const [canViewShopReports, setCanViewShopReports] = useState(false);
   const [canManageServices, setCanManageServices] = useState(false);
   const [canManageProducts, setCanManageProducts] = useState(false);
+  const [canManageAppointments, setCanManageAppointments] = useState(false);
+  const [canManageClients, setCanManageClients] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -46,12 +48,14 @@ export default function BarberPermissionsModal({
       setName(data.name || '');
       setEmail(data.email || '');
       setPhone(data.phone || '');
-      setPreferredLanguage(data.preferred_language || 'en');
+      setPreferredLanguage(data.language || 'en');
       setActive(data.active ?? true);
       setCanViewOwnStats(data.can_view_own_stats ?? false);
       setCanViewShopReports(data.can_view_shop_reports ?? false);
       setCanManageServices(data.can_manage_services ?? false);
       setCanManageProducts(data.can_manage_products ?? false);
+      setCanManageAppointments(data.can_manage_appointments ?? false);
+      setCanManageClients(data.can_manage_clients ?? false);
     } catch (err: any) {
       console.error('Error loading barber data:', err);
       setError(err.message);
@@ -82,12 +86,14 @@ export default function BarberPermissionsModal({
           name: name.trim(),
           email: email.trim(),
           phone: phone.trim() || null,
-          preferred_language: preferredLanguage,
+          language: preferredLanguage,
           active,
           can_view_own_stats: canViewOwnStats,
           can_view_shop_reports: canViewShopReports,
           can_manage_services: canManageServices,
           can_manage_products: canManageProducts,
+          can_manage_appointments: canManageAppointments,
+          can_manage_clients: canManageClients,
         })
         .eq('id', barberId);
 
@@ -342,6 +348,26 @@ export default function BarberPermissionsModal({
                     style={{ marginRight: '0.75rem', width: '16px', height: '16px', cursor: 'pointer' }}
                   />
                   <span>{language === 'en' ? 'Can manage products' : 'Puede gestionar productos'}</span>
+                </label>
+
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={canManageAppointments}
+                    onChange={(e) => setCanManageAppointments(e.target.checked)}
+                    style={{ marginRight: '0.75rem', width: '16px', height: '16px', cursor: 'pointer' }}
+                  />
+                  <span>{language === 'en' ? 'Can manage appointments (edit/delete any)' : 'Puede gestionar citas (editar/eliminar cualquiera)'}</span>
+                </label>
+
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={canManageClients}
+                    onChange={(e) => setCanManageClients(e.target.checked)}
+                    style={{ marginRight: '0.75rem', width: '16px', height: '16px', cursor: 'pointer' }}
+                  />
+                  <span>{language === 'en' ? 'Can manage clients (add/edit/delete)' : 'Puede gestionar clientes (agregar/editar/eliminar)'}</span>
                 </label>
               </div>
             </div>

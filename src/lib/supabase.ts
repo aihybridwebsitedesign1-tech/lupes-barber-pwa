@@ -27,6 +27,8 @@ export type Database = {
           can_manage_products: boolean;
           can_manage_barbers: boolean;
           can_manage_schedules: boolean;
+          can_manage_appointments: boolean;
+          can_manage_clients: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -39,6 +41,8 @@ export type Database = {
           phone: string;
           email: string | null;
           language: 'en' | 'es';
+          notes: string;
+          is_deleted: boolean;
           created_at: string;
           updated_at: string;
         };

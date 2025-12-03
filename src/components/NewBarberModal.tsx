@@ -66,11 +66,13 @@ export default function NewBarberModal({ onClose, onSave }: NewBarberModalProps)
           phone: phone.trim() || null,
           role: 'BARBER',
           active,
-          preferred_language: preferredLanguage,
+          language: preferredLanguage,
           can_view_own_stats: canViewOwnStats,
           can_view_shop_reports: canViewShopReports,
           can_manage_services: canManageServices,
           can_manage_products: canManageProducts,
+          can_manage_appointments: false,
+          can_manage_clients: false,
         });
 
         if (insertError) throw insertError;
