@@ -20,6 +20,7 @@ export default function PaymentModal({
   const { language, t } = useLanguage();
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card_in_shop' | 'card_online'>('cash');
   const [tipAmount, setTipAmount] = useState('0.00');
+  const [cashTotalCollected, setCashTotalCollected] = useState('');
   const [taxRate, setTaxRate] = useState(0);
   const [cardFeeRate, setCardFeeRate] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -77,26 +78,58 @@ export default function PaymentModal({
       return;
     }
 
+    if (paymentMethod === 'cash') {
+      const cashTotal = parseFloat(cashTotalCollected);
+      if (!cashTotalCollected || isNaN(cashTotal) || cashTotal < 0) {
+        setError(
+          language === 'en'
+            ? 'Cash total collected is required and must be >= 0'
+            : 'El total de efectivo recolectado es requerido y debe ser >= 0'
+        );
+        return;
+      }
+    }
+
     setSaving(true);
     setError('');
 
     try {
-      const { error: updateError } = await supabase
-        .from('appointments')
-        .update({
-          services_total: servicesTotal,
-          products_total: productsTotal,
-          tax_amount: totals.taxAmount,
-          tip_amount: totals.tip,
-          processing_fee_amount: totals.processingFeeAmount,
-          total_charged: totals.totalCharged,
-          net_revenue: totals.netRevenue,
-          payment_method: paymentMethod,
-          paid_at: new Date().toISOString(),
-        })
-        .eq('id', appointmentId);
+      if (paymentMethod === 'cash') {
+        const cashTotal = parseFloat(cashTotalCollected);
+        const { error: updateError } = await supabase
+          .from('appointments')
+          .update({
+            services_total: servicesTotal,
+            products_total: productsTotal,
+            tax_amount: totals.taxAmount,
+            tip_amount: tip,
+            processing_fee_amount: 0,
+            total_charged: cashTotal,
+            net_revenue: cashTotal,
+            payment_method: 'cash',
+            paid_at: new Date().toISOString(),
+          })
+          .eq('id', appointmentId);
 
-      if (updateError) throw updateError;
+        if (updateError) throw updateError;
+      } else {
+        const { error: updateError } = await supabase
+          .from('appointments')
+          .update({
+            services_total: servicesTotal,
+            products_total: productsTotal,
+            tax_amount: totals.taxAmount,
+            tip_amount: totals.tip,
+            processing_fee_amount: totals.processingFeeAmount,
+            total_charged: totals.totalCharged,
+            net_revenue: totals.netRevenue,
+            payment_method: paymentMethod,
+            paid_at: new Date().toISOString(),
+          })
+          .eq('id', appointmentId);
+
+        if (updateError) throw updateError;
+      }
 
       onSave();
     } catch (err: any) {
@@ -164,6 +197,29 @@ export default function PaymentModal({
           </select>
         </div>
 
+        {paymentMethod === 'cash' && (
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
+              {language === 'en' ? 'Cash Total Collected (including tip)' : 'Total de Efectivo Cobrado (incluye propina)'}
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={cashTotalCollected}
+              onChange={(e) => setCashTotalCollected(e.target.value)}
+              placeholder="0.00"
+              style={{
+                width: '100%',
+                padding: '10px',
+                border: '2px solid #ddd',
+                borderRadius: '6px',
+                fontSize: '14px',
+              }}
+            />
+          </div>
+        )}
+
         <div style={{ marginBottom: '1.5rem' }}>
           <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
             {language === 'en' ? 'Tip Amount' : 'Monto de Propina'}
@@ -182,6 +238,11 @@ export default function PaymentModal({
               fontSize: '14px',
             }}
           />
+          {paymentMethod === 'cash' && (
+            <div style={{ marginTop: '0.5rem', fontSize: '12px', color: '#666' }}>
+              {language === 'en' ? '(For breakdown reference only)' : '(Solo para referencia del desglose)'}
+            </div>
+          )}
         </div>
 
         <div
