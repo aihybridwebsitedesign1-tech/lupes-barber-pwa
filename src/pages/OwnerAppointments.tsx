@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
 import Header from '../components/Header';
 
 type Appointment = {
@@ -18,9 +19,11 @@ type Appointment = {
 export default function OwnerAppointments() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('all');
   const { language, t } = useLanguage();
+  const { userData } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -89,6 +92,84 @@ export default function OwnerAppointments() {
       console.error('Error loading appointments:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteAppointment = async (apt: Appointment) => {
+    if (userData?.role !== 'OWNER') {
+      alert(language === 'en' ? 'Only the owner can delete appointments' : 'Solo el propietario puede eliminar citas');
+      return;
+    }
+
+    if (apt.status === 'completed' || apt.paid_at) {
+      alert(
+        language === 'en'
+          ? 'Completed or paid appointments cannot be deleted. Mark them as cancelled instead.'
+          : 'Las citas completadas o pagadas no se pueden eliminar. Márcalas como canceladas en su lugar.'
+      );
+      return;
+    }
+
+    const confirmed = confirm(
+      language === 'en'
+        ? 'Delete this appointment? This will remove it and any associated products and transformation photos. This cannot be undone.'
+        : '¿Eliminar esta cita? Esto la eliminará junto con cualquier producto y foto de transformación asociada. Esto no se puede deshacer.'
+    );
+
+    if (!confirmed) return;
+
+    setDeleting(apt.id);
+    try {
+      const { error: productsError } = await supabase
+        .from('appointment_products')
+        .delete()
+        .eq('appointment_id', apt.id);
+      if (productsError) throw productsError;
+
+      const { data: photos, error: photosSelectError } = await supabase
+        .from('transformation_photos')
+        .select('id, image_url')
+        .eq('appointment_id', apt.id);
+
+      if (!photosSelectError && photos && photos.length > 0) {
+        for (const photo of photos) {
+          try {
+            const imagePath = photo.image_url.split('/').pop();
+            if (imagePath) {
+              await supabase.storage
+                .from('transformation-photos')
+                .remove([`appointments/${apt.id}/${imagePath}`]);
+            }
+          } catch (storageErr) {
+            console.warn('Could not delete photo file:', storageErr);
+          }
+        }
+
+        const { error: photosDeleteError } = await supabase
+          .from('transformation_photos')
+          .delete()
+          .eq('appointment_id', apt.id);
+        if (photosDeleteError) throw photosDeleteError;
+      }
+
+      const { error: appointmentError } = await supabase
+        .from('appointments')
+        .delete()
+        .eq('id', apt.id);
+      if (appointmentError) throw appointmentError;
+
+      setAppointments((prev) => prev.filter((a) => a.id !== apt.id));
+
+      alert(language === 'en' ? 'Appointment deleted successfully!' : '¡Cita eliminada exitosamente!');
+    } catch (error: any) {
+      console.error('Error deleting appointment:', error);
+      alert(
+        language === 'en'
+          ? `Error deleting appointment: ${error.message || 'Unknown error'}`
+          : `Error al eliminar cita: ${error.message || 'Error desconocido'}`
+      );
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -255,20 +336,43 @@ export default function OwnerAppointments() {
                         </span>
                       </td>
                       <td style={{ padding: '1rem', fontSize: '14px' }}>
-                        <button
-                          onClick={() => navigate(`/owner/appointments/${apt.id}`)}
-                          style={{
-                            padding: '6px 12px',
-                            backgroundColor: '#000',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '12px',
-                          }}
-                        >
-                          {language === 'en' ? 'View' : 'Ver'}
-                        </button>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button
+                            onClick={() => navigate(`/owner/appointments/${apt.id}`)}
+                            style={{
+                              padding: '6px 12px',
+                              backgroundColor: '#000',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                            }}
+                          >
+                            {language === 'en' ? 'View' : 'Ver'}
+                          </button>
+                          {userData?.role === 'OWNER' && apt.status !== 'completed' && !apt.paid_at && (
+                            <button
+                              onClick={() => handleDeleteAppointment(apt)}
+                              disabled={deleting === apt.id}
+                              style={{
+                                padding: '6px 12px',
+                                backgroundColor: deleting === apt.id ? '#ccc' : '#dc3545',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: deleting === apt.id ? 'not-allowed' : 'pointer',
+                                fontSize: '12px',
+                              }}
+                            >
+                              {deleting === apt.id
+                                ? '...'
+                                : language === 'en'
+                                ? 'Delete'
+                                : 'Eliminar'}
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

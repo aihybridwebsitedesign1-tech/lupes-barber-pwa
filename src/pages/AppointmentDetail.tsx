@@ -292,6 +292,83 @@ export default function AppointmentDetail() {
     }
   };
 
+  const handleDeleteAppointment = async () => {
+    if (userData?.role !== 'OWNER') {
+      alert(language === 'en' ? 'Only the owner can delete appointments' : 'Solo el propietario puede eliminar citas');
+      return;
+    }
+
+    if (appointment?.status === 'completed' || appointment?.paid_at) {
+      alert(
+        language === 'en'
+          ? 'Completed or paid appointments cannot be deleted. Mark them as cancelled instead.'
+          : 'Las citas completadas o pagadas no se pueden eliminar. Márcalas como canceladas en su lugar.'
+      );
+      return;
+    }
+
+    const confirmed = confirm(
+      language === 'en'
+        ? 'Delete this appointment? This will remove it and any associated products and transformation photos. This cannot be undone.'
+        : '¿Eliminar esta cita? Esto la eliminará junto con cualquier producto y foto de transformación asociada. Esto no se puede deshacer.'
+    );
+
+    if (!confirmed) return;
+
+    setSaving(true);
+    try {
+      const { error: productsError } = await supabase
+        .from('appointment_products')
+        .delete()
+        .eq('appointment_id', appointmentId);
+      if (productsError) throw productsError;
+
+      const { data: photos, error: photosSelectError } = await supabase
+        .from('transformation_photos')
+        .select('id, image_url')
+        .eq('appointment_id', appointmentId);
+
+      if (!photosSelectError && photos && photos.length > 0) {
+        for (const photo of photos) {
+          try {
+            const imagePath = photo.image_url.split('/').pop();
+            if (imagePath) {
+              await supabase.storage
+                .from('transformation-photos')
+                .remove([`appointments/${appointmentId}/${imagePath}`]);
+            }
+          } catch (storageErr) {
+            console.warn('Could not delete photo file:', storageErr);
+          }
+        }
+
+        const { error: photosDeleteError } = await supabase
+          .from('transformation_photos')
+          .delete()
+          .eq('appointment_id', appointmentId);
+        if (photosDeleteError) throw photosDeleteError;
+      }
+
+      const { error: appointmentError } = await supabase
+        .from('appointments')
+        .delete()
+        .eq('id', appointmentId);
+      if (appointmentError) throw appointmentError;
+
+      alert(language === 'en' ? 'Appointment deleted successfully!' : '¡Cita eliminada exitosamente!');
+      navigate('/owner/appointments');
+    } catch (error: any) {
+      console.error('Error deleting appointment:', error);
+      alert(
+        language === 'en'
+          ? `Error deleting appointment: ${error.message || 'Unknown error'}`
+          : `Error al eliminar cita: ${error.message || 'Error desconocido'}`
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleUploadPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !appointment || !user) return;
@@ -897,6 +974,49 @@ export default function AppointmentDetail() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {userData?.role === 'OWNER' && appointment?.status !== 'completed' && !appointment?.paid_at && (
+          <div
+            style={{
+              backgroundColor: 'white',
+              padding: '2rem',
+              borderRadius: '8px',
+              marginTop: '2rem',
+              border: '2px solid #dc3545',
+            }}
+          >
+            <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '0.5rem', color: '#dc3545' }}>
+              {language === 'en' ? 'Danger Zone' : 'Zona de Peligro'}
+            </h3>
+            <p style={{ fontSize: '14px', color: '#666', marginBottom: '1rem' }}>
+              {language === 'en'
+                ? 'Delete this appointment permanently. This cannot be undone.'
+                : 'Eliminar esta cita permanentemente. Esto no se puede deshacer.'}
+            </p>
+            <button
+              onClick={handleDeleteAppointment}
+              disabled={saving}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: saving ? '#ccc' : '#dc3545',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: saving ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+              }}
+            >
+              {saving
+                ? language === 'en'
+                  ? 'Deleting...'
+                  : 'Eliminando...'
+                : language === 'en'
+                ? 'Delete Appointment'
+                : 'Eliminar Cita'}
+            </button>
           </div>
         )}
       </main>

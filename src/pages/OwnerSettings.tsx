@@ -218,19 +218,95 @@ export default function OwnerSettings() {
 
     setDeleting(true);
     try {
-      await supabase.from('transformation_photos').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await supabase.from('appointment_products').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await supabase.from('appointments').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await supabase.from('client_notes').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await supabase.from('clients').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await supabase.from('barber_time_off').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await supabase.from('barber_schedules').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      console.log('Starting delete all data operation...');
+
+      const { error: appointmentProductsError } = await supabase
+        .from('appointment_products')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+      if (appointmentProductsError) {
+        console.error('Error deleting appointment_products:', appointmentProductsError);
+        throw appointmentProductsError;
+      }
+      console.log('Deleted appointment_products');
+
+      const { error: transformationPhotosError } = await supabase
+        .from('transformation_photos')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+      if (transformationPhotosError) {
+        console.error('Error deleting transformation_photos:', transformationPhotosError);
+        throw transformationPhotosError;
+      }
+      console.log('Deleted transformation_photos');
+
+      const { error: timeOffError } = await supabase
+        .from('barber_time_off')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+      if (timeOffError) {
+        console.error('Error deleting barber_time_off:', timeOffError);
+        throw timeOffError;
+      }
+      console.log('Deleted barber_time_off');
+
+      const { error: schedulesError } = await supabase
+        .from('barber_schedules')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+      if (schedulesError) {
+        console.error('Error deleting barber_schedules:', schedulesError);
+        throw schedulesError;
+      }
+      console.log('Deleted barber_schedules');
+
+      const { error: clientNotesError } = await supabase
+        .from('client_notes')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+      if (clientNotesError && clientNotesError.code !== 'PGRST116') {
+        console.error('Error deleting client_notes:', clientNotesError);
+        throw clientNotesError;
+      }
+      console.log('Deleted client_notes (or table does not exist)');
+
+      const { error: appointmentsError } = await supabase
+        .from('appointments')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+      if (appointmentsError) {
+        console.error('Error deleting appointments:', appointmentsError);
+        throw appointmentsError;
+      }
+      console.log('Deleted appointments');
+
+      const { error: clientsError } = await supabase
+        .from('clients')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+      if (clientsError) {
+        console.error('Error deleting clients:', clientsError);
+        throw clientsError;
+      }
+      console.log('Deleted clients');
 
       try {
-        const { data: files } = await supabase.storage.from('transformation-photos').list('appointments');
-        if (files && files.length > 0) {
+        const { data: files, error: listError } = await supabase.storage
+          .from('transformation-photos')
+          .list('appointments');
+
+        if (listError) {
+          console.warn('Could not list storage files:', listError);
+        } else if (files && files.length > 0) {
           const filePaths = files.map((file) => `appointments/${file.name}`);
-          await supabase.storage.from('transformation-photos').remove(filePaths);
+          const { error: removeError } = await supabase.storage
+            .from('transformation-photos')
+            .remove(filePaths);
+          if (removeError) {
+            console.warn('Some storage files could not be removed:', removeError);
+          } else {
+            console.log('Deleted transformation photo files from storage');
+          }
         }
       } catch (storageError) {
         console.warn('Storage cleanup encountered errors:', storageError);
@@ -243,9 +319,13 @@ export default function OwnerSettings() {
       );
       setShowDeleteModal(false);
       setDeleteConfirmText('');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting data:', error);
-      alert(language === 'en' ? 'Error deleting data' : 'Error al eliminar datos');
+      alert(
+        language === 'en'
+          ? `Error deleting data: ${error.message || 'Unknown error'}`
+          : `Error al eliminar datos: ${error.message || 'Error desconocido'}`
+      );
     } finally {
       setDeleting(false);
     }
