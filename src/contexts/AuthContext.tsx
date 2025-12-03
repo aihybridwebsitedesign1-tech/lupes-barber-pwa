@@ -9,6 +9,7 @@ interface AuthContextType {
   user: SupabaseUser | null;
   userData: UserData | null;
   loading: boolean;
+  error: string | null;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -19,6 +20,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -54,9 +56,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .maybeSingle();
 
       if (error) throw error;
-      setUserData(data);
+
+      if (!data) {
+        setError('User account exists but no profile found. Please contact support.');
+        setUserData(null);
+      } else {
+        setUserData(data);
+        setError(null);
+      }
     } catch (error) {
       console.error('Error loading user data:', error);
+      setError('Failed to load user profile');
+      setUserData(null);
     } finally {
       setLoading(false);
     }
@@ -73,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, userData, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, userData, loading, error, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

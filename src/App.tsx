@@ -11,10 +11,22 @@ import BarberToday from './pages/BarberToday';
 import Book from './pages/Book';
 
 function ProtectedRoute({ children, allowedRole }: { children: JSX.Element; allowedRole?: 'OWNER' | 'BARBER' }) {
-  const { user, userData, loading } = useAuth();
+  const { user, userData, loading, error } = useAuth();
 
   if (loading) {
     return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading...</div>;
+  }
+
+  if (error) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+        <div style={{ maxWidth: '400px', textAlign: 'center' }}>
+          <h2 style={{ color: '#dc3545', marginBottom: '1rem' }}>Authentication Error</h2>
+          <p style={{ marginBottom: '1rem' }}>{error}</p>
+          <a href="/login" style={{ color: '#0066cc' }}>Return to Login</a>
+        </div>
+      </div>
+    );
   }
 
   if (!user || !userData) {
