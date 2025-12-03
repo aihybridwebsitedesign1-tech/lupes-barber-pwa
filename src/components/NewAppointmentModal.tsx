@@ -100,12 +100,30 @@ export default function NewAppointmentModal({ onClose, onSuccess }: Props) {
     setLoading(true);
     try {
       const service = services.find(s => s.id === selectedService);
-      if (!service) return;
+      if (!service) {
+        alert('Service not found');
+        setLoading(false);
+        return;
+      }
 
+      // Date/Time Logic:
+      // 1. Combine the selected date (YYYY-MM-DD) and time (HH:MM) into a single Date object
+      // 2. Calculate end time by adding the service duration in minutes
+      // 3. Convert both to ISO strings for Supabase (stored as timestamptz)
       const startDateTime = new Date(`${appointmentDate}T${appointmentTime}`);
       const endDateTime = new Date(startDateTime.getTime() + service.duration_minutes * 60000);
 
-      const { error } = await supabase.from('appointments').insert({
+      console.log('Creating appointment:', {
+        client_id: selectedClient,
+        barber_id: selectedBarber,
+        service_id: selectedService,
+        scheduled_start: startDateTime.toISOString(),
+        scheduled_end: endDateTime.toISOString(),
+        date: appointmentDate,
+        time: appointmentTime
+      });
+
+      const { data, error } = await supabase.from('appointments').insert({
         client_id: selectedClient,
         barber_id: selectedBarber,
         service_id: selectedService,
@@ -120,14 +138,19 @@ export default function NewAppointmentModal({ onClose, onSuccess }: Props) {
         card_fee_amount: 0,
         total_charged: 0,
         net_revenue: 0
-      });
+      }).select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase insert error:', error);
+        throw error;
+      }
 
+      console.log('Appointment created successfully:', data);
+      alert('Appointment created successfully!');
       onSuccess();
     } catch (error) {
       console.error('Error creating appointment:', error);
-      alert('Error creating appointment');
+      alert('Error creating appointment: ' + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
       setLoading(false);
     }

@@ -29,6 +29,11 @@ export default function OwnerToday() {
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
 
+      console.log('Loading appointments for today:', {
+        today: today.toISOString(),
+        tomorrow: tomorrow.toISOString()
+      });
+
       const { data: appts, error } = await supabase
         .from('appointments')
         .select(`
@@ -44,7 +49,12 @@ export default function OwnerToday() {
         .lt('scheduled_start', tomorrow.toISOString())
         .order('scheduled_start', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error loading appointments:', error);
+        throw error;
+      }
+
+      console.log('Loaded appointments:', appts);
 
       const formattedAppts = (appts || []).map(apt => ({
         id: apt.id,
