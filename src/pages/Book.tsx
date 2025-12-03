@@ -13,18 +13,11 @@ type Service = {
   duration_minutes: number;
 };
 
-type Barber = {
-  id: string;
-  name: string;
-};
-
 export default function Book() {
   const [step, setStep] = useState(1);
   const [bookingLanguage, setBookingLanguage] = useState<Language>('en');
   const [services, setServices] = useState<Service[]>([]);
-  const [barbers, setBarbers] = useState<Barber[]>([]);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
-  const [selectedBarber, setSelectedBarber] = useState<string>('');
   const [appointmentDate, setAppointmentDate] = useState('');
   const [appointmentTime, setAppointmentTime] = useState('');
   const [firstName, setFirstName] = useState('');
@@ -44,8 +37,6 @@ export default function Book() {
   const t = bookingLanguage === 'en' ? {
     chooseLanguage: 'Choose Language',
     chooseService: 'Choose Service',
-    chooseBarber: 'Choose Barber',
-    anyBarber: 'Any Barber',
     chooseDateTime: 'Choose Date & Time',
     enterInfo: 'Enter Your Info',
     back: 'Back',
@@ -65,13 +56,10 @@ export default function Book() {
     yourAppointment: 'Your appointment has been scheduled',
     bookAnother: 'Book Another',
     service: 'Service',
-    barber: 'Barber',
     loading: 'Loading...'
   } : {
     chooseLanguage: 'Elegir Idioma',
     chooseService: 'Elegir Servicio',
-    chooseBarber: 'Elegir Barbero',
-    anyBarber: 'Cualquier Barbero',
     chooseDateTime: 'Elegir Fecha y Hora',
     enterInfo: 'Ingresa Tu Información',
     back: 'Atrás',
@@ -91,7 +79,6 @@ export default function Book() {
     yourAppointment: 'Tu cita ha sido agendada',
     bookAnother: 'Reservar Otra',
     service: 'Servicio',
-    barber: 'Barbero',
     loading: 'Cargando...'
   };
 
@@ -100,13 +87,12 @@ export default function Book() {
   }, []);
 
   const loadData = async () => {
-    const [servicesRes, barbersRes] = await Promise.all([
-      supabase.from('services').select('*').eq('active', true),
-      supabase.from('users').select('id, name').eq('role', 'BARBER').eq('active', true)
-    ]);
+    const { data: servicesData } = await supabase
+      .from('services')
+      .select('*')
+      .eq('active', true);
 
-    if (servicesRes.data) setServices(servicesRes.data);
-    if (barbersRes.data) setBarbers(barbersRes.data);
+    if (servicesData) setServices(servicesData);
   };
 
   const handleLanguageSelect = (lang: Language) => {
@@ -120,17 +106,12 @@ export default function Book() {
     setStep(3);
   };
 
-  const handleBarberSelect = (barberId: string) => {
-    setSelectedBarber(barberId || (barbers[0]?.id || ''));
-    setStep(4);
-  };
-
   const handleDateTimeConfirm = () => {
     if (!appointmentDate || !appointmentTime) {
       alert('Please select date and time');
       return;
     }
-    setStep(5);
+    setStep(4);
   };
 
   const handleConfirmBooking = async () => {
@@ -184,7 +165,7 @@ export default function Book() {
 
       const { error: aptError } = await supabase.from('appointments').insert({
         client_id: clientId,
-        barber_id: selectedBarber,
+        barber_id: null,
         service_id: selectedService.id,
         scheduled_start: startDateTime.toISOString(),
         scheduled_end: endDateTime.toISOString(),
@@ -213,7 +194,6 @@ export default function Book() {
   const resetBooking = () => {
     setStep(1);
     setSelectedService(null);
-    setSelectedBarber('');
     setAppointmentDate('');
     setAppointmentTime('');
     setFirstName('');
@@ -250,9 +230,6 @@ export default function Book() {
           <div style={{ backgroundColor: '#f9f9f9', padding: '1.5rem', borderRadius: '8px', marginBottom: '2rem', textAlign: 'left' }}>
             <p style={{ marginBottom: '0.5rem' }}>
               <strong>{t.service}:</strong> {selectedService && (bookingLanguage === 'es' ? selectedService.name_es : selectedService.name_en)}
-            </p>
-            <p style={{ marginBottom: '0.5rem' }}>
-              <strong>{t.barber}:</strong> {barbers.find(b => b.id === selectedBarber)?.name || t.anyBarber}
             </p>
             <p style={{ marginBottom: '0.5rem' }}>
               <strong>{t.date}:</strong> {formatDateTime()}
@@ -372,61 +349,6 @@ export default function Book() {
 
           {step === 3 && (
             <div>
-              <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '1.5rem' }}>{t.chooseBarber}</h2>
-              <div style={{ display: 'grid', gap: '1rem', marginBottom: '1rem' }}>
-                <button
-                  onClick={() => handleBarberSelect('')}
-                  style={{
-                    padding: '1.5rem',
-                    backgroundColor: '#f9f9f9',
-                    border: '2px solid #ddd',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontSize: '18px',
-                    fontWeight: '500',
-                    textAlign: 'left'
-                  }}
-                >
-                  {t.anyBarber}
-                </button>
-                {barbers.map(barber => (
-                  <button
-                    key={barber.id}
-                    onClick={() => handleBarberSelect(barber.id)}
-                    style={{
-                      padding: '1.5rem',
-                      backgroundColor: '#f9f9f9',
-                      border: '2px solid #ddd',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      fontSize: '18px',
-                      fontWeight: '500',
-                      textAlign: 'left'
-                    }}
-                  >
-                    {barber.name}
-                  </button>
-                ))}
-              </div>
-              <button
-                onClick={() => setStep(2)}
-                style={{
-                  padding: '12px 24px',
-                  backgroundColor: '#f5f5f5',
-                  color: '#000',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '16px'
-                }}
-              >
-                {t.back}
-              </button>
-            </div>
-          )}
-
-          {step === 4 && (
-            <div>
               <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '1.5rem' }}>{t.chooseDateTime}</h2>
               <div style={{ marginBottom: '1rem' }}>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
@@ -453,7 +375,7 @@ export default function Book() {
               </div>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button
-                  onClick={() => setStep(3)}
+                  onClick={() => setStep(2)}
                   style={{
                     padding: '12px 24px',
                     backgroundColor: '#f5f5f5',
@@ -485,7 +407,7 @@ export default function Book() {
             </div>
           )}
 
-          {step === 5 && (
+          {step === 4 && (
             <div>
               <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '1.5rem' }}>{t.enterInfo}</h2>
               <div style={{ marginBottom: '1rem' }}>
@@ -534,7 +456,7 @@ export default function Book() {
               </div>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button
-                  onClick={() => setStep(4)}
+                  onClick={() => setStep(3)}
                   style={{
                     padding: '12px 24px',
                     backgroundColor: '#f5f5f5',

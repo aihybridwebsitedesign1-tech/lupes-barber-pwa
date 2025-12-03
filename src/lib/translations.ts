@@ -60,6 +60,7 @@ export const translations = {
     name: 'Name',
     active: 'Active',
     inactive: 'Inactive',
+    unassigned: 'Unassigned',
   },
   es: {
     login: 'Iniciar Sesión',
@@ -120,6 +121,7 @@ export const translations = {
     name: 'Nombre',
     active: 'Activo',
     inactive: 'Inactivo',
+    unassigned: 'Sin Asignar',
   }
 };
 

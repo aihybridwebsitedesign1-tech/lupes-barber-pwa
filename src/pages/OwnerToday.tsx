@@ -8,7 +8,7 @@ type AppointmentWithDetails = {
   id: string;
   scheduled_start: string;
   status: string;
-  barber: { name: string };
+  barber: { name: string } | null;
   client: { first_name: string; last_name: string };
   service: { name_en: string; name_es: string };
 };
@@ -174,7 +174,7 @@ export default function OwnerToday() {
                 appointments.map((apt) => (
                   <tr key={apt.id} style={{ borderBottom: '1px solid #eee' }}>
                     <td style={{ padding: '1rem', fontSize: '14px' }}>{formatTime(apt.scheduled_start)}</td>
-                    <td style={{ padding: '1rem', fontSize: '14px' }}>{apt.barber?.name || 'N/A'}</td>
+                    <td style={{ padding: '1rem', fontSize: '14px' }}>{apt.barber?.name || t.unassigned}</td>
                     <td style={{ padding: '1rem', fontSize: '14px' }}>
                       {apt.client ? `${apt.client.first_name} ${apt.client.last_name}` : 'N/A'}
                     </td>
