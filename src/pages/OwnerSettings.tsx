@@ -218,115 +218,177 @@ export default function OwnerSettings() {
 
     setDeleting(true);
     try {
-      console.log('Starting delete all data operation...');
+      console.log('=== DeleteAllData: starting... ===');
 
+      console.log('DeleteAllData: deleting appointment_products...');
       const { error: appointmentProductsError } = await supabase
         .from('appointment_products')
         .delete()
         .neq('id', '00000000-0000-0000-0000-000000000000');
       if (appointmentProductsError) {
-        console.error('Error deleting appointment_products:', appointmentProductsError);
-        throw appointmentProductsError;
+        console.error('DeleteAllData: ERROR deleting appointment_products:', appointmentProductsError);
+        throw new Error(`Failed to delete appointment_products: ${appointmentProductsError.message}`);
       }
-      console.log('Deleted appointment_products');
+      const { count: apRemaining } = await supabase
+        .from('appointment_products')
+        .select('*', { count: 'exact', head: true });
+      console.log(`DeleteAllData: deleted from appointment_products (${apRemaining || 0} rows remaining)`);
 
+      console.log('DeleteAllData: deleting transformation_photos...');
       const { error: transformationPhotosError } = await supabase
         .from('transformation_photos')
         .delete()
         .neq('id', '00000000-0000-0000-0000-000000000000');
       if (transformationPhotosError) {
-        console.error('Error deleting transformation_photos:', transformationPhotosError);
-        throw transformationPhotosError;
+        console.error('DeleteAllData: ERROR deleting transformation_photos:', transformationPhotosError);
+        throw new Error(`Failed to delete transformation_photos: ${transformationPhotosError.message}`);
       }
-      console.log('Deleted transformation_photos');
+      const { count: tpRemaining } = await supabase
+        .from('transformation_photos')
+        .select('*', { count: 'exact', head: true });
+      console.log(`DeleteAllData: deleted from transformation_photos (${tpRemaining || 0} rows remaining)`);
 
+      console.log('DeleteAllData: deleting barber_time_off...');
       const { error: timeOffError } = await supabase
         .from('barber_time_off')
         .delete()
         .neq('id', '00000000-0000-0000-0000-000000000000');
       if (timeOffError) {
-        console.error('Error deleting barber_time_off:', timeOffError);
-        throw timeOffError;
+        console.error('DeleteAllData: ERROR deleting barber_time_off:', timeOffError);
+        throw new Error(`Failed to delete barber_time_off: ${timeOffError.message}`);
       }
-      console.log('Deleted barber_time_off');
+      const { count: btoRemaining } = await supabase
+        .from('barber_time_off')
+        .select('*', { count: 'exact', head: true });
+      console.log(`DeleteAllData: deleted from barber_time_off (${btoRemaining || 0} rows remaining)`);
 
+      console.log('DeleteAllData: deleting barber_schedules...');
       const { error: schedulesError } = await supabase
         .from('barber_schedules')
         .delete()
         .neq('id', '00000000-0000-0000-0000-000000000000');
       if (schedulesError) {
-        console.error('Error deleting barber_schedules:', schedulesError);
-        throw schedulesError;
+        console.error('DeleteAllData: ERROR deleting barber_schedules:', schedulesError);
+        throw new Error(`Failed to delete barber_schedules: ${schedulesError.message}`);
       }
-      console.log('Deleted barber_schedules');
+      const { count: bsRemaining } = await supabase
+        .from('barber_schedules')
+        .select('*', { count: 'exact', head: true });
+      console.log(`DeleteAllData: deleted from barber_schedules (${bsRemaining || 0} rows remaining)`);
 
+      console.log('DeleteAllData: deleting client_notes...');
       const { error: clientNotesError } = await supabase
         .from('client_notes')
         .delete()
         .neq('id', '00000000-0000-0000-0000-000000000000');
       if (clientNotesError && clientNotesError.code !== 'PGRST116') {
-        console.error('Error deleting client_notes:', clientNotesError);
-        throw clientNotesError;
+        console.error('DeleteAllData: ERROR deleting client_notes:', clientNotesError);
+        throw new Error(`Failed to delete client_notes: ${clientNotesError.message}`);
       }
-      console.log('Deleted client_notes (or table does not exist)');
+      if (clientNotesError && clientNotesError.code === 'PGRST116') {
+        console.log('DeleteAllData: client_notes table does not exist, skipping');
+      } else {
+        const { count: cnRemaining } = await supabase
+          .from('client_notes')
+          .select('*', { count: 'exact', head: true });
+        console.log(`DeleteAllData: deleted from client_notes (${cnRemaining || 0} rows remaining)`);
+      }
 
+      console.log('DeleteAllData: deleting appointments...');
       const { error: appointmentsError } = await supabase
         .from('appointments')
         .delete()
         .neq('id', '00000000-0000-0000-0000-000000000000');
       if (appointmentsError) {
-        console.error('Error deleting appointments:', appointmentsError);
-        throw appointmentsError;
+        console.error('DeleteAllData: ERROR deleting appointments:', appointmentsError);
+        throw new Error(`Failed to delete appointments: ${appointmentsError.message}`);
       }
-      console.log('Deleted appointments');
+      const { count: aptRemaining } = await supabase
+        .from('appointments')
+        .select('*', { count: 'exact', head: true });
+      console.log(`DeleteAllData: deleted from appointments (${aptRemaining || 0} rows remaining)`);
 
+      console.log('DeleteAllData: deleting clients...');
       const { error: clientsError } = await supabase
         .from('clients')
         .delete()
         .neq('id', '00000000-0000-0000-0000-000000000000');
       if (clientsError) {
-        console.error('Error deleting clients:', clientsError);
-        throw clientsError;
+        console.error('DeleteAllData: ERROR deleting clients:', clientsError);
+        throw new Error(`Failed to delete clients: ${clientsError.message}`);
       }
-      console.log('Deleted clients');
+      const { count: clientsRemaining } = await supabase
+        .from('clients')
+        .select('*', { count: 'exact', head: true });
+      console.log(`DeleteAllData: deleted from clients (${clientsRemaining || 0} rows remaining)`);
 
+      console.log('DeleteAllData: cleaning up storage files...');
       try {
         const { data: files, error: listError } = await supabase.storage
           .from('transformation-photos')
           .list('appointments');
 
         if (listError) {
-          console.warn('Could not list storage files:', listError);
+          console.warn('DeleteAllData: could not list storage files:', listError);
         } else if (files && files.length > 0) {
           const filePaths = files.map((file) => `appointments/${file.name}`);
           const { error: removeError } = await supabase.storage
             .from('transformation-photos')
             .remove(filePaths);
           if (removeError) {
-            console.warn('Some storage files could not be removed:', removeError);
+            console.warn('DeleteAllData: some storage files could not be removed:', removeError);
           } else {
-            console.log('Deleted transformation photo files from storage');
+            console.log(`DeleteAllData: deleted ${files.length} transformation photo files from storage`);
           }
+        } else {
+          console.log('DeleteAllData: no storage files to delete');
         }
       } catch (storageError) {
-        console.warn('Storage cleanup encountered errors:', storageError);
+        console.warn('DeleteAllData: storage cleanup encountered errors:', storageError);
       }
+
+      console.log('DeleteAllData: verifying final counts...');
+      const { count: finalAppointments } = await supabase
+        .from('appointments')
+        .select('*', { count: 'exact', head: true });
+      const { count: finalClients } = await supabase
+        .from('clients')
+        .select('*', { count: 'exact', head: true });
+
+      console.log(`DeleteAllData: final verification - appointments: ${finalAppointments || 0}, clients: ${finalClients || 0}`);
+
+      if ((finalAppointments || 0) > 0 || (finalClients || 0) > 0) {
+        console.error(`DeleteAllData: ERROR - Not all data was deleted! Appointments: ${finalAppointments}, Clients: ${finalClients}`);
+        alert(
+          language === 'en'
+            ? `Some appointments/clients could not be deleted. Appointments remaining: ${finalAppointments || 0}, Clients remaining: ${finalClients || 0}. See console for details.`
+            : `Algunas citas/clientes no pudieron ser eliminados. Citas restantes: ${finalAppointments || 0}, Clientes restantes: ${finalClients || 0}. Ver consola para detalles.`
+        );
+        setDeleting(false);
+        return;
+      }
+
+      console.log('=== DeleteAllData: finished successfully ===');
 
       alert(
         language === 'en'
-          ? 'All appointments and demo data deleted successfully!'
-          : '¡Todas las citas y datos de demostración eliminados exitosamente!'
+          ? 'All appointments, clients, and demo data have been deleted successfully!'
+          : '¡Todas las citas, clientes y datos de demostración han sido eliminados exitosamente!'
       );
       setShowDeleteModal(false);
       setDeleteConfirmText('');
+
+      console.log('DeleteAllData: reloading page to refresh UI...');
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
     } catch (error: any) {
-      console.error('Error deleting data:', error);
+      console.error('=== DeleteAllData: FAILED ===', error);
       alert(
         language === 'en'
-          ? `Error deleting data: ${error.message || 'Unknown error'}`
-          : `Error al eliminar datos: ${error.message || 'Error desconocido'}`
+          ? `Failed to delete data: ${error.message || 'Unknown error'}. Check console for details.`
+          : `Error al eliminar datos: ${error.message || 'Error desconocido'}. Ver consola para detalles.`
       );
-    } finally {
       setDeleting(false);
     }
   };
