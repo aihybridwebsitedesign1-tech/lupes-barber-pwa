@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import Header from '../components/Header';
+import EditAppointmentModal from '../components/EditAppointmentModal';
+import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 
 type Appointment = {
   id: string;
@@ -22,6 +24,10 @@ export default function OwnerAppointments() {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [editingAppointmentId, setEditingAppointmentId] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [appointmentToDelete, setAppointmentToDelete] = useState<Appointment | null>(null);
   const { language, t } = useLanguage();
   const { userData } = useAuth();
   const navigate = useNavigate();
@@ -95,41 +101,33 @@ export default function OwnerAppointments() {
     }
   };
 
-  const handleDeleteAppointment = async (apt: Appointment) => {
-    if (userData?.role !== 'OWNER') {
-      alert(language === 'en' ? 'Only the owner can delete appointments' : 'Solo el propietario puede eliminar citas');
+  const canDelete = userData?.role === 'OWNER' || userData?.can_manage_appointments;
+  const canEdit = userData?.role === 'OWNER' || userData?.can_manage_appointments;
+
+  const handleDeleteClick = (apt: Appointment) => {
+    if (!canDelete) {
+      alert(language === 'en' ? 'You do not have permission to delete appointments' : 'No tienes permiso para eliminar citas');
       return;
     }
+    setAppointmentToDelete(apt);
+    setShowDeleteConfirm(true);
+  };
 
-    if (apt.status === 'completed' || apt.paid_at) {
-      alert(
-        language === 'en'
-          ? 'Completed or paid appointments cannot be deleted. Mark them as cancelled instead.'
-          : 'Las citas completadas o pagadas no se pueden eliminar. Márcalas como canceladas en su lugar.'
-      );
-      return;
-    }
+  const handleDeleteConfirm = async () => {
+    if (!appointmentToDelete) return;
 
-    const confirmed = confirm(
-      language === 'en'
-        ? 'Delete this appointment? This will remove it and any associated products and transformation photos. This cannot be undone.'
-        : '¿Eliminar esta cita? Esto la eliminará junto con cualquier producto y foto de transformación asociada. Esto no se puede deshacer.'
-    );
-
-    if (!confirmed) return;
-
-    setDeleting(apt.id);
+    setDeleting(appointmentToDelete.id);
     try {
       const { error: productsError } = await supabase
         .from('appointment_products')
         .delete()
-        .eq('appointment_id', apt.id);
+        .eq('appointment_id', appointmentToDelete.id);
       if (productsError) throw productsError;
 
       const { data: photos, error: photosSelectError } = await supabase
         .from('transformation_photos')
         .select('id, image_url')
-        .eq('appointment_id', apt.id);
+        .eq('appointment_id', appointmentToDelete.id);
 
       if (!photosSelectError && photos && photos.length > 0) {
         for (const photo of photos) {
@@ -138,7 +136,7 @@ export default function OwnerAppointments() {
             if (imagePath) {
               await supabase.storage
                 .from('transformation-photos')
-                .remove([`appointments/${apt.id}/${imagePath}`]);
+                .remove([`appointments/${appointmentToDelete.id}/${imagePath}`]);
             }
           } catch (storageErr) {
             console.warn('Could not delete photo file:', storageErr);
@@ -148,17 +146,19 @@ export default function OwnerAppointments() {
         const { error: photosDeleteError } = await supabase
           .from('transformation_photos')
           .delete()
-          .eq('appointment_id', apt.id);
+          .eq('appointment_id', appointmentToDelete.id);
         if (photosDeleteError) throw photosDeleteError;
       }
 
       const { error: appointmentError } = await supabase
         .from('appointments')
         .delete()
-        .eq('id', apt.id);
+        .eq('id', appointmentToDelete.id);
       if (appointmentError) throw appointmentError;
 
-      setAppointments((prev) => prev.filter((a) => a.id !== apt.id));
+      setAppointments((prev) => prev.filter((a) => a.id !== appointmentToDelete.id));
+      setShowDeleteConfirm(false);
+      setAppointmentToDelete(null);
 
       alert(language === 'en' ? 'Appointment deleted successfully!' : '¡Cita eliminada exitosamente!');
     } catch (error: any) {
@@ -194,6 +194,17 @@ export default function OwnerAppointments() {
     return styles[status] || { bg: '#e9ecef', color: '#495057' };
   };
 
+  const filteredAppointments = appointments.filter((apt) => {
+    if (!searchQuery.trim()) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      apt.client_name.toLowerCase().includes(query) ||
+      apt.barber_name.toLowerCase().includes(query) ||
+      apt.status.toLowerCase().includes(query) ||
+      apt.service_name.toLowerCase().includes(query)
+    );
+  });
+
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
@@ -212,6 +223,25 @@ export default function OwnerAppointments() {
         <h2 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '1.5rem' }}>{t.appointments}</h2>
 
         <div style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
+              {language === 'en' ? 'Search' : 'Buscar'}
+            </label>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={language === 'en' ? 'Search by client, barber, service, or status...' : 'Buscar por cliente, barbero, servicio o estado...'}
+              style={{
+                width: '100%',
+                padding: '10px',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                fontSize: '14px',
+              }}
+            />
+          </div>
+
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
             <div style={{ flex: '1', minWidth: '200px' }}>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
@@ -260,7 +290,15 @@ export default function OwnerAppointments() {
           </div>
         </div>
 
-        {appointments.length === 0 ? (
+        {searchQuery && (
+          <div style={{ marginBottom: '1rem', fontSize: '14px', color: '#666' }}>
+            {language === 'en'
+              ? `Showing ${filteredAppointments.length} of ${appointments.length} appointments`
+              : `Mostrando ${filteredAppointments.length} de ${appointments.length} citas`}
+          </div>
+        )}
+
+        {filteredAppointments.length === 0 ? (
           <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '8px', textAlign: 'center' }}>
             <p style={{ color: '#666' }}>
               {language === 'en' ? 'No appointments found' : 'No se encontraron citas'}
@@ -295,7 +333,7 @@ export default function OwnerAppointments() {
                 </tr>
               </thead>
               <tbody>
-                {appointments.map((apt) => {
+                {filteredAppointments.map((apt) => {
                   const statusStyle = getStatusBadgeStyle(apt.status);
                   return (
                     <tr key={apt.id} style={{ borderBottom: '1px solid #eee' }}>
@@ -336,7 +374,7 @@ export default function OwnerAppointments() {
                         </span>
                       </td>
                       <td style={{ padding: '1rem', fontSize: '14px' }}>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                           <button
                             onClick={() => navigate(`/owner/appointments/${apt.id}`)}
                             style={{
@@ -351,9 +389,25 @@ export default function OwnerAppointments() {
                           >
                             {language === 'en' ? 'View' : 'Ver'}
                           </button>
-                          {userData?.role === 'OWNER' && apt.status !== 'completed' && !apt.paid_at && (
+                          {canEdit && (
                             <button
-                              onClick={() => handleDeleteAppointment(apt)}
+                              onClick={() => setEditingAppointmentId(apt.id)}
+                              style={{
+                                padding: '6px 12px',
+                                backgroundColor: '#007bff',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '12px',
+                              }}
+                            >
+                              {language === 'en' ? 'Edit' : 'Editar'}
+                            </button>
+                          )}
+                          {canDelete && (
+                            <button
+                              onClick={() => handleDeleteClick(apt)}
                               disabled={deleting === apt.id}
                               style={{
                                 padding: '6px 12px',
@@ -381,6 +435,34 @@ export default function OwnerAppointments() {
             </table>
           </div>
         )}
+
+        {editingAppointmentId && (
+          <EditAppointmentModal
+            appointmentId={editingAppointmentId}
+            onClose={() => setEditingAppointmentId(null)}
+            onSave={() => {
+              setEditingAppointmentId(null);
+              loadAppointments();
+            }}
+          />
+        )}
+
+        <ConfirmDeleteModal
+          isOpen={showDeleteConfirm}
+          title={language === 'en' ? 'Delete Appointment' : 'Eliminar Cita'}
+          description={
+            language === 'en'
+              ? 'This will permanently delete this appointment and all related data (products, photos). This cannot be undone.'
+              : 'Esto eliminará permanentemente esta cita y todos los datos relacionados (productos, fotos). Esto no se puede deshacer.'
+          }
+          confirmWord="DELETE"
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => {
+            setShowDeleteConfirm(false);
+            setAppointmentToDelete(null);
+          }}
+          isLoading={deleting !== null}
+        />
       </main>
     </div>
   );

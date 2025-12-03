@@ -83,89 +83,135 @@ export default function OwnerBarbers() {
             {language === 'en' ? 'No barbers found' : 'No se encontraron barberos'}
           </p>
         ) : (
-          <div style={{ backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead style={{ backgroundColor: '#f9f9f9' }}>
-                <tr>
-                  <th style={{ padding: '1rem', textAlign: 'left', fontSize: '14px', fontWeight: '500' }}>
-                    {t.name}
-                  </th>
-                  <th style={{ padding: '1rem', textAlign: 'left', fontSize: '14px', fontWeight: '500' }}>
-                    {t.status}
-                  </th>
-                  <th style={{ padding: '1rem', textAlign: 'left', fontSize: '14px', fontWeight: '500' }}>
-                    {language === 'en' ? 'Actions' : 'Acciones'}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {barbers.map((barber) => (
-                  <tr key={barber.id} style={{ borderBottom: '1px solid #eee' }}>
-                    <td style={{ padding: '1rem', fontSize: '14px' }}>{barber.name}</td>
-                    <td style={{ padding: '1rem', fontSize: '14px' }}>
-                      <span
-                        style={{
-                          padding: '4px 12px',
-                          borderRadius: '12px',
-                          fontSize: '12px',
-                          backgroundColor: barber.active ? '#d4edda' : '#f8d7da',
-                          color: barber.active ? '#155724' : '#721c24',
-                        }}
-                      >
-                        {barber.active ? t.active : t.inactive}
-                      </span>
-                    </td>
-                    <td style={{ padding: '1rem', fontSize: '14px' }}>
-                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                        <button
-                          onClick={() => setPermissionsBarber(barber)}
-                          style={{
-                            padding: '6px 12px',
-                            backgroundColor: '#0066cc',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '12px',
-                          }}
-                        >
-                          {language === 'en' ? 'Manage' : 'Gestionar'}
-                        </button>
-                        <button
-                          onClick={() => setScheduleBarber(barber)}
-                          style={{
-                            padding: '6px 12px',
-                            backgroundColor: '#000',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '12px',
-                          }}
-                        >
-                          {language === 'en' ? 'Edit Schedule' : 'Editar Horario'}
-                        </button>
-                        <button
-                          onClick={() => setTimeOffBarber(barber)}
-                          style={{
-                            padding: '6px 12px',
-                            backgroundColor: '#6c757d',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '12px',
-                          }}
-                        >
-                          {language === 'en' ? 'Time Off' : 'Tiempo Libre'}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <div>
+              <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '1rem' }}>
+                {language === 'en' ? 'Active Barbers' : 'Barberos Activos'} ({barbers.filter(b => b.active).length})
+              </h3>
+              {barbers.filter(b => b.active).length === 0 ? (
+                <p style={{ color: '#666', marginBottom: '2rem' }}>
+                  {language === 'en' ? 'No active barbers' : 'No hay barberos activos'}
+                </p>
+              ) : (
+                <div style={{ backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', overflow: 'hidden', marginBottom: '2rem' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead style={{ backgroundColor: '#f9f9f9' }}>
+                      <tr>
+                        <th style={{ padding: '1rem', textAlign: 'left', fontSize: '14px', fontWeight: '500' }}>
+                          {t.name}
+                        </th>
+                        <th style={{ padding: '1rem', textAlign: 'left', fontSize: '14px', fontWeight: '500' }}>
+                          {language === 'en' ? 'Actions' : 'Acciones'}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {barbers.filter(b => b.active).map((barber) => (
+                        <tr key={barber.id} style={{ borderBottom: '1px solid #eee' }}>
+                          <td style={{ padding: '1rem', fontSize: '14px' }}>{barber.name}</td>
+                          <td style={{ padding: '1rem', fontSize: '14px' }}>
+                            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                              <button
+                                onClick={() => setPermissionsBarber(barber)}
+                                style={{
+                                  padding: '6px 12px',
+                                  backgroundColor: '#0066cc',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  cursor: 'pointer',
+                                  fontSize: '12px',
+                                }}
+                              >
+                                {language === 'en' ? 'Manage' : 'Gestionar'}
+                              </button>
+                              <button
+                                onClick={() => setScheduleBarber(barber)}
+                                style={{
+                                  padding: '6px 12px',
+                                  backgroundColor: '#000',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  cursor: 'pointer',
+                                  fontSize: '12px',
+                                }}
+                              >
+                                {language === 'en' ? 'Edit Schedule' : 'Editar Horario'}
+                              </button>
+                              <button
+                                onClick={() => setTimeOffBarber(barber)}
+                                style={{
+                                  padding: '6px 12px',
+                                  backgroundColor: '#6c757d',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  cursor: 'pointer',
+                                  fontSize: '12px',
+                                }}
+                              >
+                                {language === 'en' ? 'Time Off' : 'Tiempo Libre'}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div style={{ marginTop: '3rem' }}>
+              <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '1rem' }}>
+                {language === 'en' ? 'Inactive Barbers' : 'Barberos Inactivos'} ({barbers.filter(b => !b.active).length})
+              </h3>
+              {barbers.filter(b => !b.active).length === 0 ? (
+                <p style={{ color: '#666' }}>
+                  {language === 'en' ? 'No inactive barbers' : 'No hay barberos inactivos'}
+                </p>
+              ) : (
+                <div style={{ backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead style={{ backgroundColor: '#f9f9f9' }}>
+                      <tr>
+                        <th style={{ padding: '1rem', textAlign: 'left', fontSize: '14px', fontWeight: '500' }}>
+                          {t.name}
+                        </th>
+                        <th style={{ padding: '1rem', textAlign: 'left', fontSize: '14px', fontWeight: '500' }}>
+                          {language === 'en' ? 'Actions' : 'Acciones'}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {barbers.filter(b => !b.active).map((barber) => (
+                        <tr key={barber.id} style={{ borderBottom: '1px solid #eee' }}>
+                          <td style={{ padding: '1rem', fontSize: '14px', color: '#999' }}>{barber.name}</td>
+                          <td style={{ padding: '1rem', fontSize: '14px' }}>
+                            <button
+                              onClick={() => setPermissionsBarber(barber)}
+                              style={{
+                                padding: '6px 12px',
+                                backgroundColor: '#0066cc',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '12px',
+                              }}
+                            >
+                              {language === 'en' ? 'Manage' : 'Gestionar'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </>
         )}
       </main>
 

@@ -6,6 +6,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { uploadImage, getUploadLimitText } from '../lib/uploadHelper';
 import Header from '../components/Header';
 import PaymentModal from '../components/PaymentModal';
+import EditAppointmentModal from '../components/EditAppointmentModal';
+import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 
 type Appointment = {
   id: string;
@@ -81,6 +83,8 @@ export default function AppointmentDetail() {
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     if (appointmentId) {
@@ -292,29 +296,18 @@ export default function AppointmentDetail() {
     }
   };
 
-  const handleDeleteAppointment = async () => {
-    if (userData?.role !== 'OWNER') {
-      alert(language === 'en' ? 'Only the owner can delete appointments' : 'Solo el propietario puede eliminar citas');
+  const canDelete = userData?.role === 'OWNER' || userData?.can_manage_appointments;
+  const canEditAppointment = userData?.role === 'OWNER' || userData?.can_manage_appointments;
+
+  const handleDeleteClick = () => {
+    if (!canDelete) {
+      alert(language === 'en' ? 'You do not have permission to delete appointments' : 'No tienes permiso para eliminar citas');
       return;
     }
+    setShowDeleteConfirm(true);
+  };
 
-    if (appointment?.status === 'completed' || appointment?.paid_at) {
-      alert(
-        language === 'en'
-          ? 'Completed or paid appointments cannot be deleted. Mark them as cancelled instead.'
-          : 'Las citas completadas o pagadas no se pueden eliminar. Márcalas como canceladas en su lugar.'
-      );
-      return;
-    }
-
-    const confirmed = confirm(
-      language === 'en'
-        ? 'Delete this appointment? This will remove it and any associated products and transformation photos. This cannot be undone.'
-        : '¿Eliminar esta cita? Esto la eliminará junto con cualquier producto y foto de transformación asociada. Esto no se puede deshacer.'
-    );
-
-    if (!confirmed) return;
-
+  const handleDeleteConfirm = async () => {
     setSaving(true);
     try {
       const { error: productsError } = await supabase
@@ -366,6 +359,7 @@ export default function AppointmentDetail() {
       );
     } finally {
       setSaving(false);
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -503,20 +497,38 @@ export default function AppointmentDetail() {
     <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
       <Header />
       <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
-        <button
-          onClick={() => navigate(userData?.role === 'OWNER' ? '/owner/today' : '/barber/today')}
-          style={{
-            marginBottom: '1rem',
-            padding: '8px 16px',
-            backgroundColor: '#f5f5f5',
-            border: '1px solid #ddd',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '14px',
-          }}
-        >
-          ← {language === 'en' ? 'Back' : 'Volver'}
-        </button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <button
+            onClick={() => navigate(userData?.role === 'OWNER' ? '/owner/today' : '/barber/today')}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#f5f5f5',
+              border: '1px solid #ddd',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '14px',
+            }}
+          >
+            ← {language === 'en' ? 'Back' : 'Volver'}
+          </button>
+          {canEditAppointment && (
+            <button
+              onClick={() => setShowEditModal(true)}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#007bff',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+              }}
+            >
+              {language === 'en' ? 'Edit Appointment' : 'Editar Cita'}
+            </button>
+          )}
+        </div>
 
         <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '8px', marginBottom: '2rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
@@ -996,7 +1008,7 @@ export default function AppointmentDetail() {
                 : 'Eliminar esta cita permanentemente. Esto no se puede deshacer.'}
             </p>
             <button
-              onClick={handleDeleteAppointment}
+              onClick={handleDeleteClick}
               disabled={saving}
               style={{
                 padding: '10px 20px',
@@ -1020,6 +1032,31 @@ export default function AppointmentDetail() {
           </div>
         )}
       </main>
+
+      {showEditModal && appointmentId && (
+        <EditAppointmentModal
+          appointmentId={appointmentId}
+          onClose={() => setShowEditModal(false)}
+          onSave={() => {
+            setShowEditModal(false);
+            loadAppointmentData();
+          }}
+        />
+      )}
+
+      <ConfirmDeleteModal
+        isOpen={showDeleteConfirm}
+        title={language === 'en' ? 'Delete Appointment' : 'Eliminar Cita'}
+        description={
+          language === 'en'
+            ? 'This will permanently delete this appointment and all related data (products, photos). This cannot be undone.'
+            : 'Esto eliminará permanentemente esta cita y todos los datos relacionados (productos, fotos). Esto no se puede deshacer.'
+        }
+        confirmWord="DELETE"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setShowDeleteConfirm(false)}
+        isLoading={saving}
+      />
 
       {showPaymentModal && appointment && (
         <PaymentModal
