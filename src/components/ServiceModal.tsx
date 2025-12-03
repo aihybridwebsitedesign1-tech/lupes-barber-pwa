@@ -76,6 +76,33 @@ export default function ServiceModal({ service, onClose, onSuccess }: Props) {
     }
   };
 
+  const handleRemoveImage = async () => {
+    const confirmed = confirm(
+      language === 'en'
+        ? 'Remove this image? This cannot be undone.'
+        : '¿Eliminar esta imagen? Esto no se puede deshacer.'
+    );
+
+    if (!confirmed) return;
+
+    setUploading(true);
+    try {
+      if (imageUrl && service?.id) {
+        const imagePath = imageUrl.split('/').pop();
+        if (imagePath) {
+          await supabase.storage.from('service-images').remove([`services/${service.id}/${imagePath}`]);
+        }
+      }
+
+      setImageUrl('');
+      alert(language === 'en' ? 'Image removed successfully!' : '¡Imagen eliminada exitosamente!');
+    } catch (error) {
+      console.error('Error removing image:', error);
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!service) return;
 
@@ -334,14 +361,34 @@ export default function ServiceModal({ service, onClose, onSuccess }: Props) {
                   {language === 'en' ? 'Preview:' : 'Vista previa:'}
                 </div>
                 {imageUrl ? (
-                  <img
-                    src={imageUrl}
-                    alt="Preview"
-                    style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px', border: '1px solid #ddd' }}
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
+                  <>
+                    <img
+                      src={imageUrl}
+                      alt="Preview"
+                      style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px', border: '1px solid #ddd', marginBottom: '0.5rem' }}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleRemoveImage}
+                      disabled={uploading}
+                      style={{
+                        width: '100%',
+                        padding: '4px 8px',
+                        backgroundColor: '#dc3545',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        cursor: uploading ? 'not-allowed' : 'pointer',
+                        opacity: uploading ? 0.6 : 1,
+                      }}
+                    >
+                      {language === 'en' ? 'Remove' : 'Eliminar'}
+                    </button>
+                  </>
                 ) : (
                   <div style={{ width: '100%', height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e9ecef', borderRadius: '4px', fontSize: '11px', color: '#6c757d', textAlign: 'center', padding: '0.5rem' }}>
                     {language === 'en' ? 'No image yet' : 'Sin imagen'}

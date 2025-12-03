@@ -112,6 +112,33 @@ export default function OwnerProducts() {
     }
   };
 
+  const handleRemoveImage = async () => {
+    const confirmed = confirm(
+      language === 'en'
+        ? 'Remove this image? This cannot be undone.'
+        : '¿Eliminar esta imagen? Esto no se puede deshacer.'
+    );
+
+    if (!confirmed) return;
+
+    setUploading(true);
+    try {
+      if (imageUrl && editingProduct?.id) {
+        const imagePath = imageUrl.split('/').pop();
+        if (imagePath) {
+          await supabase.storage.from('product-images').remove([`products/${editingProduct.id}/${imagePath}`]);
+        }
+      }
+
+      setImageUrl('');
+      alert(language === 'en' ? 'Image removed successfully!' : '¡Imagen eliminada exitosamente!');
+    } catch (error) {
+      console.error('Error removing image:', error);
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!nameEn || !price) {
       alert(language === 'en' ? 'Please fill in all required fields' : 'Por favor completa todos los campos requeridos');
@@ -186,6 +213,17 @@ export default function OwnerProducts() {
       if (!confirmed) {
         setDeleting(false);
         return;
+      }
+
+      if (editingProduct.image_url) {
+        const imagePath = editingProduct.image_url.split('/').pop();
+        if (imagePath) {
+          try {
+            await supabase.storage.from('product-images').remove([`products/${editingProduct.id}/${imagePath}`]);
+          } catch (err) {
+            console.error('Error deleting product image:', err);
+          }
+        }
       }
 
       const { error: deleteError } = await supabase.from('products').delete().eq('id', editingProduct.id);
@@ -509,20 +547,41 @@ export default function OwnerProducts() {
                       {language === 'en' ? 'Preview:' : 'Vista previa:'}
                     </div>
                     {imageUrl ? (
-                      <img
-                        src={imageUrl}
-                        alt="Preview"
-                        style={{
-                          width: '100%',
-                          height: '80px',
-                          objectFit: 'cover',
-                          borderRadius: '4px',
-                          border: '1px solid #ddd',
-                        }}
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none';
-                        }}
-                      />
+                      <>
+                        <img
+                          src={imageUrl}
+                          alt="Preview"
+                          style={{
+                            width: '100%',
+                            height: '80px',
+                            objectFit: 'cover',
+                            borderRadius: '4px',
+                            border: '1px solid #ddd',
+                            marginBottom: '0.5rem',
+                          }}
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleRemoveImage}
+                          disabled={uploading}
+                          style={{
+                            width: '100%',
+                            padding: '4px 8px',
+                            backgroundColor: '#dc3545',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            cursor: uploading ? 'not-allowed' : 'pointer',
+                            opacity: uploading ? 0.6 : 1,
+                          }}
+                        >
+                          {language === 'en' ? 'Remove' : 'Eliminar'}
+                        </button>
+                      </>
                     ) : (
                       <div
                         style={{

@@ -384,18 +384,20 @@ export default function PaymentModal({
               </div>
             )}
 
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                fontSize: '14px',
-                color: '#666',
-                paddingTop: '0.5rem',
-              }}
-            >
-              <span>{language === 'en' ? 'Net Revenue (after fees):' : 'Ingreso Neto (después de tarifas):'}</span>
-              <span style={{ fontWeight: '500' }}>{formatCurrency(totals.netRevenue)}</span>
-            </div>
+            {paymentMethod !== 'cash' && (
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  fontSize: '14px',
+                  color: '#666',
+                  paddingTop: '0.5rem',
+                }}
+              >
+                <span>{language === 'en' ? 'Net Revenue (after fees):' : 'Ingreso Neto (después de tarifas):'}</span>
+                <span style={{ fontWeight: '500' }}>{formatCurrency(totals.netRevenue)}</span>
+              </div>
+            )}
           </div>
         </div>
 

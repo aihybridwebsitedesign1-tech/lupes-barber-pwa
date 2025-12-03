@@ -335,6 +335,47 @@ export default function AppointmentDetail() {
     }
   };
 
+  const handleDeletePhoto = async (photo: TransformationPhoto) => {
+    if (userData?.role !== 'OWNER') {
+      alert(
+        language === 'en'
+          ? 'Only Lupe can delete photos'
+          : 'Solo Lupe puede eliminar fotos'
+      );
+      return;
+    }
+
+    const confirmed = confirm(
+      language === 'en'
+        ? 'Delete this photo? This cannot be undone.'
+        : '¿Eliminar esta foto? Esto no se puede deshacer.'
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const imagePath = photo.image_url.split('/').pop();
+      if (imagePath) {
+        await supabase.storage
+          .from('transformation-photos')
+          .remove([`appointments/${appointmentId}/${imagePath}`]);
+      }
+
+      const { error: deleteError } = await supabase
+        .from('transformation_photos')
+        .delete()
+        .eq('id', photo.id);
+
+      if (deleteError) throw deleteError;
+
+      alert(language === 'en' ? 'Photo deleted successfully!' : '¡Foto eliminada exitosamente!');
+      loadAppointmentData();
+    } catch (error) {
+      console.error('Error deleting photo:', error);
+      alert(language === 'en' ? 'Error deleting photo' : 'Error al eliminar foto');
+    }
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString(language === 'en' ? 'en-US' : 'es-ES', {
@@ -800,7 +841,16 @@ export default function AppointmentDetail() {
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
                 {photos.map((photo) => (
-                  <div key={photo.id}>
+                  <div
+                    key={photo.id}
+                    style={{
+                      position: 'relative',
+                      backgroundColor: 'white',
+                      borderRadius: '8px',
+                      padding: '0.5rem',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    }}
+                  >
                     <img
                       src={photo.image_url}
                       alt="Transformation"
@@ -814,6 +864,26 @@ export default function AppointmentDetail() {
                     />
                     {photo.notes && (
                       <p style={{ fontSize: '12px', color: '#666', marginTop: '0.5rem' }}>{photo.notes}</p>
+                    )}
+                    {userData?.role === 'OWNER' && (
+                      <button
+                        onClick={() => handleDeletePhoto(photo)}
+                        style={{
+                          position: 'absolute',
+                          top: '1rem',
+                          right: '1rem',
+                          padding: '6px 12px',
+                          backgroundColor: '#dc3545',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                        }}
+                      >
+                        {language === 'en' ? 'Delete' : 'Eliminar'}
+                      </button>
                     )}
                   </div>
                 ))}
