@@ -336,11 +336,14 @@ export default function AppointmentDetail() {
   };
 
   const handleDeletePhoto = async (photo: TransformationPhoto) => {
-    if (userData?.role !== 'OWNER') {
+    const isOwner = userData?.role === 'OWNER';
+    const isAssignedBarber = appointment?.barber?.id === userData?.id;
+
+    if (!isOwner && !isAssignedBarber) {
       alert(
         language === 'en'
-          ? 'Only Lupe can delete photos'
-          : 'Solo Lupe puede eliminar fotos'
+          ? 'Only the owner or assigned barber can delete photos'
+          : 'Solo el propietario o el barbero asignado pueden eliminar fotos'
       );
       return;
     }
@@ -356,9 +359,13 @@ export default function AppointmentDetail() {
     try {
       const imagePath = photo.image_url.split('/').pop();
       if (imagePath) {
-        await supabase.storage
-          .from('transformation-photos')
-          .remove([`appointments/${appointmentId}/${imagePath}`]);
+        try {
+          await supabase.storage
+            .from('transformation-photos')
+            .remove([`appointments/${appointmentId}/${imagePath}`]);
+        } catch (storageError) {
+          console.warn('Storage deletion failed, continuing with DB deletion:', storageError);
+        }
       }
 
       const { error: deleteError } = await supabase
@@ -368,8 +375,9 @@ export default function AppointmentDetail() {
 
       if (deleteError) throw deleteError;
 
+      setPhotos((prevPhotos) => prevPhotos.filter((p) => p.id !== photo.id));
+
       alert(language === 'en' ? 'Photo deleted successfully!' : '¡Foto eliminada exitosamente!');
-      loadAppointmentData();
     } catch (error) {
       console.error('Error deleting photo:', error);
       alert(language === 'en' ? 'Error deleting photo' : 'Error al eliminar foto');
@@ -865,7 +873,7 @@ export default function AppointmentDetail() {
                     {photo.notes && (
                       <p style={{ fontSize: '12px', color: '#666', marginTop: '0.5rem' }}>{photo.notes}</p>
                     )}
-                    {userData?.role === 'OWNER' && (
+                    {(userData?.role === 'OWNER' || appointment?.barber?.id === userData?.id) && (
                       <button
                         onClick={() => handleDeletePhoto(photo)}
                         style={{

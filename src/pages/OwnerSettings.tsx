@@ -16,6 +16,10 @@ export default function OwnerSettings() {
   const [cardFeeRate, setCardFeeRate] = useState('4');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const { language, t } = useLanguage();
 
   useEffect(() => {
@@ -94,6 +98,156 @@ export default function OwnerSettings() {
       alert(language === 'en' ? 'Error saving settings' : 'Error al guardar configuración');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleGenerateDemoData = async () => {
+    const confirmed = confirm(
+      language === 'en'
+        ? 'This will create demo clients and appointments for the past 30 days using your existing barbers, services, and products. Continue?'
+        : 'Esto creará clientes y citas de demostración para los últimos 30 días usando tus barberos, servicios y productos existentes. ¿Continuar?'
+    );
+
+    if (!confirmed) return;
+
+    setGenerating(true);
+    try {
+      const { data: barbers } = await supabase.from('users').select('id').eq('role', 'BARBER').eq('active', true);
+      const { data: services } = await supabase.from('services').select('id, base_price, duration_minutes').eq('active', true);
+
+      if (!barbers?.length || !services?.length) {
+        alert(
+          language === 'en'
+            ? 'You need at least one active barber and one active service to generate demo data.'
+            : 'Necesitas al menos un barbero activo y un servicio activo para generar datos de demostración.'
+        );
+        setGenerating(false);
+        return;
+      }
+
+      const demoClients = [];
+      const firstNames = ['Juan', 'Maria', 'Carlos', 'Ana', 'Luis', 'Sofia', 'Miguel', 'Elena', 'Jose', 'Carmen'];
+      const lastNames = ['Garcia', 'Rodriguez', 'Martinez', 'Lopez', 'Gonzalez', 'Hernandez', 'Perez', 'Sanchez', 'Ramirez', 'Torres'];
+
+      for (let i = 0; i < 20; i++) {
+        const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
+        const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
+        demoClients.push({
+          first_name: firstName,
+          last_name: lastName,
+          phone: `555-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`,
+          language: Math.random() > 0.5 ? 'en' : 'es',
+        });
+      }
+
+      const { data: insertedClients, error: clientError } = await supabase
+        .from('clients')
+        .insert(demoClients)
+        .select('id');
+
+      if (clientError) throw clientError;
+
+      const now = new Date();
+      const demoAppointments = [];
+      const statuses = ['completed', 'completed', 'completed', 'completed', 'no_show', 'cancelled'];
+      const paymentMethods = ['cash', 'cash', 'card_in_shop'];
+
+      for (let i = 0; i < 60; i++) {
+        const daysAgo = Math.floor(Math.random() * 30);
+        const appointmentDate = new Date(now);
+        appointmentDate.setDate(appointmentDate.getDate() - daysAgo);
+        appointmentDate.setHours(10 + Math.floor(Math.random() * 8), [0, 30][Math.floor(Math.random() * 2)], 0, 0);
+
+        const service = services[Math.floor(Math.random() * services.length)];
+        const barber = barbers[Math.floor(Math.random() * barbers.length)];
+        const client = insertedClients![Math.floor(Math.random() * insertedClients!.length)];
+        const status = statuses[Math.floor(Math.random() * statuses.length)];
+
+        const endTime = new Date(appointmentDate);
+        endTime.setMinutes(endTime.getMinutes() + service.duration_minutes);
+
+        const tip = status === 'completed' ? Math.floor(Math.random() * 10) + 5 : 0;
+        const paymentMethod = status === 'completed' ? paymentMethods[Math.floor(Math.random() * paymentMethods.length)] : null;
+        const processingFeeRate = paymentMethod?.startsWith('card') ? 0.04 : 0;
+        const processingFee = paymentMethod?.startsWith('card') ? (service.base_price + tip) * processingFeeRate : 0;
+        const totalCharged = status === 'completed' ? service.base_price + tip + processingFee : 0;
+
+        demoAppointments.push({
+          client_id: client.id,
+          barber_id: barber.id,
+          service_id: service.id,
+          scheduled_start: appointmentDate.toISOString(),
+          scheduled_end: endTime.toISOString(),
+          status: status,
+          actual_duration_minutes: status === 'completed' ? service.duration_minutes : null,
+          services_total: service.base_price,
+          products_total: 0,
+          tax_amount: 0,
+          tip_amount: tip,
+          processing_fee_rate: processingFeeRate,
+          processing_fee_amount: processingFee,
+          total_charged: totalCharged,
+          net_revenue: status === 'completed' ? totalCharged - processingFee : 0,
+          payment_method: paymentMethod,
+          paid_at: status === 'completed' ? appointmentDate.toISOString() : null,
+          completed_at: status === 'completed' ? appointmentDate.toISOString() : null,
+        });
+      }
+
+      const { error: apptError } = await supabase.from('appointments').insert(demoAppointments);
+      if (apptError) throw apptError;
+
+      alert(
+        language === 'en'
+          ? 'Demo data generated successfully! Check your appointments and reports.'
+          : '¡Datos de demostración generados exitosamente! Revisa tus citas y reportes.'
+      );
+    } catch (error) {
+      console.error('Error generating demo data:', error);
+      alert(language === 'en' ? 'Error generating demo data' : 'Error al generar datos de demostración');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleDeleteAllData = async () => {
+    if (deleteConfirmText !== 'RESET') {
+      alert(language === 'en' ? 'Please type RESET to confirm' : 'Por favor escribe RESET para confirmar');
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      await supabase.from('transformation_photos').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('appointment_products').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('appointments').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('client_notes').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('clients').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('barber_time_off').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('barber_schedules').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+
+      try {
+        const { data: files } = await supabase.storage.from('transformation-photos').list('appointments');
+        if (files && files.length > 0) {
+          const filePaths = files.map((file) => `appointments/${file.name}`);
+          await supabase.storage.from('transformation-photos').remove(filePaths);
+        }
+      } catch (storageError) {
+        console.warn('Storage cleanup encountered errors:', storageError);
+      }
+
+      alert(
+        language === 'en'
+          ? 'All appointments and demo data deleted successfully!'
+          : '¡Todas las citas y datos de demostración eliminados exitosamente!'
+      );
+      setShowDeleteModal(false);
+      setDeleteConfirmText('');
+    } catch (error) {
+      console.error('Error deleting data:', error);
+      alert(language === 'en' ? 'Error deleting data' : 'Error al eliminar datos');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -287,7 +441,183 @@ export default function OwnerSettings() {
             {saving ? t.loading : t.save}
           </button>
         </div>
+
+        <div
+          style={{
+            marginTop: '3rem',
+            padding: '1.5rem',
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+            border: '2px solid #ffc107',
+          }}
+        >
+          <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '1rem', color: '#856404' }}>
+            {language === 'en' ? 'Demo Data Tools' : 'Herramientas de Datos de Demostración'}
+          </h3>
+          <p style={{ fontSize: '14px', color: '#666', marginBottom: '1.5rem' }}>
+            {language === 'en'
+              ? 'Use these tools to quickly generate or remove demo data for testing and demonstrations.'
+              : 'Usa estas herramientas para generar o eliminar rápidamente datos de demostración para pruebas y demostraciones.'}
+          </p>
+
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            <button
+              onClick={handleGenerateDemoData}
+              disabled={generating}
+              style={{
+                padding: '12px 24px',
+                backgroundColor: generating ? '#ccc' : '#28a745',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: generating ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+              }}
+            >
+              {generating
+                ? language === 'en'
+                  ? 'Generating...'
+                  : 'Generando...'
+                : language === 'en'
+                ? 'Generate Demo Data'
+                : 'Generar Datos de Demostración'}
+            </button>
+
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              style={{
+                padding: '12px 24px',
+                backgroundColor: '#dc3545',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+              }}
+            >
+              {language === 'en' ? 'Delete All Appointments & Demo Data' : 'Eliminar Todas las Citas y Datos de Demostración'}
+            </button>
+          </div>
+
+          <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#fff3cd', borderRadius: '4px', fontSize: '13px', color: '#856404' }}>
+            {language === 'en'
+              ? '⚠️ Generate Demo Data will create 20 demo clients and 60 appointments over the past 30 days. Delete All Data will permanently remove all appointments, clients, and related data (but keep barbers, services, and settings).'
+              : '⚠️ Generar Datos de Demostración creará 20 clientes de demostración y 60 citas en los últimos 30 días. Eliminar Todos los Datos eliminará permanentemente todas las citas, clientes y datos relacionados (pero mantendrá barberos, servicios y configuración).'}
+          </div>
+        </div>
       </div>
+
+      {showDeleteModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+          onClick={() => setShowDeleteModal(false)}
+        >
+          <div
+            style={{
+              backgroundColor: 'white',
+              padding: '2rem',
+              borderRadius: '12px',
+              maxWidth: '500px',
+              width: '90%',
+              boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '1rem', color: '#dc3545' }}>
+              {language === 'en' ? '⚠️ Danger Zone' : '⚠️ Zona de Peligro'}
+            </h2>
+            <p style={{ fontSize: '14px', marginBottom: '1rem' }}>
+              {language === 'en'
+                ? 'This will permanently delete:'
+                : 'Esto eliminará permanentemente:'}
+            </p>
+            <ul style={{ fontSize: '14px', marginBottom: '1rem', paddingLeft: '1.5rem' }}>
+              <li>{language === 'en' ? 'All appointments' : 'Todas las citas'}</li>
+              <li>{language === 'en' ? 'All clients' : 'Todos los clientes'}</li>
+              <li>{language === 'en' ? 'All transformation photos' : 'Todas las fotos de transformación'}</li>
+              <li>{language === 'en' ? 'All barber schedules and time-off' : 'Todos los horarios y tiempo libre de barberos'}</li>
+            </ul>
+            <p style={{ fontSize: '14px', marginBottom: '1.5rem', fontWeight: '600' }}>
+              {language === 'en'
+                ? 'This will NOT delete: barbers, services, products, or shop settings.'
+                : 'Esto NO eliminará: barberos, servicios, productos o configuración de la tienda.'}
+            </p>
+            <p style={{ fontSize: '14px', marginBottom: '1rem', fontWeight: '600' }}>
+              {language === 'en' ? 'Type RESET to confirm:' : 'Escribe RESET para confirmar:'}
+            </p>
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="RESET"
+              style={{
+                width: '100%',
+                padding: '10px',
+                border: '2px solid #ddd',
+                borderRadius: '6px',
+                fontSize: '14px',
+                marginBottom: '1.5rem',
+              }}
+            />
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setDeleteConfirmText('');
+                }}
+                disabled={deleting}
+                style={{
+                  padding: '10px 24px',
+                  backgroundColor: '#f5f5f5',
+                  border: '1px solid #ddd',
+                  borderRadius: '6px',
+                  cursor: deleting ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                }}
+              >
+                {language === 'en' ? 'Cancel' : 'Cancelar'}
+              </button>
+              <button
+                onClick={handleDeleteAllData}
+                disabled={deleting || deleteConfirmText !== 'RESET'}
+                style={{
+                  padding: '10px 24px',
+                  backgroundColor: deleting || deleteConfirmText !== 'RESET' ? '#ccc' : '#dc3545',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: deleting || deleteConfirmText !== 'RESET' ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                }}
+              >
+                {deleting
+                  ? language === 'en'
+                    ? 'Deleting...'
+                    : 'Eliminando...'
+                  : language === 'en'
+                  ? 'Delete All Data'
+                  : 'Eliminar Todos los Datos'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
