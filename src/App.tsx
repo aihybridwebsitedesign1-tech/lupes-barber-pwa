@@ -1,0 +1,70 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { LanguageProvider } from './contexts/LanguageContext';
+import Login from './pages/Login';
+import OwnerToday from './pages/OwnerToday';
+import OwnerAppointments from './pages/OwnerAppointments';
+import OwnerClients from './pages/OwnerClients';
+import OwnerBarbers from './pages/OwnerBarbers';
+import OwnerServices from './pages/OwnerServices';
+import BarberToday from './pages/BarberToday';
+import Book from './pages/Book';
+
+function ProtectedRoute({ children, allowedRole }: { children: JSX.Element; allowedRole?: 'OWNER' | 'BARBER' }) {
+  const { user, userData, loading } = useAuth();
+
+  if (loading) {
+    return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading...</div>;
+  }
+
+  if (!user || !userData) {
+    return <Navigate to="/login" />;
+  }
+
+  if (allowedRole && userData.role !== allowedRole) {
+    return <Navigate to={userData.role === 'OWNER' ? '/owner/today' : '/barber/today'} />;
+  }
+
+  return children;
+}
+
+function AppRoutes() {
+  const { user, userData, loading } = useAuth();
+
+  if (loading) {
+    return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading...</div>;
+  }
+
+  return (
+    <Routes>
+      <Route path="/login" element={user ? <Navigate to={userData?.role === 'OWNER' ? '/owner/today' : '/barber/today'} /> : <Login />} />
+      <Route path="/book" element={<Book />} />
+
+      <Route path="/owner/today" element={<ProtectedRoute allowedRole="OWNER"><OwnerToday /></ProtectedRoute>} />
+      <Route path="/owner/appointments" element={<ProtectedRoute allowedRole="OWNER"><OwnerAppointments /></ProtectedRoute>} />
+      <Route path="/owner/clients" element={<ProtectedRoute allowedRole="OWNER"><OwnerClients /></ProtectedRoute>} />
+      <Route path="/owner/barbers" element={<ProtectedRoute allowedRole="OWNER"><OwnerBarbers /></ProtectedRoute>} />
+      <Route path="/owner/services" element={<ProtectedRoute allowedRole="OWNER"><OwnerServices /></ProtectedRoute>} />
+
+      <Route path="/barber/today" element={<ProtectedRoute allowedRole="BARBER"><BarberToday /></ProtectedRoute>} />
+
+      <Route path="/" element={
+        user
+          ? <Navigate to={userData?.role === 'OWNER' ? '/owner/today' : '/barber/today'} />
+          : <Navigate to="/login" />
+      } />
+    </Routes>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <LanguageProvider>
+          <AppRoutes />
+        </LanguageProvider>
+      </AuthProvider>
+    </BrowserRouter>
+  );
+}
