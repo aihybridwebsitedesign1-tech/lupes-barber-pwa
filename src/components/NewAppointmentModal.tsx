@@ -43,6 +43,12 @@ export default function NewAppointmentModal({ onClose, onSuccess }: Props) {
   const [loading, setLoading] = useState(false);
   const { language, t } = useLanguage();
 
+  const getLocalDateString = () => {
+    const today = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+  };
+
   useEffect(() => {
     loadData();
   }, []);
@@ -286,6 +292,7 @@ export default function NewAppointmentModal({ onClose, onSuccess }: Props) {
             type="date"
             value={appointmentDate}
             onChange={(e) => setAppointmentDate(e.target.value)}
+            min={getLocalDateString()}
             style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
           />
         </div>

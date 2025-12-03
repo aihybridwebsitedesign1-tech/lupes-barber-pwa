@@ -35,6 +35,12 @@ export default function Book() {
   const [loading, setLoading] = useState(false);
   const { setLanguage } = useLanguage();
 
+  const getLocalDateString = () => {
+    const today = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+  };
+
   const t = bookingLanguage === 'en' ? {
     chooseLanguage: 'Choose Language',
     chooseService: 'Choose Service',
@@ -430,7 +436,7 @@ export default function Book() {
                   type="date"
                   value={appointmentDate}
                   onChange={(e) => setAppointmentDate(e.target.value)}
-                  min={new Date().toISOString().split('T')[0]}
+                  min={getLocalDateString()}
                   style={{ width: '100%', padding: '12px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '16px' }}
                 />
               </div>
