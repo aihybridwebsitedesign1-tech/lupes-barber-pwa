@@ -219,108 +219,16 @@ export default function OwnerSettings() {
     setDeleting(true);
     try {
       console.log('=== DeleteAllData: starting... ===');
+      console.log('DeleteAllData: calling reset_demo_data RPC function...');
 
-      console.log('DeleteAllData: deleting appointment_products...');
-      const { error: appointmentProductsError } = await supabase
-        .from('appointment_products')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
-      if (appointmentProductsError) {
-        console.error('DeleteAllData: ERROR deleting appointment_products:', appointmentProductsError);
-        throw new Error(`Failed to delete appointment_products: ${appointmentProductsError.message}`);
-      }
-      const { count: apRemaining } = await supabase
-        .from('appointment_products')
-        .select('*', { count: 'exact', head: true });
-      console.log(`DeleteAllData: deleted from appointment_products (${apRemaining || 0} rows remaining)`);
+      const { error: rpcError } = await supabase.rpc('reset_demo_data');
 
-      console.log('DeleteAllData: deleting transformation_photos...');
-      const { error: transformationPhotosError } = await supabase
-        .from('transformation_photos')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
-      if (transformationPhotosError) {
-        console.error('DeleteAllData: ERROR deleting transformation_photos:', transformationPhotosError);
-        throw new Error(`Failed to delete transformation_photos: ${transformationPhotosError.message}`);
-      }
-      const { count: tpRemaining } = await supabase
-        .from('transformation_photos')
-        .select('*', { count: 'exact', head: true });
-      console.log(`DeleteAllData: deleted from transformation_photos (${tpRemaining || 0} rows remaining)`);
-
-      console.log('DeleteAllData: deleting barber_time_off...');
-      const { error: timeOffError } = await supabase
-        .from('barber_time_off')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
-      if (timeOffError) {
-        console.error('DeleteAllData: ERROR deleting barber_time_off:', timeOffError);
-        throw new Error(`Failed to delete barber_time_off: ${timeOffError.message}`);
-      }
-      const { count: btoRemaining } = await supabase
-        .from('barber_time_off')
-        .select('*', { count: 'exact', head: true });
-      console.log(`DeleteAllData: deleted from barber_time_off (${btoRemaining || 0} rows remaining)`);
-
-      console.log('DeleteAllData: deleting barber_schedules...');
-      const { error: schedulesError } = await supabase
-        .from('barber_schedules')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
-      if (schedulesError) {
-        console.error('DeleteAllData: ERROR deleting barber_schedules:', schedulesError);
-        throw new Error(`Failed to delete barber_schedules: ${schedulesError.message}`);
-      }
-      const { count: bsRemaining } = await supabase
-        .from('barber_schedules')
-        .select('*', { count: 'exact', head: true });
-      console.log(`DeleteAllData: deleted from barber_schedules (${bsRemaining || 0} rows remaining)`);
-
-      console.log('DeleteAllData: deleting client_notes...');
-      const { error: clientNotesError } = await supabase
-        .from('client_notes')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
-      if (clientNotesError && clientNotesError.code !== 'PGRST116') {
-        console.error('DeleteAllData: ERROR deleting client_notes:', clientNotesError);
-        throw new Error(`Failed to delete client_notes: ${clientNotesError.message}`);
-      }
-      if (clientNotesError && clientNotesError.code === 'PGRST116') {
-        console.log('DeleteAllData: client_notes table does not exist, skipping');
-      } else {
-        const { count: cnRemaining } = await supabase
-          .from('client_notes')
-          .select('*', { count: 'exact', head: true });
-        console.log(`DeleteAllData: deleted from client_notes (${cnRemaining || 0} rows remaining)`);
+      if (rpcError) {
+        console.error('DeleteAllData: reset_demo_data failed:', rpcError);
+        throw new Error(`Failed to delete data via reset_demo_data: ${rpcError.message}`);
       }
 
-      console.log('DeleteAllData: deleting appointments...');
-      const { error: appointmentsError } = await supabase
-        .from('appointments')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
-      if (appointmentsError) {
-        console.error('DeleteAllData: ERROR deleting appointments:', appointmentsError);
-        throw new Error(`Failed to delete appointments: ${appointmentsError.message}`);
-      }
-      const { count: aptRemaining } = await supabase
-        .from('appointments')
-        .select('*', { count: 'exact', head: true });
-      console.log(`DeleteAllData: deleted from appointments (${aptRemaining || 0} rows remaining)`);
-
-      console.log('DeleteAllData: deleting clients...');
-      const { error: clientsError } = await supabase
-        .from('clients')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
-      if (clientsError) {
-        console.error('DeleteAllData: ERROR deleting clients:', clientsError);
-        throw new Error(`Failed to delete clients: ${clientsError.message}`);
-      }
-      const { count: clientsRemaining } = await supabase
-        .from('clients')
-        .select('*', { count: 'exact', head: true });
-      console.log(`DeleteAllData: deleted from clients (${clientsRemaining || 0} rows remaining)`);
+      console.log('DeleteAllData: reset_demo_data completed successfully');
 
       console.log('DeleteAllData: cleaning up storage files...');
       try {
