@@ -413,5 +413,43 @@ const isAvailable = await isBarberAvailableForAppointment(
 
 ---
 
+## UI Polish
+
+### Time Slot Display Format (Updated)
+
+**Change:** New Appointment modal now displays time slots in 12-hour format with AM/PM.
+
+**Before:**
+```
+10:00 - 10:30
+13:30 - 14:00
+16:00 - 16:30
+```
+
+**After:**
+```
+10:00 AM – 10:30 AM
+1:30 PM – 2:00 PM
+4:00 PM – 4:30 PM
+```
+
+**Implementation:**
+- Added `formatTimeLabel(time24)` helper in NewAppointmentModal.tsx
+- Added `formatSlotLabel(slot)` helper for full slot display
+- Converts 24-hour time to 12-hour with AM/PM
+- **Internal values unchanged** - still uses "HH:MM" format for all logic
+- Only affects user-facing display labels
+
+**Files Modified:**
+- `/src/components/NewAppointmentModal.tsx` - Added formatters, updated option labels
+
+**No Impact On:**
+- Availability logic
+- Database values
+- /book flow
+- API calls
+
+---
+
 **Phase 2 Complete** ✅
 **Ready for Production** 🎉
