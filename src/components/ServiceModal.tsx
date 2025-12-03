@@ -54,8 +54,8 @@ export default function ServiceModal({ service, onClose, onSuccess }: Props) {
       return;
     }
 
-    if (selectedFile.size > 5 * 1024 * 1024) {
-      alert(language === 'en' ? 'File size must be less than 5MB' : 'El tamaño del archivo debe ser menor a 5MB');
+    if (selectedFile.size > 50 * 1024 * 1024) {
+      alert(language === 'en' ? 'File size must be less than 50MB' : 'El tamaño del archivo debe ser menor a 50MB');
       return;
     }
 
@@ -338,7 +338,7 @@ export default function ServiceModal({ service, onClose, onSuccess }: Props) {
                   {uploading ? (language === 'en' ? 'Uploading...' : 'Subiendo...') : (language === 'en' ? 'Upload Image' : 'Subir Imagen')}
                 </button>
                 <div style={{ marginTop: '0.25rem', fontSize: '11px', color: '#666' }}>
-                  {language === 'en' ? 'Max 5MB. JPG, PNG, WEBP' : 'Máx 5MB. JPG, PNG, WEBP'}
+                  {language === 'en' ? 'Max 50MB. JPG, PNG, WEBP' : 'Máx 50MB. JPG, PNG, WEBP'}
                 </div>
               </div>
 

@@ -8,6 +8,9 @@ import OwnerClients from './pages/OwnerClients';
 import OwnerBarbers from './pages/OwnerBarbers';
 import OwnerServices from './pages/OwnerServices';
 import OwnerSettings from './pages/OwnerSettings';
+import OwnerProducts from './pages/OwnerProducts';
+import ClientDetail from './pages/ClientDetail';
+import AppointmentDetail from './pages/AppointmentDetail';
 import BarberToday from './pages/BarberToday';
 import Book from './pages/Book';
 
@@ -58,9 +61,13 @@ function AppRoutes() {
       <Route path="/owner/clients" element={<ProtectedRoute allowedRole="OWNER"><OwnerClients /></ProtectedRoute>} />
       <Route path="/owner/barbers" element={<ProtectedRoute allowedRole="OWNER"><OwnerBarbers /></ProtectedRoute>} />
       <Route path="/owner/services" element={<ProtectedRoute allowedRole="OWNER"><OwnerServices /></ProtectedRoute>} />
+      <Route path="/owner/products" element={<ProtectedRoute allowedRole="OWNER"><OwnerProducts /></ProtectedRoute>} />
       <Route path="/owner/settings" element={<ProtectedRoute allowedRole="OWNER"><OwnerSettings /></ProtectedRoute>} />
+      <Route path="/owner/clients/:clientId" element={<ProtectedRoute allowedRole="OWNER"><ClientDetail /></ProtectedRoute>} />
+      <Route path="/owner/appointments/:appointmentId" element={<ProtectedRoute allowedRole="OWNER"><AppointmentDetail /></ProtectedRoute>} />
 
       <Route path="/barber/today" element={<ProtectedRoute allowedRole="BARBER"><BarberToday /></ProtectedRoute>} />
+      <Route path="/barber/appointments/:appointmentId" element={<ProtectedRoute allowedRole="BARBER"><AppointmentDetail /></ProtectedRoute>} />
 
       <Route path="/" element={
         user
