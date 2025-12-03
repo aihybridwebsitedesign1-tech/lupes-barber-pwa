@@ -30,26 +30,42 @@ export default function Header() {
                   <Link to="/owner/appointments" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 1rem' }}>
                     {t.appointments}
                   </Link>
+                  {(userData.role === 'OWNER' || userData.can_view_shop_reports) && (
+                    <Link to="/owner/reports" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 1rem' }}>
+                      {language === 'en' ? 'Reports' : 'Reportes'}
+                    </Link>
+                  )}
                   <Link to="/owner/clients" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 1rem' }}>
                     {t.clients}
                   </Link>
                   <Link to="/owner/barbers" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 1rem' }}>
                     {t.barbers}
                   </Link>
-                  <Link to="/owner/services" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 1rem' }}>
-                    {t.services}
-                  </Link>
-                  <Link to="/owner/products" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 1rem' }}>
-                    {language === 'en' ? 'Products' : 'Productos'}
-                  </Link>
+                  {(userData.role === 'OWNER' || userData.can_manage_services) && (
+                    <Link to="/owner/services" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 1rem' }}>
+                      {t.services}
+                    </Link>
+                  )}
+                  {(userData.role === 'OWNER' || userData.can_manage_products) && (
+                    <Link to="/owner/products" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 1rem' }}>
+                      {language === 'en' ? 'Products' : 'Productos'}
+                    </Link>
+                  )}
                   <Link to="/owner/settings" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 1rem' }}>
                     {language === 'en' ? 'Settings' : 'Configuración'}
                   </Link>
                 </>
               ) : (
-                <Link to="/barber/today" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 1rem', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.1)' }}>
-                  {t.today}
-                </Link>
+                <>
+                  <Link to="/barber/today" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 1rem', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.1)' }}>
+                    {t.today}
+                  </Link>
+                  {userData.can_view_own_stats && (
+                    <Link to="/barber/stats" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 1rem' }}>
+                      {language === 'en' ? 'My Stats' : 'Mis Estadísticas'}
+                    </Link>
+                  )}
+                </>
               )}
             </nav>
           )}
