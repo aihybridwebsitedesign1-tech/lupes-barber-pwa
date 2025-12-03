@@ -5,6 +5,7 @@ import Header from '../components/Header';
 import BarberScheduleModal from '../components/BarberScheduleModal';
 import BarberTimeOffModal from '../components/BarberTimeOffModal';
 import BarberPermissionsModal from '../components/BarberPermissionsModal';
+import NewBarberModal from '../components/NewBarberModal';
 
 type Barber = {
   id: string;
@@ -18,6 +19,7 @@ export default function OwnerBarbers() {
   const [scheduleBarber, setScheduleBarber] = useState<Barber | null>(null);
   const [timeOffBarber, setTimeOffBarber] = useState<Barber | null>(null);
   const [permissionsBarber, setPermissionsBarber] = useState<Barber | null>(null);
+  const [showNewBarberModal, setShowNewBarberModal] = useState(false);
   const { language, t } = useLanguage();
 
   useEffect(() => {
@@ -57,7 +59,24 @@ export default function OwnerBarbers() {
     <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
       <Header />
       <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
-        <h2 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '1.5rem' }}>{t.barbers}</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <h2 style={{ fontSize: '28px', fontWeight: 'bold' }}>{t.barbers}</h2>
+          <button
+            onClick={() => setShowNewBarberModal(true)}
+            style={{
+              padding: '12px 24px',
+              backgroundColor: '#000',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '500',
+            }}
+          >
+            {language === 'en' ? 'New Barber' : 'Nuevo Barbero'}
+          </button>
+        </div>
 
         {barbers.length === 0 ? (
           <p style={{ color: '#666' }}>
@@ -174,6 +193,16 @@ export default function OwnerBarbers() {
           onClose={() => setPermissionsBarber(null)}
           onSave={() => {
             setPermissionsBarber(null);
+            loadBarbers();
+          }}
+        />
+      )}
+
+      {showNewBarberModal && (
+        <NewBarberModal
+          onClose={() => setShowNewBarberModal(false)}
+          onSave={() => {
+            setShowNewBarberModal(false);
             loadBarbers();
           }}
         />

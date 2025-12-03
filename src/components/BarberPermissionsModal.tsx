@@ -16,7 +16,10 @@ export default function BarberPermissionsModal({
 }: BarberPermissionsModalProps) {
   const { language } = useLanguage();
   const { userData } = useAuth();
-  const [barberData, setBarberData] = useState<any>(null);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [preferredLanguage, setPreferredLanguage] = useState<'en' | 'es'>('en');
   const [active, setActive] = useState(true);
   const [canViewOwnStats, setCanViewOwnStats] = useState(false);
   const [canViewShopReports, setCanViewShopReports] = useState(false);
@@ -40,7 +43,10 @@ export default function BarberPermissionsModal({
 
       if (error) throw error;
 
-      setBarberData(data);
+      setName(data.name || '');
+      setEmail(data.email || '');
+      setPhone(data.phone || '');
+      setPreferredLanguage(data.preferred_language || 'en');
       setActive(data.active ?? true);
       setCanViewOwnStats(data.can_view_own_stats ?? false);
       setCanViewShopReports(data.can_view_shop_reports ?? false);
@@ -63,10 +69,20 @@ export default function BarberPermissionsModal({
     setSaving(true);
     setError('');
 
+    if (!name.trim() || !email.trim()) {
+      setError(language === 'en' ? 'Name and email are required' : 'Nombre y correo electrónico son requeridos');
+      setSaving(false);
+      return;
+    }
+
     try {
       const { error: updateError } = await supabase
         .from('users')
         .update({
+          name: name.trim(),
+          email: email.trim(),
+          phone: phone.trim() || null,
+          preferred_language: preferredLanguage,
           active,
           can_view_own_stats: canViewOwnStats,
           can_view_shop_reports: canViewShopReports,
@@ -171,12 +187,87 @@ export default function BarberPermissionsModal({
           <p>{language === 'en' ? 'Loading...' : 'Cargando...'}</p>
         ) : (
           <>
-            {barberData && (
-              <div style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
-                <div style={{ fontWeight: 'bold', marginBottom: '0.25rem' }}>{barberData.name}</div>
-                <div style={{ fontSize: '14px', color: '#666' }}>{barberData.email}</div>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '1rem' }}>
+                {language === 'en' ? 'Barber Information' : 'Información del Barbero'}
+              </h3>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
+                    {language === 'en' ? 'Name' : 'Nombre'}
+                  </label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      border: '2px solid #ddd',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
+                    {language === 'en' ? 'Email' : 'Correo Electrónico'}
+                  </label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      border: '2px solid #ddd',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
+                    {language === 'en' ? 'Phone' : 'Teléfono'}
+                  </label>
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      border: '2px solid #ddd',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
+                    {language === 'en' ? 'Preferred Language' : 'Idioma Preferido'}
+                  </label>
+                  <select
+                    value={preferredLanguage}
+                    onChange={(e) => setPreferredLanguage(e.target.value as 'en' | 'es')}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      border: '2px solid #ddd',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                    }}
+                  >
+                    <option value="en">English</option>
+                    <option value="es">Español</option>
+                  </select>
+                </div>
               </div>
-            )}
+            </div>
 
             <div style={{ marginBottom: '1.5rem' }}>
               <label
