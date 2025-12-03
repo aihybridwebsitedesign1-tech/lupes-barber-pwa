@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
+import { uploadImage, getUploadLimitText } from '../lib/uploadHelper';
 import Header from '../components/Header';
 
 type Product = {
@@ -90,29 +91,17 @@ export default function OwnerProducts() {
       return;
     }
 
-    if (selectedFile.size > 50 * 1024 * 1024) {
-      alert(language === 'en' ? 'File size must be less than 50MB' : 'El tamaño del archivo debe ser menor a 50MB');
-      return;
-    }
-
     setUploading(true);
     try {
       const fileId = editingProduct?.id || crypto.randomUUID();
-      const timestamp = Date.now();
-      const filePath = `products/${fileId}/${timestamp}_${selectedFile.name}`;
+      const result = await uploadImage(selectedFile, 'product-images', `products/${fileId}`);
 
-      const { error: uploadError } = await supabase.storage.from('product-images').upload(filePath, selectedFile, {
-        cacheControl: '3600',
-        upsert: false,
-      });
+      if (!result.success) {
+        alert(language === 'en' ? result.error : result.error === 'File size must be less than 100MB' ? 'El tamaño del archivo debe ser menor a 100MB' : result.error);
+        return;
+      }
 
-      if (uploadError) throw uploadError;
-
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from('product-images').getPublicUrl(filePath);
-
-      setImageUrl(publicUrl);
+      setImageUrl(result.url!);
       setSelectedFile(null);
       alert(language === 'en' ? 'Image uploaded successfully!' : '¡Imagen subida exitosamente!');
     } catch (error) {
@@ -511,7 +500,7 @@ export default function OwnerProducts() {
                         : 'Subir Imagen'}
                     </button>
                     <div style={{ marginTop: '0.25rem', fontSize: '11px', color: '#666' }}>
-                      {language === 'en' ? 'Max 50MB. JPG, PNG, WEBP' : 'Máx 50MB. JPG, PNG, WEBP'}
+                      {getUploadLimitText(language)}
                     </div>
                   </div>
 

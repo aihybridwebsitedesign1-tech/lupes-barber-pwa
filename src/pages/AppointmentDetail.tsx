@@ -3,7 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
+import { uploadImage, getUploadLimitText } from '../lib/uploadHelper';
 import Header from '../components/Header';
+import PaymentModal from '../components/PaymentModal';
 
 type Appointment = {
   id: string;
@@ -74,9 +76,7 @@ export default function AppointmentDetail() {
   const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState('');
   const [productQuantity, setProductQuantity] = useState(1);
-  const [showPaymentSection, setShowPaymentSection] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card_in_shop' | 'card_online'>('cash');
-  const [tipAmount, setTipAmount] = useState('0');
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [actualDuration, setActualDuration] = useState('');
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -227,50 +227,6 @@ export default function AppointmentDetail() {
       .eq('id', appointmentId);
   };
 
-  const handleRecordPayment = async () => {
-    if (!appointment) return;
-
-    setSaving(true);
-    try {
-      const { data: shopConfig } = await supabase.from('shop_config').select('tax_rate, card_processing_fee_rate').single();
-
-      const taxRate = Number(shopConfig?.tax_rate || 0);
-      const cardFeeRate = paymentMethod === 'cash' ? 0 : Number(shopConfig?.card_processing_fee_rate || 0.04);
-
-      const subtotal = appointment.services_total + appointment.products_total;
-      const taxAmount = subtotal * taxRate;
-      const totalBeforeTip = subtotal + taxAmount;
-      const tipAmountNum = Number(tipAmount) || 0;
-      const processingFeeAmount = (totalBeforeTip + tipAmountNum) * cardFeeRate;
-      const totalCharged = totalBeforeTip + tipAmountNum + processingFeeAmount;
-      const netRevenue = totalCharged - processingFeeAmount;
-
-      const { error } = await supabase
-        .from('appointments')
-        .update({
-          payment_method: paymentMethod,
-          tip_amount: tipAmountNum,
-          tax_amount: taxAmount,
-          processing_fee_rate: cardFeeRate,
-          processing_fee_amount: processingFeeAmount,
-          total_charged: totalCharged,
-          net_revenue: netRevenue,
-          paid_at: new Date().toISOString(),
-        })
-        .eq('id', appointmentId);
-
-      if (error) throw error;
-
-      alert(language === 'en' ? 'Payment recorded successfully!' : '¡Pago registrado exitosamente!');
-      setShowPaymentSection(false);
-      loadAppointmentData();
-    } catch (error) {
-      console.error('Error recording payment:', error);
-      alert(language === 'en' ? 'Error recording payment' : 'Error al registrar pago');
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const handleMarkCompleted = async () => {
     if (!appointment) return;
@@ -340,11 +296,6 @@ export default function AppointmentDetail() {
     const file = e.target.files?.[0];
     if (!file || !appointment || !user) return;
 
-    if (file.size > 50 * 1024 * 1024) {
-      alert(language === 'en' ? 'File size must be less than 50MB' : 'El tamaño del archivo debe ser menor a 50MB');
-      return;
-    }
-
     if (appointment.status !== 'completed') {
       alert(
         language === 'en'
@@ -356,27 +307,19 @@ export default function AppointmentDetail() {
 
     setUploading(true);
     try {
-      const timestamp = Date.now();
-      const filePath = `appointments/${appointmentId}/${timestamp}_${file.name}`;
+      const result = await uploadImage(file, 'transformation-photos', `appointments/${appointmentId}`);
 
-      const { error: uploadError } = await supabase.storage
-        .from('transformation-photos')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false,
-        });
-
-      if (uploadError) throw uploadError;
-
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from('transformation-photos').getPublicUrl(filePath);
+      if (!result.success) {
+        alert(language === 'en' ? result.error : result.error === 'File size must be less than 100MB' ? 'El tamaño del archivo debe ser menor a 100MB' : result.error);
+        setUploading(false);
+        return;
+      }
 
       const { error: insertError } = await supabase.from('transformation_photos').insert({
         appointment_id: appointmentId,
         barber_id: appointment.barber?.id || user.id,
         client_id: appointment.client.id,
-        image_url: publicUrl,
+        image_url: result.url!,
         type: 'single',
       });
 
@@ -731,97 +674,20 @@ export default function AppointmentDetail() {
               {language === 'en' ? 'Payment' : 'Pago'}
             </h3>
 
-            {!showPaymentSection ? (
-              <button
-                onClick={() => setShowPaymentSection(true)}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#000',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                }}
-              >
-                {language === 'en' ? 'Record Payment' : 'Registrar Pago'}
-              </button>
-            ) : (
-              <div>
-                <div style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
-                    {language === 'en' ? 'Payment Method' : 'Método de Pago'}
-                  </label>
-                  <select
-                    value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value as any)}
-                    style={{
-                      width: '100%',
-                      padding: '8px',
-                      border: '1px solid #ddd',
-                      borderRadius: '4px',
-                    }}
-                  >
-                    <option value="cash">{language === 'en' ? 'Cash' : 'Efectivo'}</option>
-                    <option value="card_in_shop">{language === 'en' ? 'Card (in shop)' : 'Tarjeta (en tienda)'}</option>
-                    <option value="card_online">{language === 'en' ? 'Card (online)' : 'Tarjeta (en línea)'}</option>
-                  </select>
-                </div>
-
-                <div style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
-                    {language === 'en' ? 'Tip Amount' : 'Monto de Propina'}
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={tipAmount}
-                    onChange={(e) => setTipAmount(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px',
-                      border: '1px solid #ddd',
-                      borderRadius: '4px',
-                    }}
-                  />
-                </div>
-
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button
-                    onClick={() => {
-                      setShowPaymentSection(false);
-                      setTipAmount('0');
-                    }}
-                    style={{
-                      padding: '10px 20px',
-                      backgroundColor: '#f5f5f5',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                    }}
-                  >
-                    {t.cancel}
-                  </button>
-                  <button
-                    onClick={handleRecordPayment}
-                    disabled={saving}
-                    style={{
-                      padding: '10px 20px',
-                      backgroundColor: '#000',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: saving ? 'not-allowed' : 'pointer',
-                      fontSize: '14px',
-                    }}
-                  >
-                    {saving ? t.loading : t.save}
-                  </button>
-                </div>
-              </div>
-            )}
+            <button
+              onClick={() => setShowPaymentModal(true)}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: '#000',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '14px',
+              }}
+            >
+              {language === 'en' ? 'Record Payment' : 'Registrar Pago'}
+            </button>
           </div>
         )}
 
@@ -923,7 +789,7 @@ export default function AppointmentDetail() {
                 />
               </label>
               <div style={{ marginTop: '0.5rem', fontSize: '12px', color: '#666' }}>
-                {language === 'en' ? 'Max 50MB. JPG, PNG, WEBP' : 'Máx 50MB. JPG, PNG, WEBP'}
+                {getUploadLimitText(language)}
               </div>
             </div>
 
@@ -956,6 +822,19 @@ export default function AppointmentDetail() {
           </div>
         )}
       </main>
+
+      {showPaymentModal && appointment && (
+        <PaymentModal
+          appointmentId={appointmentId!}
+          servicesTotal={appointment.services_total}
+          productsTotal={appointment.products_total}
+          onClose={() => setShowPaymentModal(false)}
+          onSave={() => {
+            setShowPaymentModal(false);
+            loadAppointmentData();
+          }}
+        />
+      )}
     </div>
   );
 }
