@@ -17,8 +17,15 @@ export default function BarberToday() {
   const [appointments, setAppointments] = useState<AppointmentWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const { language, t } = useLanguage();
-  const { userData } = useAuth();
+  const { userData, signOut } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (userData && userData.role === 'BARBER' && userData.active === false) {
+      return;
+    }
+    loadAppointments();
+  }, [userData]);
 
   const loadAppointments = async () => {
     if (!userData) return;
@@ -61,10 +68,6 @@ export default function BarberToday() {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    loadAppointments();
-  }, [userData]);
 
   const formatTime = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -118,6 +121,41 @@ export default function BarberToday() {
       <div>
         <Header />
         <div style={{ padding: '2rem', textAlign: 'center' }}>{t.loading}</div>
+      </div>
+    );
+  }
+
+  if (userData && userData.role === 'BARBER' && userData.active === false) {
+    return (
+      <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
+        <Header />
+        <main style={{ maxWidth: '600px', margin: '0 auto', padding: '4rem 2rem', textAlign: 'center' }}>
+          <div style={{ backgroundColor: 'white', padding: '3rem 2rem', borderRadius: '12px', boxShadow: '0 4px 8px rgba(0,0,0,0.1)' }}>
+            <h2 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '1.5rem', color: '#f44336' }}>
+              {language === 'en' ? 'Account Inactive' : 'Cuenta Inactiva'}
+            </h2>
+            <p style={{ fontSize: '16px', color: '#666', marginBottom: '2rem', lineHeight: '1.6' }}>
+              {language === 'en'
+                ? 'Your account has been deactivated. Please contact the shop owner for more information.'
+                : 'Tu cuenta ha sido desactivada. Por favor contacta al dueño de la tienda para más información.'}
+            </p>
+            <button
+              onClick={signOut}
+              style={{
+                padding: '12px 32px',
+                backgroundColor: '#000',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '16px',
+                fontWeight: '500',
+              }}
+            >
+              {language === 'en' ? 'Logout' : 'Cerrar Sesión'}
+            </button>
+          </div>
+        </main>
       </div>
     );
   }

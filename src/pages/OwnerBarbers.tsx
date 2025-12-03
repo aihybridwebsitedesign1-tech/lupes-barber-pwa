@@ -4,6 +4,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import Header from '../components/Header';
 import BarberScheduleModal from '../components/BarberScheduleModal';
 import BarberTimeOffModal from '../components/BarberTimeOffModal';
+import BarberPermissionsModal from '../components/BarberPermissionsModal';
 
 type Barber = {
   id: string;
@@ -16,6 +17,7 @@ export default function OwnerBarbers() {
   const [loading, setLoading] = useState(true);
   const [scheduleBarber, setScheduleBarber] = useState<Barber | null>(null);
   const [timeOffBarber, setTimeOffBarber] = useState<Barber | null>(null);
+  const [permissionsBarber, setPermissionsBarber] = useState<Barber | null>(null);
   const { language, t } = useLanguage();
 
   useEffect(() => {
@@ -95,7 +97,21 @@ export default function OwnerBarbers() {
                       </span>
                     </td>
                     <td style={{ padding: '1rem', fontSize: '14px' }}>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <button
+                          onClick={() => setPermissionsBarber(barber)}
+                          style={{
+                            padding: '6px 12px',
+                            backgroundColor: '#0066cc',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                          }}
+                        >
+                          {language === 'en' ? 'Manage' : 'Gestionar'}
+                        </button>
                         <button
                           onClick={() => setScheduleBarber(barber)}
                           style={{
@@ -149,6 +165,17 @@ export default function OwnerBarbers() {
           barberName={timeOffBarber.name}
           onClose={() => setTimeOffBarber(null)}
           onSuccess={() => loadBarbers()}
+        />
+      )}
+
+      {permissionsBarber && (
+        <BarberPermissionsModal
+          barberId={permissionsBarber.id}
+          onClose={() => setPermissionsBarber(null)}
+          onSave={() => {
+            setPermissionsBarber(null);
+            loadBarbers();
+          }}
         />
       )}
     </div>

@@ -20,7 +20,7 @@ export default function PaymentModal({
   const { language, t } = useLanguage();
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card_in_shop' | 'card_online'>('cash');
   const [tipAmount, setTipAmount] = useState('0.00');
-  const [cashTotalCollected, setCashTotalCollected] = useState('');
+  const [cashBaseAmount, setCashBaseAmount] = useState('');
   const [taxRate, setTaxRate] = useState(0);
   const [cardFeeRate, setCardFeeRate] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -79,12 +79,12 @@ export default function PaymentModal({
     }
 
     if (paymentMethod === 'cash') {
-      const cashTotal = parseFloat(cashTotalCollected);
-      if (!cashTotalCollected || isNaN(cashTotal) || cashTotal < 0) {
+      const cashBase = parseFloat(cashBaseAmount);
+      if (!cashBaseAmount || isNaN(cashBase) || cashBase < 0) {
         setError(
           language === 'en'
-            ? 'Cash total collected is required and must be >= 0'
-            : 'El total de efectivo recolectado es requerido y debe ser >= 0'
+            ? 'Cash amount is required and must be >= 0'
+            : 'El monto de efectivo es requerido y debe ser >= 0'
         );
         return;
       }
@@ -95,7 +95,8 @@ export default function PaymentModal({
 
     try {
       if (paymentMethod === 'cash') {
-        const cashTotal = parseFloat(cashTotalCollected);
+        const cashBase = parseFloat(cashBaseAmount);
+        const cashTotal = cashBase + tip;
         const { error: updateError } = await supabase
           .from('appointments')
           .update({
@@ -198,17 +199,66 @@ export default function PaymentModal({
         </div>
 
         {paymentMethod === 'cash' && (
+          <>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
+                {language === 'en' ? 'Cash Amount (before tip)' : 'Monto de Efectivo (antes de propina)'}
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={cashBaseAmount}
+                onChange={(e) => setCashBaseAmount(e.target.value)}
+                placeholder="0.00"
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  border: '2px solid #ddd',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
+                {language === 'en' ? 'Tip Amount' : 'Monto de Propina'}
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={tipAmount}
+                onChange={(e) => setTipAmount(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  border: '2px solid #ddd',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                }}
+              />
+              <div style={{ marginTop: '0.5rem', fontSize: '12px', color: '#666' }}>
+                {language === 'en'
+                  ? 'Tip is stored separately and included in the recorded cash total.'
+                  : 'La propina se almacena por separado e incluida en el total de efectivo registrado.'}
+              </div>
+            </div>
+          </>
+        )}
+
+        {paymentMethod !== 'cash' && (
           <div style={{ marginBottom: '1.5rem' }}>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
-              {language === 'en' ? 'Cash Total Collected (including tip)' : 'Total de Efectivo Cobrado (incluye propina)'}
+              {language === 'en' ? 'Tip Amount' : 'Monto de Propina'}
             </label>
             <input
               type="number"
               step="0.01"
               min="0"
-              value={cashTotalCollected}
-              onChange={(e) => setCashTotalCollected(e.target.value)}
-              placeholder="0.00"
+              value={tipAmount}
+              onChange={(e) => setTipAmount(e.target.value)}
               style={{
                 width: '100%',
                 padding: '10px',
@@ -219,31 +269,6 @@ export default function PaymentModal({
             />
           </div>
         )}
-
-        <div style={{ marginBottom: '1.5rem' }}>
-          <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
-            {language === 'en' ? 'Tip Amount' : 'Monto de Propina'}
-          </label>
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            value={tipAmount}
-            onChange={(e) => setTipAmount(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '10px',
-              border: '2px solid #ddd',
-              borderRadius: '6px',
-              fontSize: '14px',
-            }}
-          />
-          {paymentMethod === 'cash' && (
-            <div style={{ marginTop: '0.5rem', fontSize: '12px', color: '#666' }}>
-              {language === 'en' ? '(For breakdown reference only)' : '(Solo para referencia del desglose)'}
-            </div>
-          )}
-        </div>
 
         <div
           style={{
@@ -303,28 +328,61 @@ export default function PaymentModal({
               </div>
             )}
 
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                fontSize: '18px',
-                fontWeight: 'bold',
-                paddingTop: '0.75rem',
-                borderTop: '2px solid #000',
-                marginTop: '0.5rem',
-              }}
-            >
-              <span>
-                {paymentMethod === 'cash'
-                  ? language === 'en'
-                    ? 'Out-the-door Total (Cash):'
-                    : 'Total a Pagar (Efectivo):'
-                  : language === 'en'
-                  ? 'Card Total (includes fee):'
-                  : 'Total con Tarjeta (incluye tarifa):'}
-              </span>
-              <span>{formatCurrency(totals.totalCharged)}</span>
-            </div>
+            {paymentMethod === 'cash' && (
+              <>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    fontSize: '14px',
+                    paddingTop: '0.5rem',
+                    borderTop: '1px solid #ddd',
+                    color: '#666',
+                  }}
+                >
+                  <span>{language === 'en' ? 'Suggested Out-the-door Total (Cash):' : 'Total Sugerido (Efectivo):'}</span>
+                  <span style={{ fontWeight: '500' }}>{formatCurrency(totals.totalCharged)}</span>
+                </div>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    fontSize: '18px',
+                    fontWeight: 'bold',
+                    paddingTop: '0.75rem',
+                    borderTop: '2px solid #000',
+                    marginTop: '0.5rem',
+                  }}
+                >
+                  <span>
+                    {language === 'en' ? 'Recorded Cash Total (base + tip):' : 'Total de Efectivo Registrado (base + propina):'}
+                  </span>
+                  <span>
+                    {formatCurrency(
+                      (parseFloat(cashBaseAmount) || 0) + (parseFloat(tipAmount) || 0)
+                    )}
+                  </span>
+                </div>
+              </>
+            )}
+
+            {paymentMethod !== 'cash' && (
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  fontSize: '18px',
+                  fontWeight: 'bold',
+                  paddingTop: '0.75rem',
+                  borderTop: '2px solid #000',
+                  marginTop: '0.5rem',
+                }}
+              >
+                <span>{language === 'en' ? 'Card Total (includes fee):' : 'Total con Tarjeta (incluye tarifa):'}</span>
+                <span>{formatCurrency(totals.totalCharged)}</span>
+              </div>
+            )}
 
             <div
               style={{
