@@ -298,6 +298,7 @@ export default function AppointmentDetail() {
 
   const canDelete = userData?.role === 'OWNER' || userData?.can_manage_appointments;
   const canEditAppointment = userData?.role === 'OWNER' || userData?.can_manage_appointments;
+  const canManagePayment = userData?.role === 'OWNER' || userData?.can_manage_appointments;
 
   const handleDeleteClick = () => {
     if (!canDelete) {
@@ -806,92 +807,114 @@ export default function AppointmentDetail() {
           </div>
         )}
 
-        {canEdit && !appointment.paid_at && (
-          <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '8px', marginBottom: '2rem' }}>
-            <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '1rem' }}>
-              {language === 'en' ? 'Payment' : 'Pago'}
-            </h3>
+        <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '8px', marginBottom: '2rem' }}>
+          <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '1rem' }}>
+            {appointment.paid_at
+              ? language === 'en' ? 'Payment Summary' : 'Resumen de Pago'
+              : language === 'en' ? 'Payment' : 'Pago'}
+          </h3>
 
-            <button
-              onClick={() => setShowPaymentModal(true)}
-              style={{
-                padding: '10px 20px',
-                backgroundColor: '#000',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '14px',
-              }}
-            >
-              {language === 'en' ? 'Record Payment' : 'Registrar Pago'}
-            </button>
-          </div>
-        )}
-
-        {appointment.paid_at && (
-          <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '8px', marginBottom: '2rem' }}>
-            <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '1rem' }}>
-              {language === 'en' ? 'Payment Summary' : 'Resumen de Pago'}
-            </h3>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>{language === 'en' ? 'Services' : 'Servicios'}:</span>
-                <span>{formatCurrency(appointment.services_total)}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>{language === 'en' ? 'Products' : 'Productos'}:</span>
-                <span>{formatCurrency(appointment.products_total)}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>{language === 'en' ? 'Tax' : 'Impuesto'}:</span>
-                <span>{formatCurrency(appointment.tax_amount)}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>{language === 'en' ? 'Tip' : 'Propina'}:</span>
-                <span>{formatCurrency(appointment.tip_amount)}</span>
-              </div>
-              {appointment.processing_fee_amount > 0 && (
+          {appointment.paid_at ? (
+            <>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>{language === 'en' ? 'Processing Fee' : 'Tarifa de Procesamiento'}:</span>
-                  <span>{formatCurrency(appointment.processing_fee_amount)}</span>
+                  <span>{language === 'en' ? 'Services' : 'Servicios'}:</span>
+                  <span>{formatCurrency(appointment.services_total)}</span>
                 </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>{language === 'en' ? 'Products' : 'Productos'}:</span>
+                  <span>{formatCurrency(appointment.products_total)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>{language === 'en' ? 'Tax' : 'Impuesto'}:</span>
+                  <span>{formatCurrency(appointment.tax_amount)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>{language === 'en' ? 'Tip' : 'Propina'}:</span>
+                  <span>{formatCurrency(appointment.tip_amount)}</span>
+                </div>
+                {appointment.processing_fee_amount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>{language === 'en' ? 'Processing Fee' : 'Tarifa de Procesamiento'}:</span>
+                    <span>{formatCurrency(appointment.processing_fee_amount)}</span>
+                  </div>
+                )}
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    paddingTop: '0.5rem',
+                    borderTop: '2px solid #000',
+                    fontWeight: 'bold',
+                    fontSize: '18px',
+                  }}
+                >
+                  <span>{language === 'en' ? 'Total Charged' : 'Total Cobrado'}:</span>
+                  <span>{formatCurrency(appointment.total_charged)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#666' }}>
+                  <span>{language === 'en' ? 'Net Revenue' : 'Ingreso Neto'}:</span>
+                  <span>{formatCurrency(appointment.net_revenue)}</span>
+                </div>
+                <div style={{ marginTop: '0.5rem', fontSize: '14px', color: '#666' }}>
+                  {language === 'en' ? 'Payment Method' : 'Método de Pago'}:{' '}
+                  {appointment.payment_method === 'cash'
+                    ? language === 'en'
+                      ? 'Cash'
+                      : 'Efectivo'
+                    : appointment.payment_method === 'card_in_shop'
+                    ? language === 'en'
+                      ? 'Card (in shop)'
+                      : 'Tarjeta (en tienda)'
+                    : language === 'en'
+                    ? 'Card (online)'
+                    : 'Tarjeta (en línea)'}
+                </div>
+              </div>
+
+              {canManagePayment && (
+                <button
+                  onClick={() => setShowPaymentModal(true)}
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: '#007bff',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                  }}
+                >
+                  {language === 'en' ? 'Edit Payment' : 'Editar Pago'}
+                </button>
               )}
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  paddingTop: '0.5rem',
-                  borderTop: '2px solid #000',
-                  fontWeight: 'bold',
-                  fontSize: '18px',
-                }}
-              >
-                <span>{language === 'en' ? 'Total Charged' : 'Total Cobrado'}:</span>
-                <span>{formatCurrency(appointment.total_charged)}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#666' }}>
-                <span>{language === 'en' ? 'Net Revenue' : 'Ingreso Neto'}:</span>
-                <span>{formatCurrency(appointment.net_revenue)}</span>
-              </div>
-              <div style={{ marginTop: '0.5rem', fontSize: '14px', color: '#666' }}>
-                {language === 'en' ? 'Payment Method' : 'Método de Pago'}:{' '}
-                {appointment.payment_method === 'cash'
-                  ? language === 'en'
-                    ? 'Cash'
-                    : 'Efectivo'
-                  : appointment.payment_method === 'card_in_shop'
-                  ? language === 'en'
-                    ? 'Card (in shop)'
-                    : 'Tarjeta (en tienda)'
-                  : language === 'en'
-                  ? 'Card (online)'
-                  : 'Tarjeta (en línea)'}
-              </div>
-            </div>
-          </div>
-        )}
+            </>
+          ) : (
+            <>
+              {canManagePayment ? (
+                <button
+                  onClick={() => setShowPaymentModal(true)}
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: '#000',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                  }}
+                >
+                  {language === 'en' ? 'Record Payment' : 'Registrar Pago'}
+                </button>
+              ) : (
+                <p style={{ color: '#666', fontStyle: 'italic' }}>
+                  {language === 'en' ? 'No payment recorded yet' : 'Aún no se ha registrado el pago'}
+                </p>
+              )}
+            </>
+          )}
+        </div>
 
         {canEdit && appointment.status === 'completed' && (
           <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '8px' }}>

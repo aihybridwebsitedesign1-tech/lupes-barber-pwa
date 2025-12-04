@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import Header from '../components/Header';
+import EditClientModal from '../components/EditClientModal';
+import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 
 type Client = {
   id: string;
@@ -45,7 +47,7 @@ export default function ClientDetail() {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
   const { language, t } = useLanguage();
-  const { user } = useAuth();
+  const { user, userData } = useAuth();
   const [client, setClient] = useState<Client | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -55,6 +57,11 @@ export default function ClientDetail() {
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editedClient, setEditedClient] = useState<Client | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const canManageClients = userData?.role === 'OWNER' || userData?.can_manage_clients;
 
   useEffect(() => {
     if (clientId) {
@@ -193,6 +200,58 @@ export default function ClientDetail() {
     }
   };
 
+  const handleDeleteConfirm = async () => {
+    if (!clientId) return;
+
+    setDeleting(true);
+    try {
+      const { data: appointments, error: appointmentsError } = await supabase
+        .from('appointments')
+        .select('id')
+        .eq('client_id', clientId);
+
+      if (appointmentsError) throw appointmentsError;
+
+      if (appointments && appointments.length > 0) {
+        const { error: softDeleteError } = await supabase
+          .from('clients')
+          .update({ is_deleted: true })
+          .eq('id', clientId);
+
+        if (softDeleteError) throw softDeleteError;
+
+        alert(
+          language === 'en'
+            ? 'Client marked as deleted. They still appear in historical data.'
+            : 'Cliente marcado como eliminado. Aún aparece en datos históricos.'
+        );
+      } else {
+        const { error: hardDeleteError } = await supabase
+          .from('clients')
+          .delete()
+          .eq('id', clientId);
+
+        if (hardDeleteError) throw hardDeleteError;
+
+        alert(
+          language === 'en' ? 'Client deleted successfully!' : '¡Cliente eliminado exitosamente!'
+        );
+      }
+
+      navigate('/owner/clients');
+    } catch (error: any) {
+      console.error('Error deleting client:', error);
+      alert(
+        language === 'en'
+          ? `Error deleting client: ${error.message || 'Unknown error'}`
+          : `Error al eliminar cliente: ${error.message || 'Error desconocido'}`
+      );
+    } finally {
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString(language === 'en' ? 'en-US' : 'es-ES', {
@@ -260,11 +319,45 @@ export default function ClientDetail() {
         </button>
 
         <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '8px', marginBottom: '2rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
             <h2 style={{ fontSize: '24px', fontWeight: 'bold' }}>
               {language === 'en' ? 'Client Information' : 'Información del Cliente'}
             </h2>
-            {!editing ? (
+            {canManageClients && !editing && (
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  onClick={() => setShowEditModal(true)}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: '#007bff',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                  }}
+                >
+                  {language === 'en' ? 'Edit Client' : 'Editar Cliente'}
+                </button>
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: '#dc3545',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                  }}
+                >
+                  {language === 'en' ? 'Delete' : 'Eliminar'}
+                </button>
+              </div>
+            )}
+            {!canManageClients && !editing && (
               <button
                 onClick={() => setEditing(true)}
                 style={{
@@ -279,7 +372,8 @@ export default function ClientDetail() {
               >
                 {language === 'en' ? 'Edit' : 'Editar'}
               </button>
-            ) : (
+            )}
+            {editing && (
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button
                   onClick={() => {
@@ -590,6 +684,31 @@ export default function ClientDetail() {
             </div>
           )}
         </div>
+
+        {showEditModal && clientId && (
+          <EditClientModal
+            clientId={clientId}
+            onClose={() => setShowEditModal(false)}
+            onSave={() => {
+              setShowEditModal(false);
+              loadClientData();
+            }}
+          />
+        )}
+
+        <ConfirmDeleteModal
+          isOpen={showDeleteConfirm}
+          title={language === 'en' ? 'Delete Client' : 'Eliminar Cliente'}
+          description={
+            language === 'en'
+              ? 'Type DELETE to confirm. If the client has appointments, they will be marked as deleted but will remain in historical data.'
+              : 'Escriba DELETE para confirmar. Si el cliente tiene citas, se marcará como eliminado pero permanecerá en los datos históricos.'
+          }
+          confirmWord="DELETE"
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => setShowDeleteConfirm(false)}
+          isLoading={deleting}
+        />
       </main>
     </div>
   );

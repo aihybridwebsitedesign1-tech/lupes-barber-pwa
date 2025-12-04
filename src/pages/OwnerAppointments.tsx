@@ -219,7 +219,7 @@ export default function OwnerAppointments() {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
       <Header />
-      <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
+      <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '1rem' }}>
         <h2 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '1.5rem' }}>{t.appointments}</h2>
 
         <div style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
@@ -306,7 +306,8 @@ export default function OwnerAppointments() {
           </div>
         ) : (
           <div style={{ backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '800px' }}>
               <thead style={{ backgroundColor: '#f9f9f9' }}>
                 <tr>
                   <th style={{ padding: '1rem', textAlign: 'left', fontSize: '14px', fontWeight: '500' }}>
@@ -433,6 +434,7 @@ export default function OwnerAppointments() {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         )}
 

@@ -2,7 +2,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
 import Header from '../components/Header';
+import NewClientModal from '../components/NewClientModal';
+import EditClientModal from '../components/EditClientModal';
+import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 
 type Client = {
   id: string;
@@ -19,8 +23,16 @@ export default function OwnerClients() {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showNewClientModal, setShowNewClientModal] = useState(false);
+  const [editingClientId, setEditingClientId] = useState<string | null>(null);
+  const [deletingClientId, setDeletingClientId] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const { language, t } = useLanguage();
+  const { userData } = useAuth();
   const navigate = useNavigate();
+
+  const canManageClients = userData?.role === 'OWNER' || userData?.can_manage_clients;
 
   useEffect(() => {
     loadClients();
@@ -31,6 +43,7 @@ export default function OwnerClients() {
       const { data: clientsData, error: clientsError } = await supabase
         .from('clients')
         .select('*')
+        .eq('is_deleted', false)
         .order('first_name');
 
       if (clientsError) throw clientsError;
@@ -79,6 +92,64 @@ export default function OwnerClients() {
     });
   };
 
+  const handleDeleteClick = (client: Client) => {
+    setDeletingClientId(client.id);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingClientId) return;
+
+    setDeleting(true);
+    try {
+      const { data: appointments, error: appointmentsError } = await supabase
+        .from('appointments')
+        .select('id')
+        .eq('client_id', deletingClientId);
+
+      if (appointmentsError) throw appointmentsError;
+
+      if (appointments && appointments.length > 0) {
+        const { error: softDeleteError } = await supabase
+          .from('clients')
+          .update({ is_deleted: true })
+          .eq('id', deletingClientId);
+
+        if (softDeleteError) throw softDeleteError;
+
+        alert(
+          language === 'en'
+            ? 'Client marked as deleted. They still appear in historical data.'
+            : 'Cliente marcado como eliminado. Aún aparece en datos históricos.'
+        );
+      } else {
+        const { error: hardDeleteError } = await supabase
+          .from('clients')
+          .delete()
+          .eq('id', deletingClientId);
+
+        if (hardDeleteError) throw hardDeleteError;
+
+        alert(
+          language === 'en' ? 'Client deleted successfully!' : '¡Cliente eliminado exitosamente!'
+        );
+      }
+
+      setClients((prev) => prev.filter((c) => c.id !== deletingClientId));
+      setShowDeleteConfirm(false);
+      setDeletingClientId(null);
+    } catch (error: any) {
+      console.error('Error deleting client:', error);
+      alert(
+        language === 'en'
+          ? `Error deleting client: ${error.message || 'Unknown error'}`
+          : `Error al eliminar cliente: ${error.message || 'Error desconocido'}`
+      );
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
@@ -93,10 +164,29 @@ export default function OwnerClients() {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
       <Header />
-      <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
-        <div style={{ marginBottom: '1.5rem' }}>
-          <h2 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '1rem' }}>{t.clients}</h2>
+      <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+          <h2 style={{ fontSize: '28px', fontWeight: 'bold' }}>{t.clients}</h2>
+          {canManageClients && (
+            <button
+              onClick={() => setShowNewClientModal(true)}
+              style={{
+                padding: '12px 24px',
+                backgroundColor: '#000',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+              }}
+            >
+              {language === 'en' ? 'New Client' : 'Nuevo Cliente'}
+            </button>
+          )}
+        </div>
 
+        <div style={{ marginBottom: '1.5rem' }}>
           <input
             type="text"
             placeholder={language === 'en' ? 'Search by name or phone...' : 'Buscar por nombre o teléfono...'}
@@ -123,7 +213,8 @@ export default function OwnerClients() {
           </div>
         ) : (
           <div style={{ backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '800px' }}>
               <thead style={{ backgroundColor: '#f9f9f9' }}>
                 <tr>
                   <th style={{ padding: '1rem', textAlign: 'left', fontSize: '14px', fontWeight: '500' }}>
@@ -183,30 +274,109 @@ export default function OwnerClients() {
                       </span>
                     </td>
                     <td style={{ padding: '1rem', fontSize: '14px' }}>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/owner/clients/${client.id}`);
-                        }}
-                        style={{
-                          padding: '6px 12px',
-                          backgroundColor: '#000',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '12px',
-                        }}
-                      >
-                        {language === 'en' ? 'View' : 'Ver'}
-                      </button>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/owner/clients/${client.id}`);
+                          }}
+                          style={{
+                            padding: '6px 12px',
+                            backgroundColor: '#000',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                          }}
+                        >
+                          {language === 'en' ? 'View' : 'Ver'}
+                        </button>
+                        {canManageClients && (
+                          <>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingClientId(client.id);
+                              }}
+                              style={{
+                                padding: '6px 12px',
+                                backgroundColor: '#007bff',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '12px',
+                              }}
+                            >
+                              {language === 'en' ? 'Edit' : 'Editar'}
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteClick(client);
+                              }}
+                              style={{
+                                padding: '6px 12px',
+                                backgroundColor: '#dc3545',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '12px',
+                              }}
+                            >
+                              {language === 'en' ? 'Delete' : 'Eliminar'}
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         )}
+
+        {showNewClientModal && (
+          <NewClientModal
+            onClose={() => setShowNewClientModal(false)}
+            onSave={() => {
+              setShowNewClientModal(false);
+              loadClients();
+            }}
+          />
+        )}
+
+        {editingClientId && (
+          <EditClientModal
+            clientId={editingClientId}
+            onClose={() => setEditingClientId(null)}
+            onSave={() => {
+              setEditingClientId(null);
+              loadClients();
+            }}
+          />
+        )}
+
+        <ConfirmDeleteModal
+          isOpen={showDeleteConfirm}
+          title={language === 'en' ? 'Delete Client' : 'Eliminar Cliente'}
+          description={
+            language === 'en'
+              ? 'Type DELETE to confirm. If the client has appointments, they will be marked as deleted but will remain in historical data.'
+              : 'Escriba DELETE para confirmar. Si el cliente tiene citas, se marcará como eliminado pero permanecerá en los datos históricos.'
+          }
+          confirmWord="DELETE"
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => {
+            setShowDeleteConfirm(false);
+            setDeletingClientId(null);
+          }}
+          isLoading={deleting}
+        />
       </main>
     </div>
   );
