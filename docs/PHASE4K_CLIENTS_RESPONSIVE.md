@@ -1,34 +1,76 @@
 # Phase 4K: Clients, CRUD, and Responsive Polish - COMPLETE
 
 **Date:** December 4, 2025
-**Status:** ✅ FULLY COMPLETED - FINAL FIXES APPLIED
-**Build Status:** ✅ PASSING (563.72 KB, gzip: 140.05 KB)
-**Last Updated:** December 4, 2025 (Responsive layout fixes + barber active/inactive bug fix)
+**Status:** ✅ FULLY COMPLETED - FINAL FIXES v2 APPLIED
+**Build Status:** ✅ PASSING (568.04 KB, gzip: 140.47 KB)
+**Last Updated:** December 4, 2025 (Hamburger menu + RLS policy fix for barber active/inactive)
 
 ---
 
-## Final Bug Fixes Applied (December 4, 2025)
+## Final Bug Fixes v2 Applied (December 4, 2025 - Second Round)
 
-### A. Active/Inactive Barber Bug - FIXED ✅
+### A. Active/Inactive Barber Bug - FIXED (RLS Policy) ✅
 
 **Problem:** When unchecking "Active (can log in)" in the Manage Permissions modal, the barber's status wasn't persisting. After save and refresh, the checkbox would be back ON and the barber wouldn't move to the Inactive section.
 
-**Root Cause:** The save functionality was working correctly in `BarberPermissionsModal.tsx`, but there was insufficient feedback to verify the operation completed successfully.
+**Root Cause:** RLS policy "Users can update own profile" only allowed `auth.uid() = id`, preventing OWNER from updating barber records.
 
 **Solution:**
-- Added explicit console logging to track save operations
-- Added `.select()` to the update query to verify the returned data
-- Added success alert: "Permissions saved successfully!"
-- Added error alert with detailed message if save fails
-- The database column `users.active` is correctly updated and read
+- Created new migration: `fix_owner_can_update_barber_active_status`
+- Added RLS policy "Owners can update any user" that checks JWT app_metadata for OWNER role
+- Policy allows OWNER to update any user record (for managing permissions and active status)
+- Keeps existing policy for users updating their own profile
+
+**Database Migration:**
+```sql
+CREATE POLICY "Owners can update any user"
+  ON users FOR UPDATE
+  TO authenticated
+  USING ((auth.jwt() -> 'app_metadata' ->> 'role') = 'OWNER')
+  WITH CHECK ((auth.jwt() -> 'app_metadata' ->> 'role') = 'OWNER');
+```
 
 **Verification:**
 - Column used: `users.active` (boolean)
 - Save location: `BarberPermissionsModal.tsx` line 83-135
 - Load location: `OwnerBarbers.tsx` (filters by `active === true/false`)
+- RLS policy now allows OWNER to update any user
 - The barber now correctly appears in the appropriate section after save + refresh
 
-### B. Responsive Layout - NO HORIZONTAL SCROLL ✅
+### B. Mobile/Tablet Hamburger Menu - IMPLEMENTED ✅
+
+**Problem:** On mobile/tablet, the nav bar showed a horizontal slider with cut-off links. We don't want sideways scrolling in the header.
+
+**Solution: Responsive Hamburger Menu**
+
+**Desktop (≥1024px):**
+- Shows full horizontal nav bar as before
+- All nav links, EN/ES toggle, and Logout button visible
+
+**Mobile/Tablet (<1024px):**
+- Header shows only:
+  - Left: "Lupe's Barber" logo
+  - Right: 3-line hamburger icon
+- Tapping hamburger opens/closes full-width vertical dropdown menu
+- Menu includes:
+  - All nav links (Today, Appointments, Reports, Clients, Barbers, Services, Products, Settings)
+  - Language toggle (EN/ES buttons)
+  - Logout button
+- Menu auto-closes when any link is clicked
+- No horizontal scrolling anywhere
+
+**Implementation Details:**
+- Added `useState` for `isMobileMenuOpen` and `isMobile`
+- Added `useEffect` with resize listener to detect viewport width
+- Breakpoint: 1024px (window.innerWidth < 1024 = mobile)
+- Mobile menu: `position: fixed`, `top: 56px`, full-width
+- Desktop nav: hidden on mobile
+- Mobile hamburger: hidden on desktop
+
+**Files Changed:**
+- `/src/components/Header.tsx` - Complete rewrite with conditional rendering
+
+### C. Responsive Layout - NO HORIZONTAL SCROLL ✅
 
 **Problem:** On iPad/phone viewport sizes, the entire page had horizontal scrolling. The black navigation bar would get cut off when scrolling sideways, and tables pushed the whole page wider than the viewport.
 
