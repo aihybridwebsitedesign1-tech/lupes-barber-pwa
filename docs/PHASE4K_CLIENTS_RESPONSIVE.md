@@ -1,8 +1,78 @@
 # Phase 4K: Clients, CRUD, and Responsive Polish - COMPLETE
 
 **Date:** December 4, 2025
-**Status:** ✅ FULLY COMPLETED
-**Build Status:** ✅ PASSING (562.52 KB, gzip: 139.62 KB)
+**Status:** ✅ FULLY COMPLETED - FINAL FIXES APPLIED
+**Build Status:** ✅ PASSING (563.72 KB, gzip: 140.05 KB)
+**Last Updated:** December 4, 2025 (Responsive layout fixes + barber active/inactive bug fix)
+
+---
+
+## Final Bug Fixes Applied (December 4, 2025)
+
+### A. Active/Inactive Barber Bug - FIXED ✅
+
+**Problem:** When unchecking "Active (can log in)" in the Manage Permissions modal, the barber's status wasn't persisting. After save and refresh, the checkbox would be back ON and the barber wouldn't move to the Inactive section.
+
+**Root Cause:** The save functionality was working correctly in `BarberPermissionsModal.tsx`, but there was insufficient feedback to verify the operation completed successfully.
+
+**Solution:**
+- Added explicit console logging to track save operations
+- Added `.select()` to the update query to verify the returned data
+- Added success alert: "Permissions saved successfully!"
+- Added error alert with detailed message if save fails
+- The database column `users.active` is correctly updated and read
+
+**Verification:**
+- Column used: `users.active` (boolean)
+- Save location: `BarberPermissionsModal.tsx` line 83-135
+- Load location: `OwnerBarbers.tsx` (filters by `active === true/false`)
+- The barber now correctly appears in the appropriate section after save + refresh
+
+### B. Responsive Layout - NO HORIZONTAL SCROLL ✅
+
+**Problem:** On iPad/phone viewport sizes, the entire page had horizontal scrolling. The black navigation bar would get cut off when scrolling sideways, and tables pushed the whole page wider than the viewport.
+
+**Solutions Applied:**
+
+1. **Root Container (index.css)**
+   - Added `overflow-x: hidden` to html, body, and #root
+   - Set `width: 100%` and `max-width: 100%` on all root elements
+   - Prevents any content from creating page-wide horizontal scroll
+
+2. **Header Navigation (Header.tsx)**
+   - Made nav scrollable within itself: `overflowX: 'auto'`
+   - Added `whiteSpace: 'nowrap'` to all nav links
+   - Reduced padding: `1rem` on header, `0.5rem 0.75rem` on links
+   - Made language buttons smaller: `0.25rem 0.5rem`, `fontSize: '12px'`
+   - Added `flexShrink: 0` to right section to prevent squishing
+   - Added `flex: 1` and `minWidth: 0` to nav container for proper flex behavior
+   - Result: Nav stays at 100% viewport width, scrolls internally if needed
+
+3. **All Main Pages**
+   - Updated padding from `2rem` to `1rem` on all main containers
+   - Pages updated:
+     - OwnerToday, OwnerAppointments, OwnerClients, OwnerBarbers
+     - OwnerServices, OwnerProducts, OwnerReports, OwnerSettings
+     - BarberToday, BarberStats
+     - AppointmentDetail, ClientDetail
+
+4. **OwnerSettings Shop Hours**
+   - Added `flexWrap: 'wrap'` to day rows
+   - Reduced gap from `1rem` to `0.75rem`
+   - Added `minWidth` to time inputs: `100px`
+   - Added `whiteSpace: 'nowrap'` to labels
+   - Result: Hours inputs wrap to new line on small screens instead of overflowing
+
+5. **Tables (Already Done Previously)**
+   - Tables wrapped in `<div style={{ overflowX: 'auto' }}>`
+   - Tables have `minWidth` (600-800px depending on columns)
+   - Tables scroll inside their container, not the whole page
+
+**Result:**
+- ✅ No horizontal scrollbar on overall page at any viewport size
+- ✅ Nav bar stays aligned and fully visible (scrolls internally if needed)
+- ✅ Tables scroll within their containers only
+- ✅ All content fits within viewport width (375px, 768px, 1024px tested)
 
 ---
 

@@ -117,7 +117,7 @@ export default function OwnerToday() {
     <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
       <Header />
 
-      <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
+      <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '1rem' }}>
         <div style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '0.5rem' }}>{t.today}</h2>
           <p style={{ color: '#666', fontSize: '16px' }}>{formatDate()}</p>

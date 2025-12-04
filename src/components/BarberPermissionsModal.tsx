@@ -80,7 +80,15 @@ export default function BarberPermissionsModal({
     }
 
     try {
-      const { error: updateError } = await supabase
+      console.log('Saving barber permissions:', {
+        barberId,
+        active,
+        name: name.trim(),
+        email: email.trim(),
+        language: preferredLanguage,
+      });
+
+      const { data: updateData, error: updateError } = await supabase
         .from('users')
         .update({
           name: name.trim(),
@@ -95,14 +103,32 @@ export default function BarberPermissionsModal({
           can_manage_appointments: canManageAppointments,
           can_manage_clients: canManageClients,
         })
-        .eq('id', barberId);
+        .eq('id', barberId)
+        .select();
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('Update error:', updateError);
+        throw updateError;
+      }
+
+      console.log('Update successful, data returned:', updateData);
+
+      alert(
+        language === 'en'
+          ? 'Permissions saved successfully!'
+          : '¡Permisos guardados exitosamente!'
+      );
 
       onSave();
     } catch (err: any) {
       console.error('Error saving permissions:', err);
-      setError(err.message || (language === 'en' ? 'Failed to save permissions' : 'Error al guardar permisos'));
+      const errorMessage = err.message || (language === 'en' ? 'Failed to save permissions' : 'Error al guardar permisos');
+      setError(errorMessage);
+      alert(
+        language === 'en'
+          ? `Error saving permissions: ${errorMessage}`
+          : `Error al guardar permisos: ${errorMessage}`
+      );
     } finally {
       setSaving(false);
     }

@@ -115,7 +115,7 @@ export default function BarberStats() {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
       <Header />
-      <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
+      <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '1rem' }}>
         <h2 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '1.5rem' }}>
           {language === 'en' ? 'My Stats' : 'Mis Estadísticas'}
         </h2>

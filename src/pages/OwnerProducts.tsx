@@ -256,7 +256,7 @@ export default function OwnerProducts() {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
         <Header />
-        <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
+        <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '1rem' }}>
           <p>{t.loading}</p>
         </main>
       </div>
@@ -266,7 +266,7 @@ export default function OwnerProducts() {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
       <Header />
-      <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
+      <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '1rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <h2 style={{ fontSize: '28px', fontWeight: 'bold' }}>
             {language === 'en' ? 'Products' : 'Productos'}

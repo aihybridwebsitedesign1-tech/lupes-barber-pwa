@@ -313,9 +313,9 @@ export default function OwnerSettings() {
   const dayNames = language === 'en' ? DAYS : DAYS_ES;
 
   return (
-    <div>
+    <div style={{ width: '100%', maxWidth: '100%', overflowX: 'hidden' }}>
       <Header />
-      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '1rem', width: '100%', boxSizing: 'border-box' }}>
         <h1 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '2rem' }}>
           {language === 'en' ? 'Shop Settings' : 'Configuración de la Tienda'}
         </h1>
@@ -335,18 +335,19 @@ export default function OwnerSettings() {
                   key={dayIndex}
                   style={{
                     display: 'flex',
+                    flexWrap: 'wrap',
                     alignItems: 'center',
-                    gap: '1rem',
+                    gap: '0.75rem',
                     padding: '1rem',
                     backgroundColor: '#f9f9f9',
                     borderRadius: '4px',
                   }}
                 >
-                  <div style={{ width: '120px', fontWeight: '500' }}>
+                  <div style={{ minWidth: '100px', fontWeight: '500', fontSize: '14px' }}>
                     {dayNames[dayIndex]}
                   </div>
 
-                  <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '14px' }}>
                     <input
                       type="checkbox"
                       checked={isOpen}
@@ -358,8 +359,8 @@ export default function OwnerSettings() {
 
                   {isOpen && shopHours[dayKey] && (
                     <>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <label style={{ fontSize: '14px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <label style={{ fontSize: '14px', whiteSpace: 'nowrap' }}>
                           {language === 'en' ? 'From:' : 'Desde:'}
                         </label>
                         <input
@@ -371,12 +372,13 @@ export default function OwnerSettings() {
                             border: '1px solid #ddd',
                             borderRadius: '4px',
                             fontSize: '14px',
+                            minWidth: '100px',
                           }}
                         />
                       </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <label style={{ fontSize: '14px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <label style={{ fontSize: '14px', whiteSpace: 'nowrap' }}>
                           {language === 'en' ? 'To:' : 'Hasta:'}
                         </label>
                         <input
@@ -387,6 +389,7 @@ export default function OwnerSettings() {
                             padding: '0.5rem',
                             border: '1px solid #ddd',
                             borderRadius: '4px',
+                            minWidth: '100px',
                             fontSize: '14px',
                           }}
                         />

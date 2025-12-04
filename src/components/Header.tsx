@@ -15,53 +15,53 @@ export default function Header() {
   const isOwner = userData?.role === 'OWNER';
 
   return (
-    <header style={{ backgroundColor: '#000', color: 'white', padding: '1rem 2rem', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', maxWidth: '1200px', margin: '0 auto' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-          <h1 style={{ fontSize: '20px', fontWeight: 'bold' }}>Lupe's Barber</h1>
+    <header style={{ backgroundColor: '#000', color: 'white', padding: '1rem', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', width: '100%', boxSizing: 'border-box' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', maxWidth: '1200px', margin: '0 auto', gap: '1rem', width: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', minWidth: 0, flex: '1' }}>
+          <h1 style={{ fontSize: '20px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>Lupe's Barber</h1>
 
           {userData && (
-            <nav style={{ display: 'flex', gap: '1rem' }}>
+            <nav style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', minWidth: 0, flex: '1', paddingBottom: '0.25rem' }}>
               {isOwner ? (
                 <>
-                  <Link to="/owner/today" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 1rem', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.1)' }}>
+                  <Link to="/owner/today" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 0.75rem', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.1)', whiteSpace: 'nowrap', fontSize: '14px' }}>
                     {t.today}
                   </Link>
-                  <Link to="/owner/appointments" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 1rem' }}>
+                  <Link to="/owner/appointments" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 0.75rem', whiteSpace: 'nowrap', fontSize: '14px' }}>
                     {t.appointments}
                   </Link>
                   {(userData.role === 'OWNER' || userData.can_view_shop_reports) && (
-                    <Link to="/owner/reports" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 1rem' }}>
+                    <Link to="/owner/reports" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 0.75rem', whiteSpace: 'nowrap', fontSize: '14px' }}>
                       {language === 'en' ? 'Reports' : 'Reportes'}
                     </Link>
                   )}
-                  <Link to="/owner/clients" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 1rem' }}>
+                  <Link to="/owner/clients" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 0.75rem', whiteSpace: 'nowrap', fontSize: '14px' }}>
                     {t.clients}
                   </Link>
-                  <Link to="/owner/barbers" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 1rem' }}>
+                  <Link to="/owner/barbers" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 0.75rem', whiteSpace: 'nowrap', fontSize: '14px' }}>
                     {t.barbers}
                   </Link>
                   {(userData.role === 'OWNER' || userData.can_manage_services) && (
-                    <Link to="/owner/services" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 1rem' }}>
+                    <Link to="/owner/services" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 0.75rem', whiteSpace: 'nowrap', fontSize: '14px' }}>
                       {t.services}
                     </Link>
                   )}
                   {(userData.role === 'OWNER' || userData.can_manage_products) && (
-                    <Link to="/owner/products" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 1rem' }}>
+                    <Link to="/owner/products" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 0.75rem', whiteSpace: 'nowrap', fontSize: '14px' }}>
                       {language === 'en' ? 'Products' : 'Productos'}
                     </Link>
                   )}
-                  <Link to="/owner/settings" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 1rem' }}>
+                  <Link to="/owner/settings" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 0.75rem', whiteSpace: 'nowrap', fontSize: '14px' }}>
                     {language === 'en' ? 'Settings' : 'Configuración'}
                   </Link>
                 </>
               ) : (
                 <>
-                  <Link to="/barber/today" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 1rem', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.1)' }}>
+                  <Link to="/barber/today" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 0.75rem', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.1)', whiteSpace: 'nowrap', fontSize: '14px' }}>
                     {t.today}
                   </Link>
                   {userData.can_view_own_stats && (
-                    <Link to="/barber/stats" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 1rem' }}>
+                    <Link to="/barber/stats" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 0.75rem', whiteSpace: 'nowrap', fontSize: '14px' }}>
                       {language === 'en' ? 'My Stats' : 'Mis Estadísticas'}
                     </Link>
                   )}
@@ -71,18 +71,19 @@ export default function Header() {
           )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: '0.25rem' }}>
             <button
               onClick={() => setLanguage('en')}
               style={{
-                padding: '0.25rem 0.75rem',
+                padding: '0.25rem 0.5rem',
                 backgroundColor: language === 'en' ? 'white' : 'transparent',
                 color: language === 'en' ? '#000' : 'white',
                 border: '1px solid white',
                 borderRadius: '4px',
                 cursor: 'pointer',
-                fontSize: '14px'
+                fontSize: '12px',
+                minWidth: '32px'
               }}
             >
               EN
@@ -90,13 +91,14 @@ export default function Header() {
             <button
               onClick={() => setLanguage('es')}
               style={{
-                padding: '0.25rem 0.75rem',
+                padding: '0.25rem 0.5rem',
                 backgroundColor: language === 'es' ? 'white' : 'transparent',
                 color: language === 'es' ? '#000' : 'white',
                 border: '1px solid white',
                 borderRadius: '4px',
                 cursor: 'pointer',
-                fontSize: '14px'
+                fontSize: '12px',
+                minWidth: '32px'
               }}
             >
               ES
@@ -105,18 +107,18 @@ export default function Header() {
 
           {userData && (
             <>
-              <span style={{ fontSize: '14px' }}>{userData.name}</span>
               <button
                 onClick={handleSignOut}
                 style={{
-                  padding: '0.5rem 1rem',
+                  padding: '0.5rem 0.75rem',
                   backgroundColor: '#fff',
                   color: '#000',
                   border: 'none',
                   borderRadius: '4px',
                   cursor: 'pointer',
                   fontSize: '14px',
-                  fontWeight: '500'
+                  fontWeight: '500',
+                  whiteSpace: 'nowrap'
                 }}
               >
                 {t.logout}

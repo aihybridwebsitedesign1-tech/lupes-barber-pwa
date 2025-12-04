@@ -68,7 +68,7 @@ export default function OwnerServices() {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
         <Header />
-        <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
+        <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '1rem' }}>
           <p>{t.loading}</p>
         </main>
       </div>
