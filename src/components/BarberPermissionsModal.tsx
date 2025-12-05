@@ -27,6 +27,7 @@ export default function BarberPermissionsModal({
   const [canManageProducts, setCanManageProducts] = useState(false);
   const [canManageAppointments, setCanManageAppointments] = useState(false);
   const [canManageClients, setCanManageClients] = useState(false);
+  const [canSendSms, setCanSendSms] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -56,6 +57,7 @@ export default function BarberPermissionsModal({
       setCanManageProducts(data.can_manage_products ?? false);
       setCanManageAppointments(data.can_manage_appointments ?? false);
       setCanManageClients(data.can_manage_clients ?? false);
+      setCanSendSms(data.can_send_sms ?? false);
     } catch (err: any) {
       console.error('Error loading barber data:', err);
       setError(err.message);
@@ -102,6 +104,7 @@ export default function BarberPermissionsModal({
           can_manage_products: canManageProducts,
           can_manage_appointments: canManageAppointments,
           can_manage_clients: canManageClients,
+          can_send_sms: canSendSms,
         })
         .eq('id', barberId)
         .select();
@@ -394,6 +397,16 @@ export default function BarberPermissionsModal({
                     style={{ marginRight: '0.75rem', width: '16px', height: '16px', cursor: 'pointer' }}
                   />
                   <span>{language === 'en' ? 'Can manage clients (add/edit/delete)' : 'Puede gestionar clientes (agregar/editar/eliminar)'}</span>
+                </label>
+
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={canSendSms}
+                    onChange={(e) => setCanSendSms(e.target.checked)}
+                    style={{ marginRight: '0.75rem', width: '16px', height: '16px', cursor: 'pointer' }}
+                  />
+                  <span>{language === 'en' ? 'Can send SMS messages (Engage)' : 'Puede enviar mensajes SMS (Engage)'}</span>
                 </label>
               </div>
             </div>
