@@ -917,6 +917,65 @@ Read-only table showing:
 - Shrinkage tracking report
 - Product performance analytics
 
+#### 1.5 Products Management & Pricing Model
+
+**Location:** `src/pages/OwnerProducts.tsx`
+
+**Pricing Model (Unified as of Version 38):**
+
+The product pricing has been simplified to use retail price as the canonical selling price:
+
+- **`retail_price`**: What clients pay (displayed in inventory, used for checkout)
+- **`supply_cost`**: The shop's cost to acquire the product
+- **`price`**: Legacy field kept in sync with `retail_price` for backwards compatibility
+
+**Data Mapping:**
+- On product edit load: If `retail_price` is null but `price` has a value, `retail_price` is pre-filled from `price`
+- On save: Both `price` and `retail_price` are set to the same value (the retail price input)
+- All inventory calculations use `retail_price` and `supply_cost`
+
+**Required Fields for Public Website:**
+
+To ensure products are ready for client-facing display, the following fields are required:
+
+- **Name (English)** * - Primary product name
+- **Name (Spanish)** * - Localized product name
+- **Description (English)** * - Product details
+- **Description (Spanish)** * - Localized details
+- **Category** * - Product classification (e.g., "Hair Care", "Styling Products")
+- **Brand** * - Manufacturer or brand name
+- **Retail Price** * - Selling price
+
+**Optional Fields:**
+- **SKU** - Product code (useful for inventory tracking but not required for public display)
+- **Image URL** - Product image (see Image Handling section below)
+
+**Validation:**
+- All required fields are enforced on save with clear bilingual error messages
+- Numeric values (prices, stock, thresholds) must be ≥ 0
+- Empty stock defaults to 0 on save
+
+**Image Handling:**
+
+Currently, products are displayed as text-only in appointment management and inventory pages. Product images are stored but not rendered in the UI yet.
+
+**When Product Cards are Implemented (Future):**
+- If `image_url` is present → Display the product image
+- If `image_url` is missing → Show a clean fallback:
+  - Solid neutral background with product name + brand, OR
+  - Neutral placeholder icon with text
+  - No broken image icons
+
+**Current Product Display Locations:**
+- Appointment Detail page: Products shown in select dropdown and table (text only)
+- Inventory Management: Products in table with stock info (text only)
+- Inventory Reports: Products in valuation table (text only)
+
+**Future Product Card Display:**
+- Client-facing product catalog (Phase 6: Client Website)
+- Product recommendations during booking flow
+- Post-service product suggestions
+
 ### Part 2: Booking Rules Enforcement
 
 #### 2.1 Booking Validation Helper

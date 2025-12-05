@@ -7,12 +7,14 @@ import Header from '../components/Header';
 
 type Product = {
   id: string;
-  name: string;
+  name_en: string;
+  name_es: string;
   sku: string | null;
   retail_price: number;
   supply_cost: number;
   current_stock: number;
   low_stock_threshold: number;
+  active: boolean;
 };
 
 type StockStatus = 'OUT' | 'LOW' | 'OK';
@@ -37,12 +39,14 @@ export default function OwnerInventoryReports() {
     setLoading(true);
     const { data, error } = await supabase
       .from('products')
-      .select('id, name, sku, retail_price, supply_cost, current_stock, low_stock_threshold')
-      .order('name');
+      .select('id, name_en, name_es, sku, retail_price, supply_cost, current_stock, low_stock_threshold, active')
+      .eq('active', true)
+      .order('name_en');
 
     if (error) {
       console.error('Error fetching products:', error);
     } else {
+      console.log(`[OwnerInventoryReports] Fetched ${data?.length || 0} active products`);
       setProducts(data || []);
     }
     setLoading(false);
@@ -216,7 +220,9 @@ export default function OwnerInventoryReports() {
                     const costVal = (product.current_stock ?? 0) * (product.supply_cost ?? 0);
                     return (
                       <tr key={product.id} style={{ borderBottom: '1px solid #e5e5e5', backgroundColor: rowBg }}>
-                        <td style={{ padding: '1rem', fontWeight: '500' }}>{product.name}</td>
+                        <td style={{ padding: '1rem', fontWeight: '500' }}>
+                          {language === 'en' ? product.name_en : product.name_es}
+                        </td>
                         <td style={{ padding: '1rem', color: '#666' }}>{product.sku || '—'}</td>
                         <td style={{ padding: '1rem', textAlign: 'center', fontWeight: '600' }}>{product.current_stock ?? 0}</td>
                         <td style={{ padding: '1rem', textAlign: 'center' }}>{getStatusBadge(status)}</td>

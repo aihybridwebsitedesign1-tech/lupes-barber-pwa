@@ -32,7 +32,6 @@ export default function OwnerProducts() {
   const [nameEs, setNameEs] = useState('');
   const [descEn, setDescEn] = useState('');
   const [descEs, setDescEs] = useState('');
-  const [price, setPrice] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [active, setActive] = useState(true);
   const [sku, setSku] = useState('');
@@ -59,13 +58,15 @@ export default function OwnerProducts() {
       setNameEs(editingProduct.name_es);
       setDescEn(editingProduct.description_en || '');
       setDescEs(editingProduct.description_es || '');
-      setPrice(String(editingProduct.price));
+
+      const retailPriceValue = editingProduct.retail_price || editingProduct.price || 0;
+      setRetailPrice(String(retailPriceValue));
+
       setImageUrl(editingProduct.image_url || '');
       setActive(editingProduct.active);
       setSku(editingProduct.sku || '');
       setBrand(editingProduct.brand || '');
       setCategory(editingProduct.category || '');
-      setRetailPrice(String(editingProduct.retail_price || ''));
       setSupplyCost(String(editingProduct.supply_cost || ''));
       setCurrentStock(String(editingProduct.current_stock ?? ''));
       setLowStockThreshold(String(editingProduct.low_stock_threshold || 5));
@@ -91,7 +92,6 @@ export default function OwnerProducts() {
     setNameEs('');
     setDescEn('');
     setDescEs('');
-    setPrice('');
     setImageUrl('');
     setActive(true);
     setSku('');
@@ -172,24 +172,25 @@ export default function OwnerProducts() {
   };
 
   const handleSave = async () => {
-    if (!nameEn || !price) {
-      alert(language === 'en' ? 'Please fill in all required fields' : 'Por favor completa todos los campos requeridos');
+    if (!nameEn || !nameEs || !descEn || !descEs || !category || !brand || !retailPrice) {
+      alert(language === 'en'
+        ? 'Please fill in all required fields (Name EN/ES, Description EN/ES, Category, Brand, Retail Price)'
+        : 'Por favor completa todos los campos requeridos (Nombre EN/ES, Descripción EN/ES, Categoría, Marca, Precio Retail)');
       return;
     }
 
-    const priceNum = parseFloat(price);
-    if (isNaN(priceNum) || priceNum < 0) {
-      alert(language === 'en' ? 'Price must be a valid number' : 'El precio debe ser un número válido');
+    const retailPriceNum = parseFloat(retailPrice);
+    if (isNaN(retailPriceNum) || retailPriceNum < 0) {
+      alert(language === 'en' ? 'Retail price must be a valid number' : 'El precio retail debe ser un número válido');
       return;
     }
 
-    const retailPriceNum = retailPrice ? parseFloat(retailPrice) : 0;
     const supplyCostNum = supplyCost ? parseFloat(supplyCost) : 0;
     const currentStockNum = currentStock ? parseInt(currentStock) : 0;
     const lowThresholdNum = lowStockThreshold ? parseInt(lowStockThreshold) : 5;
     const highThresholdNum = highStockThreshold ? parseInt(highStockThreshold) : 100;
 
-    if (retailPriceNum < 0 || supplyCostNum < 0 || currentStockNum < 0 || lowThresholdNum < 0 || highThresholdNum < 0) {
+    if (supplyCostNum < 0 || currentStockNum < 0 || lowThresholdNum < 0 || highThresholdNum < 0) {
       alert(language === 'en' ? 'Numeric values must be ≥ 0' : 'Los valores numéricos deben ser ≥ 0');
       return;
     }
@@ -201,7 +202,7 @@ export default function OwnerProducts() {
         name_es: nameEs || nameEn,
         description_en: descEn || null,
         description_es: descEs || null,
-        price: priceNum,
+        price: retailPriceNum,
         image_url: imageUrl || null,
         active,
         sku: sku || null,
@@ -487,20 +488,19 @@ export default function OwnerProducts() {
 
             <div style={{ marginBottom: '1rem' }}>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
-                {language === 'en' ? 'Name (Spanish)' : 'Nombre (Español)'}
+                {language === 'en' ? 'Name (Spanish)' : 'Nombre (Español)'} *
               </label>
               <input
                 type="text"
                 value={nameEs}
                 onChange={(e) => setNameEs(e.target.value)}
-                placeholder={language === 'en' ? 'Optional - defaults to English name' : 'Opcional - por defecto nombre en inglés'}
                 style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
               />
             </div>
 
             <div style={{ marginBottom: '1rem' }}>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
-                {language === 'en' ? 'Description (English)' : 'Descripción (Inglés)'}
+                {language === 'en' ? 'Description (English)' : 'Descripción (Inglés)'} *
               </label>
               <textarea
                 value={descEn}
@@ -512,26 +512,12 @@ export default function OwnerProducts() {
 
             <div style={{ marginBottom: '1rem' }}>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
-                {language === 'en' ? 'Description (Spanish)' : 'Descripción (Español)'}
+                {language === 'en' ? 'Description (Spanish)' : 'Descripción (Español)'} *
               </label>
               <textarea
                 value={descEs}
                 onChange={(e) => setDescEs(e.target.value)}
                 rows={3}
-                style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
-              />
-            </div>
-
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
-                {language === 'en' ? 'Price ($)' : 'Precio ($)'} *
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
                 style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
               />
             </div>
@@ -679,7 +665,7 @@ export default function OwnerProducts() {
 
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
-                  {language === 'en' ? 'Category' : 'Categoría'}
+                  {language === 'en' ? 'Category' : 'Categoría'} *
                 </label>
                 <input
                   type="text"
@@ -693,7 +679,7 @@ export default function OwnerProducts() {
 
             <div style={{ marginBottom: '1rem' }}>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
-                {language === 'en' ? 'Brand' : 'Marca'}
+                {language === 'en' ? 'Brand' : 'Marca'} *
               </label>
               <input
                 type="text"
@@ -707,7 +693,7 @@ export default function OwnerProducts() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
-                  {language === 'en' ? 'Retail Price ($)' : 'Precio Retail ($)'}
+                  {language === 'en' ? 'Retail Price ($)' : 'Precio Retail ($)'} *
                 </label>
                 <input
                   type="number"

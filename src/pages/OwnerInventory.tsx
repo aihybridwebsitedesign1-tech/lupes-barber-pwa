@@ -7,7 +7,8 @@ import Header from '../components/Header';
 
 type Product = {
   id: string;
-  name: string;
+  name_en: string;
+  name_es: string;
   sku: string | null;
   category: string | null;
   brand: string | null;
@@ -16,6 +17,7 @@ type Product = {
   current_stock: number;
   low_stock_threshold: number;
   high_stock_threshold: number;
+  active: boolean;
 };
 
 type StockStatus = 'OUT' | 'LOW' | 'OK';
@@ -46,12 +48,14 @@ export default function OwnerInventory() {
     setLoading(true);
     const { data, error } = await supabase
       .from('products')
-      .select('id, name, sku, category, brand, retail_price, supply_cost, current_stock, low_stock_threshold, high_stock_threshold')
-      .order('name');
+      .select('id, name_en, name_es, sku, category, brand, retail_price, supply_cost, current_stock, low_stock_threshold, high_stock_threshold, active')
+      .eq('active', true)
+      .order('name_en');
 
     if (error) {
       console.error('Error fetching products:', error);
     } else {
+      console.log(`[OwnerInventory] Fetched ${data?.length || 0} active products`);
       setProducts(data || []);
     }
     setLoading(false);
@@ -242,7 +246,9 @@ export default function OwnerInventory() {
                     const rowBg = status === 'OUT' ? '#fff5f5' : status === 'LOW' ? '#fffef0' : 'white';
                     return (
                       <tr key={product.id} style={{ borderBottom: '1px solid #e5e5e5', backgroundColor: rowBg }}>
-                        <td style={{ padding: '1rem', fontWeight: '500' }}>{product.name}</td>
+                        <td style={{ padding: '1rem', fontWeight: '500' }}>
+                          {language === 'en' ? product.name_en : product.name_es}
+                        </td>
                         <td style={{ padding: '1rem', color: '#666' }}>{product.sku || '—'}</td>
                         <td style={{ padding: '1rem', color: '#666' }}>{product.category || '—'}</td>
                         <td style={{ padding: '1rem', color: '#666' }}>{product.brand || '—'}</td>
@@ -347,7 +353,7 @@ export default function OwnerInventory() {
                 </label>
                 <input
                   type="text"
-                  value={selectedProduct.name}
+                  value={language === 'en' ? selectedProduct.name_en : selectedProduct.name_es}
                   readOnly
                   style={{
                     width: '100%',
