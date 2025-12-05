@@ -2485,4 +2485,562 @@ All client pages fully support EN/ES:
 
 ---
 
+## Owner Analytics & Reporting
+
+This section documents the analytics dashboard that provides owners with comprehensive insights into revenue, appointments, and booking sources.
+
+### Overview
+
+**Purpose:** Give shop owners clear, actionable insights into business performance, revenue sources, and growth trends.
+
+**Location:** `src/pages/OwnerReports.tsx`
+
+**Route:** `/owner/reports`
+
+**Access:** Owner role only
+
+---
+
+### Date Range Filtering
+
+**Preset Options:**
+
+The dashboard provides 5 date range presets for quick analysis:
+
+1. **Today** - Current day only (00:00:00 to 23:59:59)
+2. **Last 7 Days** - Rolling 7-day window from today
+3. **Last 30 Days** - Rolling 30-day window from today
+4. **This Month** - Calendar month to date (1st to today)
+5. **Custom** - User-defined start and end dates
+
+**Date Calculation Logic:**
+
+All date filtering uses UTC-safe calculations with time zone awareness:
+
+```typescript
+const today = new Date();
+today.setHours(0, 0, 0, 0);
+
+const last7 = new Date(today);
+last7.setDate(today.getDate() - 7);
+
+const last30 = new Date(today);
+last30.setDate(today.getDate() - 30);
+
+const thisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+```
+
+**Query Filter:**
+
+Appointments are filtered by `scheduled_start` within the date range:
+
+```typescript
+supabase
+  .from('appointments')
+  .select('*')
+  .gte('scheduled_start', startDate.toISOString())
+  .lte('scheduled_start', endDate.toISOString())
+```
+
+---
+
+### Data Tables Used
+
+**Primary Tables:**
+
+1. **`appointments`**
+   - Core transaction data
+   - Fields used: `id`, `status`, `source`, `scheduled_start`, `barber_id`, `service_id`, `services_total`, `tip_amount`, `service_due_to_barber`, `service_due_to_shop`
+   - Filtered by date range and status
+
+2. **`services`**
+   - Service catalog for category grouping
+   - Fields used: `id`, `name_en`, `name_es`, `category`
+   - Joined to appointments via `service_id`
+
+3. **`products`** (via `appointment_products`)
+   - Product sales data
+   - Fields used: `id`, `name_en`, `name_es`, `unit_price`
+   - Aggregated by product for sales totals
+
+4. **`appointment_products`**
+   - Line items for product sales
+   - Fields used: `appointment_id`, `product_id`, `quantity`, `unit_price`
+   - Filtered by appointments in date range
+
+5. **`users`** (barbers)
+   - Barber identification
+   - Fields used: `id`, `name`
+   - Joined to appointments via `barber_id`
+
+**Auxiliary Queries:**
+
+- Products query fetches product names for detailed sales breakdown
+- Services query fetches category groupings for service analysis
+
+---
+
+### Core KPIs (Key Performance Indicators)
+
+The dashboard displays 7 primary metrics:
+
+**1. Total Revenue**
+- **Calculation:** Sum of `services_total` + `products_total` from completed appointments
+- **Includes:** Service charges and product sales
+- **Excludes:** Tips, card processing fees
+- **Status Filter:** Only `status = 'completed'`
+
+**2. Services Revenue**
+- **Calculation:** Sum of `services_total` from completed appointments
+- **Includes:** All service charges before tips/fees
+- **Excludes:** Product sales, tips
+- **Status Filter:** Only `status = 'completed'`
+
+**3. Total Tips**
+- **Calculation:** Sum of `tip_amount` from completed appointments
+- **Includes:** All tips recorded at payment
+- **Excludes:** Cash tips not entered in system
+- **Status Filter:** Only `status = 'completed'`
+
+**4. Completed Appointments**
+- **Calculation:** Count of appointments with `status = 'completed'`
+- **Includes:** All completed appointments in date range
+- **Excludes:** Booked, cancelled, no-show
+
+**5. Cancelled Appointments**
+- **Calculation:** Count of appointments with `status = 'cancelled'`
+- **Includes:** All cancellations regardless of timing
+- **Purpose:** Track cancellation trends
+
+**6. Total Appointments**
+- **Calculation:** Count of all appointments in date range
+- **Includes:** All statuses (booked, completed, cancelled, no_show)
+- **Purpose:** Denominator for cancellation rate
+
+**7. Cancellation Rate**
+- **Calculation:** `(cancelled_count / total_count) * 100`
+- **Format:** Percentage with 1 decimal place
+- **Interpretation:** Higher rate indicates potential issues (scheduling, no-shows, etc.)
+
+**Status Inclusion Rules:**
+
+| Status | Total Revenue | Services Revenue | Tips | Completed Count | Cancelled Count | Total Count | Cancellation Rate |
+|--------|---------------|------------------|------|-----------------|-----------------|-------------|-------------------|
+| completed | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | Denominator |
+| booked | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | Denominator |
+| cancelled | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | Numerator & Denominator |
+| no_show | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | Denominator |
+
+---
+
+### Booking Source Analysis
+
+**Purpose:** Track where appointments originate to measure marketing effectiveness and booking channel performance.
+
+**Source Values:**
+
+1. **`owner`** - Created by owner
+   - Manual bookings by shop owner
+   - Walk-ins entered by owner
+   - Phone bookings entered by owner
+   - Badge Color: Blue (#e3f2fd text, #1565c0 background)
+
+2. **`barber`** - Created by barber
+   - Bookings made by barber for their clients
+   - Personal referrals and requests
+   - Badge Color: Purple (#f3e5f5 text, #6a1b9a background)
+
+3. **`client_web`** - Online bookings
+   - Self-service bookings via client website
+   - Public booking flow at `/client/book`
+   - Badge Color: Green (#e8f5e9 text, #2e7d32 background)
+
+4. **`walk_in`** - Walk-in appointments
+   - Clients who walked in without prior booking
+   - Immediate service requests
+   - Badge Color: Orange (#fff3e0 text, #e65100 background)
+
+5. **`null` or `unknown`** - Legacy/undefined
+   - Appointments created before source tracking was implemented
+   - Default value for migration backfill
+   - Badge Color: Gray (#f5f5f5 text, #666 background)
+
+**Breakdown Metrics:**
+
+For each source, the dashboard shows:
+- **Appointments:** Count of completed appointments
+- **Revenue:** Sum of services_total
+- **Tips:** Sum of tip_amount
+- **Percentage:** (appointments from this source / total appointments) * 100
+
+**Use Cases:**
+
+- **Online Effectiveness:** Track `client_web` percentage to measure online booking adoption
+- **Barber Contribution:** See which barbers drive their own bookings
+- **Marketing ROI:** Correlate marketing campaigns with source changes
+- **Walk-In Tracking:** Monitor spontaneous traffic vs scheduled appointments
+
+---
+
+### Barber Performance Breakdown
+
+**Purpose:** Analyze individual barber productivity, revenue generation, and commission earnings.
+
+**Metrics per Barber:**
+
+1. **Completed Appointments:** Count of appointments with `status = 'completed'` for that barber
+2. **Revenue:** Sum of `services_total` (excludes tips and product sales)
+3. **Tips:** Sum of `tip_amount`
+4. **Avg Ticket:** `revenue / completed_appointments` (average service revenue per appointment)
+
+**Calculations:**
+
+```typescript
+const barberMap = new Map<string, BarberBreakdown>();
+
+completedAppointments.forEach(apt => {
+  const barberName = apt.barber?.name || 'Unassigned';
+  const existing = barberMap.get(barberName) || {
+    barber: barberName,
+    appointments: 0,
+    revenue: 0,
+    tips: 0,
+    avgTicket: 0,
+  };
+
+  existing.appointments += 1;
+  existing.revenue += Number(apt.services_total || 0);
+  existing.tips += Number(apt.tip_amount || 0);
+
+  barberMap.set(barberName, existing);
+});
+
+barbers.forEach(b => {
+  b.avgTicket = b.appointments > 0 ? b.revenue / b.appointments : 0;
+});
+```
+
+**CSV Export:**
+
+- Filename format: `barber-breakdown-YYYY-MM-DD.csv`
+- Columns: Barber, Appointments, Revenue, Tips, Avg Ticket
+- Currency values formatted with $ prefix
+- Numbers formatted with 2 decimal places
+
+**Use Cases:**
+
+- **Performance Reviews:** Compare barber productivity
+- **Commission Verification:** Cross-check revenue calculations
+- **Scheduling Optimization:** Identify high-demand barbers
+- **Training Needs:** Spot low-performing barbers
+
+---
+
+### Service & Category Performance
+
+**Purpose:** Identify most popular services and revenue-generating categories.
+
+**Grouping Logic:**
+
+Services are grouped by the `services.category` field. If category is null or empty, service is grouped under "Other" / "Otro".
+
+**Metrics per Service/Category:**
+
+1. **Completed:** Count of completed appointments using that service
+2. **Revenue:** Sum of `services_total` for that service
+3. **Avg Price:** `revenue / completed` (average price per service instance)
+
+**Use Cases:**
+
+- **Menu Optimization:** Identify underperforming services to remove
+- **Pricing Strategy:** Compare avg price to base price (upsells, add-ons)
+- **Marketing Focus:** Promote high-margin services
+- **Barber Training:** Focus training on popular services
+
+---
+
+### Product Sales Summary
+
+**Purpose:** Track retail product sales during appointments for inventory and revenue analysis.
+
+**Data Source:**
+
+Products sold are retrieved via `appointment_products` table:
+
+```typescript
+supabase
+  .from('appointment_products')
+  .select('product_id, quantity, unit_price')
+  .in('appointment_id', completedAppointmentIds)
+```
+
+**Summary Cards:**
+
+1. **Products Sold:** Total quantity across all products
+2. **Product Revenue:** Sum of `quantity * unit_price`
+3. **Avg Per Sale:** `product_revenue / appointments_with_products`
+
+**Detailed Breakdown Table:**
+
+Columns:
+- **Product:** Bilingual product name (`name_en` / `name_es`)
+- **Quantity:** Total units sold
+- **Price:** Unit price at time of sale
+- **Total:** `quantity * price`
+
+**CSV Export:**
+
+- Filename format: `product-sales-YYYY-MM-DD.csv`
+- Columns: Product, Quantity, Price, Total
+- Currency values formatted with $ prefix
+
+**Use Cases:**
+
+- **Inventory Planning:** Stock high-selling products
+- **Cross-Sell Opportunities:** Identify which services lead to product sales
+- **Revenue Diversification:** Track non-service revenue
+- **Commission Calculations:** Future feature for product commissions
+
+---
+
+### Empty States & Error Handling
+
+**No Data Scenarios:**
+
+1. **No Appointments in Range:**
+   - Shows friendly message: "No data available for the selected date range"
+   - Bilingual: "No hay datos disponibles para el rango de fechas seleccionado"
+   - All KPI cards show $0.00 or 0
+   - Tables show empty state message
+
+2. **No Products Sold:**
+   - Product sales section shows: "No products sold in this period"
+   - Summary cards show 0 for all metrics
+
+3. **No Completed Appointments:**
+   - Revenue metrics show $0.00
+   - Cancellation rate may still be calculated if there are cancellations
+
+**Error Handling:**
+
+- Query failures are caught and logged to console
+- User sees generic error message: "Failed to load analytics data"
+- Bilingual error messages
+- Refresh button to retry
+- No crashes or white screens
+
+---
+
+### CSV Export Functionality
+
+**Purpose:** Allow owners to export data for external analysis, accounting software, or record-keeping.
+
+**Implementation:**
+
+Uses shared utility: `src/lib/csvExport.ts`
+
+**Export Function:**
+
+```typescript
+export function exportToCSV(
+  data: any[],
+  filename: string,
+  headers: Record<string, string>
+)
+```
+
+**CSV Features:**
+
+- Proper escaping of commas, quotes, newlines
+- UTF-8 encoding for bilingual content
+- Auto-generated filename with current date
+- Browser download prompt (no server upload)
+
+**Available Exports:**
+
+1. **Barber Breakdown:**
+   - Button: "Export CSV" in barber section
+   - Fields: Barber, Appointments, Revenue, Tips, Avg Ticket
+
+2. **Product Sales:**
+   - Button: "Export CSV" in product section
+   - Fields: Product, Quantity, Price, Total
+
+**Future Exports:**
+
+- Complete appointment log with all fields
+- Source breakdown with detailed metrics
+- Service performance with category groupings
+- Monthly summary report (all KPIs)
+
+---
+
+### Performance Considerations
+
+**Optimization Strategies:**
+
+1. **Single Query per Table:**
+   - All appointments fetched once, filtered in memory
+   - Products fetched once and joined client-side
+   - Services fetched once for category lookups
+
+2. **Efficient Aggregations:**
+   - JavaScript `reduce()` and `Map()` for grouping
+   - No N+1 queries
+   - Client-side calculations minimize database load
+
+3. **Date Range Limits:**
+   - Queries explicitly filter by date range
+   - Uses indexed `scheduled_start` column
+   - Prevents full table scans
+
+**Potential Bottlenecks:**
+
+- Large date ranges (1+ year) may slow down on high-volume shops
+- Product joins can be expensive if many products per appointment
+- Future optimization: Server-side aggregation via Postgres functions or views
+
+---
+
+### Bilingual Support
+
+**All analytics labels are bilingual (EN/ES):**
+
+**Date Presets:**
+- Today / Hoy
+- Last 7 Days / Últimos 7 Días
+- Last 30 Days / Últimos 30 Días
+- This Month / Este Mes
+- Custom / Personalizado
+
+**KPI Labels:**
+- Total Revenue / Ingresos Totales
+- Services Revenue / Ingresos por Servicios
+- Total Tips / Propinas Totales
+- Completed Appointments / Citas Completadas
+- Cancelled Appointments / Citas Canceladas
+- Total Appointments / Total de Citas
+- Cancellation Rate / Tasa de Cancelación
+
+**Section Headers:**
+- By Booking Source / Por Fuente de Reserva
+- By Barber / Por Barbero
+- By Service/Category / Por Servicio/Categoría
+- Product Sales / Ventas de Productos
+
+**Table Headers:**
+- Appointments / Citas
+- Revenue / Ingresos
+- Tips / Propinas
+- Avg Ticket / Ticket Promedio
+- Completed / Completados
+- Quantity / Cantidad
+- Price / Precio
+- Total / Total
+
+---
+
+### Known Limitations
+
+1. **No Real-Time Updates:**
+   - Dashboard does not auto-refresh
+   - User must manually change date range to see new data
+
+2. **Product Commissions Not Shown:**
+   - Currently only service commissions are calculated
+   - Product commissions planned for Phase 7
+
+3. **No Trend Visualization:**
+   - Data shown in tables, no charts or graphs
+   - Future: Add Chart.js or similar for visual trends
+
+4. **Limited Historical Analysis:**
+   - No year-over-year comparison
+   - No month-over-month growth metrics
+
+5. **Single Shop Only:**
+   - No multi-location support
+   - All data from single `shop_config` instance
+
+6. **No Scheduled Reports:**
+   - No email delivery of weekly/monthly summaries
+   - Manual export only
+
+---
+
+### Future Enhancements
+
+**Planned Features:**
+
+1. **Visual Charts:**
+   - Line chart for revenue over time
+   - Bar chart for barber comparison
+   - Pie chart for source distribution
+
+2. **Advanced Filters:**
+   - Filter by specific barber
+   - Filter by service category
+   - Filter by booking source
+   - Combine multiple filters
+
+3. **Comparative Analysis:**
+   - Year-over-year comparison
+   - Month-over-month growth
+   - Week-over-week trends
+
+4. **Automated Reports:**
+   - Email weekly summary to owner
+   - SMS alerts for milestone achievements
+   - PDF export for accounting
+
+5. **Product Commission Tracking:**
+   - Show product commissions in barber breakdown
+   - Track due_to_barber for products
+   - Separate service vs product earnings
+
+6. **Client Analytics:**
+   - New vs returning client ratio
+   - Client lifetime value
+   - Churn rate and retention metrics
+
+7. **Predictive Insights:**
+   - Revenue forecasting
+   - Busy hour predictions
+   - Staffing recommendations
+
+---
+
+### Testing Checklist
+
+**Analytics Dashboard:**
+- [ ] Date presets load correct ranges
+- [ ] Custom date picker enforces valid ranges
+- [ ] All KPIs calculate correctly
+- [ ] Source breakdown adds to 100%
+- [ ] Barber breakdown includes all barbers with appointments
+- [ ] Service breakdown groups by category
+- [ ] Product sales matches appointment_products table
+- [ ] CSV exports download successfully
+- [ ] CSV files open correctly in Excel/Sheets
+- [ ] Empty states display when no data
+- [ ] Error states show friendly messages
+- [ ] Bilingual labels work (EN/ES)
+- [ ] Currency formats correctly ($0.00)
+- [ ] Percentages show 1 decimal place
+- [ ] Date labels format correctly
+- [ ] Page loads without errors
+- [ ] Build passes with no TypeScript errors
+
+**Integration:**
+- [ ] Completed appointments from all sources appear in analytics
+- [ ] Source badges match appointment.source values
+- [ ] Revenue calculations match PaymentModal totals
+- [ ] Commission fields populated correctly
+- [ ] Product sales tracked when products added to appointments
+- [ ] Cancelled appointments excluded from revenue
+- [ ] Booked appointments excluded from revenue
+- [ ] No_show appointments excluded from revenue
+
+---
+
 **End of Architecture Document**
