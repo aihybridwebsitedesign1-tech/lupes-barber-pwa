@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
+import { validateBookingRules, formatBookingRuleError, getShopConfig } from '../lib/bookingRules';
+import { sendCancellation, sendReschedule, formatAppointmentDate, formatAppointmentTime } from '../lib/notificationHelper';
 import ClientHeader from '../components/ClientHeader';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -34,6 +36,21 @@ export default function ClientAppointments() {
   const [upcomingAppointments, setUpcomingAppointments] = useState<Appointment[]>([]);
   const [pastAppointments, setPastAppointments] = useState<Appointment[]>([]);
   const [loadingAppointments, setLoadingAppointments] = useState(false);
+
+  // Action modals state
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelling, setCancelling] = useState(false);
+
+  // Reschedule state
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [rescheduleTime, setRescheduleTime] = useState('');
+  const [timeSlots, setTimeSlots] = useState<string[]>([]);
+  const [rescheduling, setRescheduling] = useState(false);
+  const [rescheduleError, setRescheduleError] = useState('');
+  const [shopInfo, setShopInfo] = useState<{ shop_name: string; phone: string | null }>({ shop_name: "Lupe's Barber", phone: null });
 
   // Handle phone submission and OTP request
   const handleRequestOTP = async () => {
@@ -124,19 +141,35 @@ export default function ClientAppointments() {
   const loadAppointments = async () => {
     setLoadingAppointments(true);
     try {
-      // Find client by phone
-      const { data: client, error: clientError } = await supabase
-        .from('clients')
-        .select('id')
-        .eq('phone', phoneNumber)
-        .maybeSingle();
+      // Find client by phone and load shop config
+      const [clientRes, shopConfigRes] = await Promise.all([
+        supabase
+          .from('clients')
+          .select('id')
+          .eq('phone', phoneNumber)
+          .maybeSingle(),
+        supabase
+          .from('shop_config')
+          .select('shop_name, phone')
+          .single()
+      ]);
 
-      if (clientError) throw clientError;
+      if (clientRes.error) throw clientRes.error;
 
-      if (!client) {
+      if (!clientRes.data) {
         setUpcomingAppointments([]);
         setPastAppointments([]);
         return;
+      }
+
+      const client = clientRes.data;
+
+      // Store shop info for notifications
+      if (shopConfigRes.data) {
+        setShopInfo({
+          shop_name: shopConfigRes.data.shop_name || "Lupe's Barber",
+          phone: shopConfigRes.data.phone || null
+        });
       }
 
       // Fetch appointments
@@ -188,6 +221,193 @@ export default function ClientAppointments() {
       setError(language === 'en' ? 'Failed to load appointments' : 'Error al cargar citas');
     } finally {
       setLoadingAppointments(false);
+    }
+  };
+
+  // Cancel appointment handler
+  const handleCancelAppointment = async () => {
+    if (!selectedAppointment) return;
+
+    setCancelling(true);
+    try {
+      // Find client
+      const { data: client } = await supabase
+        .from('clients')
+        .select('id, language')
+        .eq('phone', phoneNumber)
+        .maybeSingle();
+
+      if (!client) throw new Error('Client not found');
+
+      // Update appointment status
+      const note = cancelReason
+        ? `Cancelled by client: ${cancelReason}`
+        : 'Cancelled by client self-service';
+
+      const { error: updateError } = await supabase
+        .from('appointments')
+        .update({
+          status: 'cancelled',
+          notes: selectedAppointment.notes
+            ? `${selectedAppointment.notes}\n${note}`
+            : note
+        })
+        .eq('id', selectedAppointment.id);
+
+      if (updateError) throw updateError;
+
+      // Send cancellation notification to client
+      const clientLanguage = (client.language || language) as 'en' | 'es';
+      sendCancellation({
+        appointmentId: selectedAppointment.id,
+        clientId: client.id,
+        phoneNumber: phoneNumber,
+        scheduledStart: selectedAppointment.scheduled_start,
+        shopName: shopInfo.shop_name,
+        shopPhone: shopInfo.phone || undefined,
+        language: clientLanguage,
+      }).catch(err => {
+        console.error('Failed to send cancellation SMS:', err);
+      });
+
+      // Reload appointments
+      await loadAppointments();
+
+      // Show success message
+      alert(language === 'en'
+        ? 'Your appointment has been cancelled.'
+        : 'Tu cita ha sido cancelada.');
+
+      // Close modal
+      setShowCancelModal(false);
+      setSelectedAppointment(null);
+      setCancelReason('');
+    } catch (error) {
+      console.error('Error cancelling appointment:', error);
+      alert(language === 'en'
+        ? 'Failed to cancel appointment. Please try again or contact the shop.'
+        : 'Error al cancelar la cita. Intenta de nuevo o contacta a la tienda.');
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  // Generate time slots for reschedule
+  const generateTimeSlotsForReschedule = async () => {
+    if (!rescheduleDate) return;
+
+    const config = await getShopConfig();
+    const intervalMinutes = config?.client_booking_interval_minutes || 15;
+
+    const slots: string[] = [];
+    for (let hour = 9; hour < 19; hour++) {
+      for (let minute = 0; minute < 60; minute += intervalMinutes) {
+        const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+        slots.push(timeStr);
+      }
+    }
+
+    setTimeSlots(slots);
+  };
+
+  // Reschedule appointment handler
+  const handleRescheduleAppointment = async () => {
+    if (!selectedAppointment) return;
+
+    if (!rescheduleDate || !rescheduleTime) {
+      setRescheduleError(language === 'en'
+        ? 'Please select date and time'
+        : 'Por favor selecciona fecha y hora');
+      return;
+    }
+
+    setRescheduling(true);
+    setRescheduleError('');
+
+    try {
+      // Find client
+      const { data: client } = await supabase
+        .from('clients')
+        .select('id, language')
+        .eq('phone', phoneNumber)
+        .maybeSingle();
+
+      if (!client) throw new Error('Client not found');
+
+      // Validate booking rules
+      const newDateTime = new Date(`${rescheduleDate}T${rescheduleTime}:00`);
+      const validationError = await validateBookingRules(newDateTime, 'reschedule');
+
+      if (validationError) {
+        setRescheduleError(formatBookingRuleError(validationError, language));
+        return;
+      }
+
+      // Get service duration
+      const { data: service } = await supabase
+        .from('services')
+        .select('duration_minutes')
+        .eq('id', (await supabase
+          .from('appointments')
+          .select('service_id')
+          .eq('id', selectedAppointment.id)
+          .single()).data?.service_id)
+        .single();
+
+      const durationMinutes = service?.duration_minutes || 30;
+      const newEndTime = new Date(newDateTime.getTime() + durationMinutes * 60000);
+
+      // Update appointment
+      const { error: updateError } = await supabase
+        .from('appointments')
+        .update({
+          scheduled_start: newDateTime.toISOString(),
+          scheduled_end: newEndTime.toISOString(),
+          notes: selectedAppointment.notes
+            ? `${selectedAppointment.notes}\nRescheduled by client self-service`
+            : 'Rescheduled by client self-service'
+        })
+        .eq('id', selectedAppointment.id);
+
+      if (updateError) throw updateError;
+
+      // Send reschedule notification to client
+      const clientLanguage = (client.language || language) as 'en' | 'es';
+      sendReschedule({
+        appointmentId: selectedAppointment.id,
+        clientId: client.id,
+        phoneNumber: phoneNumber,
+        newScheduledStart: newDateTime.toISOString(),
+        barberName: selectedAppointment.barber_name || 'our barber',
+        shopName: shopInfo.shop_name,
+        shopPhone: shopInfo.phone || undefined,
+        language: clientLanguage,
+      }).catch(err => {
+        console.error('Failed to send reschedule SMS:', err);
+      });
+
+      // Reload appointments
+      await loadAppointments();
+
+      // Show success message
+      const dateFormatted = formatAppointmentDate(newDateTime.toISOString(), language);
+      const timeFormatted = formatAppointmentTime(newDateTime.toISOString());
+      alert(language === 'en'
+        ? `Your appointment has been rescheduled to ${dateFormatted} at ${timeFormatted}.`
+        : `Tu cita ha sido reprogramada para ${dateFormatted} a las ${timeFormatted}.`);
+
+      // Close modal
+      setShowRescheduleModal(false);
+      setSelectedAppointment(null);
+      setRescheduleDate('');
+      setRescheduleTime('');
+    } catch (error) {
+      console.error('Error rescheduling appointment:', error);
+      setRescheduleError(language === 'en'
+        ? 'Failed to reschedule appointment. Please try again or contact the shop.'
+        : 'Error al reprogramar la cita. Intenta de nuevo o contacta a la tienda.');
+    } finally {
+      setRescheduling(false);
     }
   };
 
@@ -494,7 +714,51 @@ export default function ClientAppointments() {
                         </span>
                       </div>
 
-                      {/* Cancel and Reschedule buttons will be added here */}
+                      {/* Action buttons */}
+                      <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
+                        <button
+                          onClick={() => {
+                            setSelectedAppointment(apt);
+                            setShowRescheduleModal(true);
+                            setRescheduleDate('');
+                            setRescheduleTime('');
+                            setRescheduleError('');
+                          }}
+                          style={{
+                            flex: 1,
+                            padding: '0.75rem',
+                            backgroundColor: '#000',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            fontWeight: '500',
+                          }}
+                        >
+                          {language === 'en' ? 'Reschedule' : 'Reprogramar'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedAppointment(apt);
+                            setShowCancelModal(true);
+                            setCancelReason('');
+                          }}
+                          style={{
+                            flex: 1,
+                            padding: '0.75rem',
+                            backgroundColor: 'transparent',
+                            color: '#d32f2f',
+                            border: '1px solid #d32f2f',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            fontWeight: '500',
+                          }}
+                        >
+                          {language === 'en' ? 'Cancel' : 'Cancelar'}
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -562,6 +826,260 @@ export default function ClientAppointments() {
           </>
         )}
       </main>
+
+      {/* Cancel Modal */}
+      {showCancelModal && selectedAppointment && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '1rem',
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            padding: '2rem',
+            maxWidth: '500px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflow: 'auto',
+          }}>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '1rem' }}>
+              {language === 'en' ? 'Cancel Appointment' : 'Cancelar Cita'}
+            </h2>
+
+            <p style={{ marginBottom: '1.5rem', color: '#666' }}>
+              {language === 'en'
+                ? 'Are you sure you want to cancel this appointment?'
+                : '¿Estás seguro de que deseas cancelar esta cita?'}
+            </p>
+
+            <div style={{ backgroundColor: '#f5f5f5', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
+              <div style={{ fontWeight: 'bold', marginBottom: '0.5rem' }}>
+                {language === 'es' ? selectedAppointment.service_name_es : selectedAppointment.service_name_en}
+              </div>
+              <div style={{ fontSize: '14px', color: '#666' }}>
+                {formatAppointmentDateTime(selectedAppointment.scheduled_start)}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                {language === 'en' ? 'Reason (optional)' : 'Razón (opcional)'}
+              </label>
+              <textarea
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder={language === 'en' ? 'Let us know why you\'re cancelling' : 'Dinos por qué cancelas'}
+                disabled={cancelling}
+                rows={3}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  fontSize: '14px',
+                  border: '2px solid #ddd',
+                  borderRadius: '8px',
+                  outline: 'none',
+                  resize: 'vertical',
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button
+                onClick={() => {
+                  setShowCancelModal(false);
+                  setSelectedAppointment(null);
+                  setCancelReason('');
+                }}
+                disabled={cancelling}
+                style={{
+                  flex: 1,
+                  padding: '0.75rem',
+                  backgroundColor: 'transparent',
+                  color: '#666',
+                  border: '1px solid #ddd',
+                  borderRadius: '8px',
+                  cursor: cancelling ? 'default' : 'pointer',
+                  fontSize: '14px',
+                }}
+              >
+                {language === 'en' ? 'Keep Appointment' : 'Mantener Cita'}
+              </button>
+              <button
+                onClick={handleCancelAppointment}
+                disabled={cancelling}
+                style={{
+                  flex: 1,
+                  padding: '0.75rem',
+                  backgroundColor: cancelling ? '#ccc' : '#d32f2f',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: cancelling ? 'default' : 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                }}
+              >
+                {cancelling
+                  ? (language === 'en' ? 'Cancelling...' : 'Cancelando...')
+                  : (language === 'en' ? 'Yes, Cancel' : 'Sí, Cancelar')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reschedule Modal */}
+      {showRescheduleModal && selectedAppointment && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '1rem',
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            padding: '2rem',
+            maxWidth: '500px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflow: 'auto',
+          }}>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '1rem' }}>
+              {language === 'en' ? 'Reschedule Appointment' : 'Reprogramar Cita'}
+            </h2>
+
+            <div style={{ backgroundColor: '#f5f5f5', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
+              <div style={{ fontWeight: 'bold', marginBottom: '0.5rem' }}>
+                {language === 'en' ? 'Current:' : 'Actual:'}
+              </div>
+              <div style={{ fontSize: '14px', color: '#666' }}>
+                {formatAppointmentDateTime(selectedAppointment.scheduled_start)}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                {language === 'en' ? 'New Date' : 'Nueva Fecha'}
+              </label>
+              <input
+                type="date"
+                value={rescheduleDate}
+                onChange={(e) => {
+                  setRescheduleDate(e.target.value);
+                  generateTimeSlotsForReschedule();
+                }}
+                disabled={rescheduling}
+                min={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  fontSize: '14px',
+                  border: '2px solid #ddd',
+                  borderRadius: '8px',
+                  outline: 'none',
+                }}
+              />
+            </div>
+
+            {rescheduleDate && (
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                  {language === 'en' ? 'New Time' : 'Nueva Hora'}
+                </label>
+                <select
+                  value={rescheduleTime}
+                  onChange={(e) => setRescheduleTime(e.target.value)}
+                  disabled={rescheduling}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    fontSize: '14px',
+                    border: '2px solid #ddd',
+                    borderRadius: '8px',
+                    outline: 'none',
+                  }}
+                >
+                  <option value="">
+                    {language === 'en' ? 'Select time' : 'Selecciona hora'}
+                  </option>
+                  {timeSlots.map((slot) => (
+                    <option key={slot} value={slot}>
+                      {slot}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {rescheduleError && (
+              <div style={{ padding: '1rem', backgroundColor: '#ffe5e5', border: '1px solid #ffcccc', borderRadius: '8px', marginBottom: '1rem', color: '#d32f2f' }}>
+                {rescheduleError}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button
+                onClick={() => {
+                  setShowRescheduleModal(false);
+                  setSelectedAppointment(null);
+                  setRescheduleDate('');
+                  setRescheduleTime('');
+                  setRescheduleError('');
+                }}
+                disabled={rescheduling}
+                style={{
+                  flex: 1,
+                  padding: '0.75rem',
+                  backgroundColor: 'transparent',
+                  color: '#666',
+                  border: '1px solid #ddd',
+                  borderRadius: '8px',
+                  cursor: rescheduling ? 'default' : 'pointer',
+                  fontSize: '14px',
+                }}
+              >
+                {language === 'en' ? 'Cancel' : 'Cancelar'}
+              </button>
+              <button
+                onClick={handleRescheduleAppointment}
+                disabled={rescheduling || !rescheduleDate || !rescheduleTime}
+                style={{
+                  flex: 1,
+                  padding: '0.75rem',
+                  backgroundColor: rescheduling || !rescheduleDate || !rescheduleTime ? '#ccc' : '#000',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: rescheduling || !rescheduleDate || !rescheduleTime ? 'default' : 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                }}
+              >
+                {rescheduling
+                  ? (language === 'en' ? 'Saving...' : 'Guardando...')
+                  : (language === 'en' ? 'Reschedule' : 'Reprogramar')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

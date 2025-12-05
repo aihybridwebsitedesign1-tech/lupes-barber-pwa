@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import { getAvailableTimeSlots, type TimeSlot } from '../lib/availability';
+import { sendConfirmation } from '../lib/notificationHelper';
 
 type Client = {
   id: string;
@@ -185,12 +186,12 @@ export default function NewAppointmentModal({ onClose, onSuccess }: Props) {
         scheduled_start: startDateTime.toISOString(),
         scheduled_end: endDateTime.toISOString(),
         status: 'booked',
-        channel: 'internal_manual',
+        source: 'owner_manual',
         services_total: service.base_price,
         products_total: 0,
         tax_amount: 0,
         tip_amount: 0,
-        card_fee_amount: 0,
+        processing_fee_amount: 0,
         total_charged: 0,
         net_revenue: 0
       }).select();
@@ -198,6 +199,39 @@ export default function NewAppointmentModal({ onClose, onSuccess }: Props) {
       if (error) {
         console.error('Supabase insert error:', error);
         throw error;
+      }
+
+      // Send confirmation SMS
+      if (data && data[0]) {
+        const newAppointmentId = data[0].id;
+
+        // Fetch client, barber, and shop info for notification
+        const [clientRes, barberRes, shopConfigRes] = await Promise.all([
+          supabase.from('clients').select('phone, language').eq('id', selectedClient).single(),
+          supabase.from('users').select('name').eq('id', selectedBarber).single(),
+          supabase.from('shop_config').select('shop_name, phone').single()
+        ]);
+
+        if (clientRes.data && clientRes.data.phone) {
+          const barber = barbers.find(b => b.id === selectedBarber);
+          const serviceName = language === 'es' ? service.name_es : service.name_en;
+          const clientLanguage = (clientRes.data.language || language) as 'en' | 'es';
+
+          sendConfirmation({
+            appointmentId: newAppointmentId,
+            clientId: selectedClient,
+            phoneNumber: clientRes.data.phone,
+            scheduledStart: startDateTime.toISOString(),
+            barberName: barber?.name || barberRes.data?.name || 'our barber',
+            serviceName: serviceName,
+            shopName: shopConfigRes.data?.shop_name || "Lupe's Barber",
+            shopPhone: shopConfigRes.data?.phone || undefined,
+            language: clientLanguage,
+          }).catch(err => {
+            console.error('Failed to send confirmation SMS:', err);
+            // Don't block appointment creation on notification failure
+          });
+        }
       }
 
       console.log('Appointment created successfully:', data);

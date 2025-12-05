@@ -3062,9 +3062,13 @@ This section documents the automated communication system and client self-servic
 
 **When Sent:**
 - Client books online via `/client/book`
-- Owner creates/reschedules appointment (future enhancement)
+- Owner creates appointment via NewAppointmentModal (OwnerToday, OwnerAppointments)
+- Owner reschedules appointment (future enhancement)
 
-**Implementation:** `src/lib/notificationHelper.ts` + `ClientBook.tsx`
+**Implementation:**
+- `src/lib/notificationHelper.ts` - Reusable confirmation helper
+- `ClientBook.tsx` - Client booking flow
+- `NewAppointmentModal.tsx` - Owner appointment creation
 
 **Message Templates:**
 
@@ -3088,12 +3092,22 @@ Spanish: `{ShopName}: Su cita está reservada para {Date} a las {Time} con {Barb
 3. Checks `appointment_reminders_sent` to prevent duplicates
 4. Sends SMS and records in tracking table
 
-**Invocation:** Currently manual. Future: cron job or scheduled trigger.
+**Invocation:**
 
+Manual (for testing):
 ```bash
 curl -X POST {SUPABASE_URL}/functions/v1/send-reminders \
   -H "Authorization: Bearer {SERVICE_ROLE_KEY}"
 ```
+
+Production (automated):
+- Set up a cron job or scheduled task to call the edge function hourly
+- Options:
+  - GitHub Actions with cron schedule
+  - External cron service (e.g., cron-job.org, EasyCron)
+  - Supabase pg_cron extension (if available)
+- Recommended: Run every hour to catch appointments in 23-25 hour window
+- Function is idempotent - safe to run multiple times
 
 **Configuration:**
 - `shop_config.enable_reminders` (boolean, default: true)
@@ -3129,7 +3143,8 @@ After verification, client sees:
 **Upcoming Appointments:**
 - `status = 'booked'` and `scheduled_start >= now()`
 - Shows: service, date/time, barber, status badge
-- Future: Cancel/Reschedule buttons (planned)
+- **Cancel button**: Sets status to 'cancelled', adds note, sends SMS confirmation
+- **Reschedule button**: Validates booking rules, updates date/time, sends SMS confirmation
 
 **Past Appointments:**
 - `scheduled_start < now()` or completed/cancelled status
@@ -3139,6 +3154,40 @@ After verification, client sees:
 - Appointments filtered by phone number only
 - No cross-client data exposure
 - Session token stored in component state (no persistence)
+
+#### Client Cancel Functionality
+
+**How it works:**
+1. Client clicks "Cancel" button on upcoming appointment
+2. Modal asks for optional cancellation reason
+3. Updates appointment status to 'cancelled'
+4. Appends note to appointment: "Cancelled by client self-service"
+5. Sends cancellation SMS to client
+6. Appointment moves to "Past" section with cancelled badge
+
+**Business Rules:**
+- Only upcoming appointments can be cancelled
+- Cancelled appointments remain in database (soft delete)
+- SMS notification sent to confirm cancellation
+
+#### Client Reschedule Functionality
+
+**How it works:**
+1. Client clicks "Reschedule" button on upcoming appointment
+2. Modal shows current date/time and new date/time picker
+3. Validates new time using same booking rules as initial booking:
+   - Respects `min_book_ahead_hours`
+   - Respects `days_bookable_in_advance`
+   - Uses `client_booking_interval_minutes` for time slots
+4. Updates `scheduled_start` and `scheduled_end`
+5. Appends note: "Rescheduled by client self-service"
+6. Sends reschedule SMS with new date/time
+7. Preserves barber, service, and client
+
+**Business Rules:**
+- Same validation as new bookings (min advance notice, max advance booking)
+- Cannot reschedule to past dates
+- Must select valid time slot from generated options
 
 ### Notification Tracking
 
