@@ -1,11 +1,102 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
+import { supabase } from '../lib/supabase';
 import ClientHeader from '../components/ClientHeader';
 import BarberPole from '../components/BarberPole';
+
+type ShopConfig = {
+  shop_name: string;
+  address: string;
+  phone: string;
+  shop_hours: {
+    [key: string]: { open: string; close: string } | null;
+  };
+};
 
 export default function ClientHome() {
   const { language } = useLanguage();
   const navigate = useNavigate();
+  const [shopConfig, setShopConfig] = useState<ShopConfig | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadShopConfig();
+  }, []);
+
+  const loadShopConfig = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('shop_config')
+        .select('shop_name, address, phone, shop_hours')
+        .single();
+
+      if (error) throw error;
+      if (data) setShopConfig(data);
+    } catch (err) {
+      console.error('Error loading shop config:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatHours = () => {
+    if (!shopConfig?.shop_hours) {
+      return language === 'en'
+        ? 'Mon-Sat: 10am - 7pm\nSun: Closed'
+        : 'Lun-Sáb: 10am - 7pm\nDom: Cerrado';
+    }
+
+    const hours = shopConfig.shop_hours;
+    const dayNames = {
+      en: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+      es: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'],
+    };
+    const names = language === 'en' ? dayNames.en : dayNames.es;
+
+    const lines: string[] = [];
+    let currentRange: { start: number; end: number; hours: string } | null = null;
+
+    for (let i = 0; i <= 6; i++) {
+      const dayHours = hours[String(i)];
+      const hoursStr = dayHours
+        ? `${dayHours.open} - ${dayHours.close}`
+        : language === 'en'
+        ? 'Closed'
+        : 'Cerrado';
+
+      if (
+        currentRange &&
+        currentRange.hours === hoursStr &&
+        currentRange.end === i - 1
+      ) {
+        currentRange.end = i;
+      } else {
+        if (currentRange) {
+          if (currentRange.start === currentRange.end) {
+            lines.push(`${names[currentRange.start]}: ${currentRange.hours}`);
+          } else {
+            lines.push(
+              `${names[currentRange.start]}-${names[currentRange.end]}: ${currentRange.hours}`
+            );
+          }
+        }
+        currentRange = { start: i, end: i, hours: hoursStr };
+      }
+    }
+
+    if (currentRange) {
+      if (currentRange.start === currentRange.end) {
+        lines.push(`${names[currentRange.start]}: ${currentRange.hours}`);
+      } else {
+        lines.push(
+          `${names[currentRange.start]}-${names[currentRange.end]}: ${currentRange.hours}`
+        );
+      }
+    }
+
+    return lines.join('\n');
+  };
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
@@ -74,9 +165,13 @@ export default function ClientHome() {
               <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '0.5rem' }}>
                 {language === 'en' ? 'Location' : 'Ubicación'}
               </h3>
-              <p style={{ color: '#666', lineHeight: '1.6' }}>
-                123 Main Street<br />
-                Your City, ST 12345
+              <p style={{ color: '#666', lineHeight: '1.6', whiteSpace: 'pre-line' }}>
+                {loading
+                  ? '...'
+                  : shopConfig?.address ||
+                    (language === 'en'
+                      ? 'Visit us for details'
+                      : 'Visítanos para detalles')}
               </p>
             </div>
 
@@ -86,7 +181,10 @@ export default function ClientHome() {
                 {language === 'en' ? 'Phone' : 'Teléfono'}
               </h3>
               <p style={{ color: '#666', lineHeight: '1.6' }}>
-                (555) 123-4567
+                {loading
+                  ? '...'
+                  : shopConfig?.phone ||
+                    (language === 'en' ? 'Call for info' : 'Llama para info')}
               </p>
             </div>
 
@@ -95,10 +193,8 @@ export default function ClientHome() {
               <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '0.5rem' }}>
                 {language === 'en' ? 'Hours' : 'Horario'}
               </h3>
-              <p style={{ color: '#666', lineHeight: '1.6' }}>
-                {language === 'en' ? 'Mon-Fri: 9am - 7pm' : 'Lun-Vie: 9am - 7pm'}<br />
-                {language === 'en' ? 'Sat: 9am - 6pm' : 'Sáb: 9am - 6pm'}<br />
-                {language === 'en' ? 'Sun: Closed' : 'Dom: Cerrado'}
+              <p style={{ color: '#666', lineHeight: '1.6', whiteSpace: 'pre-line' }}>
+                {loading ? '...' : formatHours()}
               </p>
             </div>
           </div>

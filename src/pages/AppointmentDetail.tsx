@@ -8,12 +8,15 @@ import Header from '../components/Header';
 import PaymentModal from '../components/PaymentModal';
 import EditAppointmentModal from '../components/EditAppointmentModal';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
+import CancelAppointmentModal from '../components/CancelAppointmentModal';
+import RescheduleAppointmentModal from '../components/RescheduleAppointmentModal';
 
 type Appointment = {
   id: string;
   scheduled_start: string;
   scheduled_end: string;
   status: string;
+  source: string | null;
   actual_duration_minutes: number | null;
   services_total: number;
   products_total: number;
@@ -85,6 +88,8 @@ export default function AppointmentDetail() {
   const [saving, setSaving] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
 
   useEffect(() => {
     if (appointmentId) {
@@ -113,6 +118,7 @@ export default function AppointmentDetail() {
           scheduled_start: aptData.scheduled_start,
           scheduled_end: aptData.scheduled_end,
           status: aptData.status,
+          source: aptData.source || null,
           actual_duration_minutes: aptData.actual_duration_minutes,
           services_total: Number(aptData.services_total),
           products_total: Number(aptData.products_total),
@@ -277,23 +283,16 @@ export default function AppointmentDetail() {
     }
   };
 
-  const handleCancelAppointment = async () => {
-    if (!confirm(language === 'en' ? 'Cancel this appointment?' : '¿Cancelar esta cita?')) return;
+  const handleCancelSuccess = () => {
+    setShowCancelModal(false);
+    alert(language === 'en' ? 'Appointment cancelled!' : '¡Cita cancelada!');
+    loadAppointmentData();
+  };
 
-    setSaving(true);
-    try {
-      const { error } = await supabase.from('appointments').update({ status: 'cancelled' }).eq('id', appointmentId);
-
-      if (error) throw error;
-
-      alert(language === 'en' ? 'Appointment cancelled!' : '¡Cita cancelada!');
-      loadAppointmentData();
-    } catch (error) {
-      console.error('Error cancelling appointment:', error);
-      alert(language === 'en' ? 'Error cancelling appointment' : 'Error al cancelar cita');
-    } finally {
-      setSaving(false);
-    }
+  const handleRescheduleSuccess = () => {
+    setShowRescheduleModal(false);
+    alert(language === 'en' ? 'Appointment rescheduled!' : '¡Cita reprogramada!');
+    loadAppointmentData();
   };
 
   const canDelete = userData?.role === 'OWNER' || userData?.can_manage_appointments;
@@ -629,7 +628,7 @@ export default function AppointmentDetail() {
                   }}
                 />
               </div>
-              <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <button
                   onClick={handleMarkCompleted}
                   disabled={saving}
@@ -660,21 +659,40 @@ export default function AppointmentDetail() {
                 >
                   {language === 'en' ? 'Mark No-Show' : 'Marcar Ausencia'}
                 </button>
-                <button
-                  onClick={handleCancelAppointment}
-                  disabled={saving}
-                  style={{
-                    padding: '8px 16px',
-                    backgroundColor: '#dc3545',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: saving ? 'not-allowed' : 'pointer',
-                    fontSize: '14px',
-                  }}
-                >
-                  {t.cancel}
-                </button>
+                {userData?.role === 'OWNER' && (
+                  <>
+                    <button
+                      onClick={() => setShowRescheduleModal(true)}
+                      disabled={saving}
+                      style={{
+                        padding: '8px 16px',
+                        backgroundColor: '#007bff',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: saving ? 'not-allowed' : 'pointer',
+                        fontSize: '14px',
+                      }}
+                    >
+                      {language === 'en' ? 'Reschedule' : 'Reprogramar'}
+                    </button>
+                    <button
+                      onClick={() => setShowCancelModal(true)}
+                      disabled={saving}
+                      style={{
+                        padding: '8px 16px',
+                        backgroundColor: '#dc3545',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: saving ? 'not-allowed' : 'pointer',
+                        fontSize: '14px',
+                      }}
+                    >
+                      {t.cancel}
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -1091,6 +1109,26 @@ export default function AppointmentDetail() {
             setShowPaymentModal(false);
             loadAppointmentData();
           }}
+        />
+      )}
+
+      {showCancelModal && appointmentId && (
+        <CancelAppointmentModal
+          appointmentId={appointmentId}
+          onClose={() => setShowCancelModal(false)}
+          onSuccess={handleCancelSuccess}
+        />
+      )}
+
+      {showRescheduleModal && appointment && appointmentId && (
+        <RescheduleAppointmentModal
+          appointmentId={appointmentId}
+          currentStart={appointment.scheduled_start}
+          currentEnd={appointment.scheduled_end}
+          barberId={appointment.barber?.id || null}
+          serviceId={appointment.service.id}
+          onClose={() => setShowRescheduleModal(false)}
+          onSuccess={handleRescheduleSuccess}
         />
       )}
     </div>

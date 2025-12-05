@@ -7,6 +7,9 @@ import Header from '../components/Header';
 
 type ShopConfig = {
   id: number;
+  shop_name: string;
+  address: string;
+  phone: string;
   shop_hours: any;
   tax_rate: number;
   card_processing_fee_rate: number;
@@ -31,6 +34,9 @@ export default function OwnerSettings() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  const [shopName, setShopName] = useState("Lupe's Barber Shop");
+  const [address, setAddress] = useState('');
+  const [phone, setPhone] = useState('');
   const [taxRate, setTaxRate] = useState('0');
   const [cardFeeRate, setCardFeeRate] = useState('4');
 
@@ -63,6 +69,9 @@ export default function OwnerSettings() {
 
       if (data) {
         setConfig(data);
+        setShopName(data.shop_name || "Lupe's Barber Shop");
+        setAddress(data.address || '');
+        setPhone(data.phone || '');
         setTaxRate(((data.tax_rate || 0) * 100).toFixed(2));
         setCardFeeRate(((data.card_processing_fee_rate || 0) * 100).toFixed(2));
         setDaysBookableInAdvance(String(data.days_bookable_in_advance || 30));
@@ -89,6 +98,9 @@ export default function OwnerSettings() {
       const { error: updateError } = await supabase
         .from('shop_config')
         .update({
+          shop_name: shopName,
+          address: address,
+          phone: phone,
           tax_rate: parseFloat(taxRate) / 100,
           card_processing_fee_rate: parseFloat(cardFeeRate) / 100,
         })
@@ -250,6 +262,80 @@ export default function OwnerSettings() {
                     <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '1.5rem' }}>
                       {language === 'en' ? 'Shop Information' : 'Información de Tienda'}
                     </h3>
+
+                    <div style={{ marginBottom: '1.5rem' }}>
+                      <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '0.5rem' }}>
+                        {language === 'en' ? 'Shop Name' : 'Nombre de la Tienda'}
+                      </label>
+                      <input
+                        type="text"
+                        value={shopName}
+                        onChange={(e) => setShopName(e.target.value)}
+                        style={{
+                          width: '100%',
+                          maxWidth: '500px',
+                          padding: '0.5rem',
+                          border: '1px solid #ddd',
+                          borderRadius: '4px',
+                          fontSize: '14px',
+                        }}
+                      />
+                      <p style={{ fontSize: '13px', color: '#666', marginTop: '0.25rem' }}>
+                        {language === 'en'
+                          ? 'Name displayed to clients'
+                          : 'Nombre mostrado a los clientes'}
+                      </p>
+                    </div>
+
+                    <div style={{ marginBottom: '1.5rem' }}>
+                      <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '0.5rem' }}>
+                        {language === 'en' ? 'Address' : 'Dirección'}
+                      </label>
+                      <textarea
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                        rows={3}
+                        style={{
+                          width: '100%',
+                          maxWidth: '500px',
+                          padding: '0.5rem',
+                          border: '1px solid #ddd',
+                          borderRadius: '4px',
+                          fontSize: '14px',
+                          fontFamily: 'inherit',
+                          resize: 'vertical',
+                        }}
+                      />
+                      <p style={{ fontSize: '13px', color: '#666', marginTop: '0.25rem' }}>
+                        {language === 'en'
+                          ? 'Shop address shown on the public website'
+                          : 'Dirección mostrada en el sitio web público'}
+                      </p>
+                    </div>
+
+                    <div style={{ marginBottom: '1.5rem' }}>
+                      <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '0.5rem' }}>
+                        {language === 'en' ? 'Phone Number' : 'Número de Teléfono'}
+                      </label>
+                      <input
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        style={{
+                          width: '100%',
+                          maxWidth: '300px',
+                          padding: '0.5rem',
+                          border: '1px solid #ddd',
+                          borderRadius: '4px',
+                          fontSize: '14px',
+                        }}
+                      />
+                      <p style={{ fontSize: '13px', color: '#666', marginTop: '0.25rem' }}>
+                        {language === 'en'
+                          ? 'Contact phone displayed on the public website'
+                          : 'Teléfono de contacto mostrado en el sitio web público'}
+                      </p>
+                    </div>
 
                     <div style={{ marginBottom: '1.5rem' }}>
                       <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '0.5rem' }}>

@@ -4,11 +4,13 @@ import { supabase } from '../lib/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import Header from '../components/Header';
 import NewAppointmentModal from '../components/NewAppointmentModal';
+import SetupChecklist from '../components/SetupChecklist';
 
 type AppointmentWithDetails = {
   id: string;
   scheduled_start: string;
   status: string;
+  source: string | null;
   barber: { name: string } | null;
   client: { first_name: string; last_name: string };
   service: { name_en: string; name_es: string };
@@ -42,6 +44,7 @@ export default function OwnerToday() {
           id,
           scheduled_start,
           status,
+          source,
           services_total,
           barber:barber_id (name),
           client:client_id (first_name, last_name),
@@ -62,6 +65,7 @@ export default function OwnerToday() {
         id: apt.id,
         scheduled_start: apt.scheduled_start,
         status: apt.status,
+        source: apt.source || null,
         barber: Array.isArray(apt.barber) ? apt.barber[0] : apt.barber,
         client: Array.isArray(apt.client) ? apt.client[0] : apt.client,
         service: Array.isArray(apt.service) ? apt.service[0] : apt.service,
@@ -104,6 +108,59 @@ export default function OwnerToday() {
     loadData();
   };
 
+  const getSourceBadge = (source: string | null) => {
+    const sourceMap = {
+      owner: {
+        labelEn: 'Owner',
+        labelEs: 'Dueño',
+        color: '#e3f2fd',
+        textColor: '#1565c0',
+      },
+      barber: {
+        labelEn: 'Barber',
+        labelEs: 'Barbero',
+        color: '#f3e5f5',
+        textColor: '#6a1b9a',
+      },
+      client_web: {
+        labelEn: 'Online',
+        labelEs: 'En línea',
+        color: '#e8f5e9',
+        textColor: '#2e7d32',
+      },
+      walk_in: {
+        labelEn: 'Walk-In',
+        labelEs: 'Sin cita',
+        color: '#fff3e0',
+        textColor: '#e65100',
+      },
+    };
+
+    const defaultBadge = {
+      labelEn: 'Unknown',
+      labelEs: 'Desconocido',
+      color: '#f5f5f5',
+      textColor: '#666',
+    };
+
+    const badge = source ? sourceMap[source as keyof typeof sourceMap] || defaultBadge : defaultBadge;
+
+    return (
+      <span
+        style={{
+          padding: '0.25rem 0.75rem',
+          borderRadius: '12px',
+          fontSize: '12px',
+          fontWeight: '500',
+          backgroundColor: badge.color,
+          color: badge.textColor,
+        }}
+      >
+        {language === 'en' ? badge.labelEn : badge.labelEs}
+      </span>
+    );
+  };
+
   if (loading) {
     return (
       <div>
@@ -118,6 +175,8 @@ export default function OwnerToday() {
       <Header />
 
       <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '1rem' }}>
+        <SetupChecklist />
+
         <div style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '0.5rem' }}>{t.today}</h2>
           <p style={{ color: '#666', fontSize: '16px' }}>{formatDate()}</p>
@@ -162,13 +221,16 @@ export default function OwnerToday() {
                 <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '14px' }}>{t.barber}</th>
                 <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '14px' }}>{t.client}</th>
                 <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '14px' }}>{t.service}</th>
+                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '14px' }}>
+                  {language === 'en' ? 'Source' : 'Origen'}
+                </th>
                 <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '14px' }}>{t.status}</th>
               </tr>
             </thead>
             <tbody>
               {appointments.length === 0 ? (
                 <tr>
-                  <td colSpan={5} style={{ padding: '2rem', textAlign: 'center', color: '#999' }}>
+                  <td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: '#999' }}>
                     No appointments today
                   </td>
                 </tr>
@@ -192,6 +254,9 @@ export default function OwnerToday() {
                     </td>
                     <td style={{ padding: '1rem', fontSize: '14px' }}>
                       {apt.service ? (language === 'es' ? apt.service.name_es : apt.service.name_en) : 'N/A'}
+                    </td>
+                    <td style={{ padding: '1rem', fontSize: '14px' }}>
+                      {getSourceBadge(apt.source)}
                     </td>
                     <td style={{ padding: '1rem', fontSize: '14px' }}>
                       <span style={{

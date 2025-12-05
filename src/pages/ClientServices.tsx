@@ -86,8 +86,31 @@ export default function ClientServices() {
             {language === 'en' ? 'Loading services...' : 'Cargando servicios...'}
           </div>
         ) : Object.keys(groupedServices).length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '3rem', fontSize: '18px', color: '#666' }}>
-            {language === 'en' ? 'No services available at this time.' : 'No hay servicios disponibles en este momento.'}
+          <div style={{ textAlign: 'center', padding: '4rem 2rem', backgroundColor: 'white', borderRadius: '12px', maxWidth: '600px', margin: '0 auto' }}>
+            <div style={{ fontSize: '64px', marginBottom: '1rem' }}>💈</div>
+            <h3 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '0.75rem' }}>
+              {language === 'en' ? 'Services Coming Soon' : 'Servicios Próximamente'}
+            </h3>
+            <p style={{ fontSize: '16px', color: '#666', lineHeight: '1.6', marginBottom: '1.5rem' }}>
+              {language === 'en'
+                ? 'Services are being updated. Please check back soon or call the shop to book.'
+                : 'Los servicios se están actualizando. Vuelve pronto o llama a la barbería para reservar.'}
+            </p>
+            <button
+              onClick={() => navigate('/client/home')}
+              style={{
+                padding: '0.75rem 1.5rem',
+                backgroundColor: '#e74c3c',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '16px',
+                fontWeight: '500',
+              }}
+            >
+              {language === 'en' ? 'Back to Home' : 'Volver al Inicio'}
+            </button>
           </div>
         ) : (
           Object.keys(groupedServices).map((category) => (
