@@ -9,8 +9,17 @@ type AppointmentWithDetails = {
   id: string;
   scheduled_start: string;
   status: string;
+  services_total: number;
+  tip_amount: number;
+  service_due_to_barber: number;
   client: { first_name: string; last_name: string };
   service: { name_en: string; name_es: string };
+};
+
+type EarningsSummary = {
+  servicesRevenue: number;
+  tips: number;
+  commission: number;
 };
 
 export default function BarberToday() {
@@ -43,6 +52,9 @@ export default function BarberToday() {
           id,
           scheduled_start,
           status,
+          services_total,
+          tip_amount,
+          service_due_to_barber,
           client:client_id (first_name, last_name),
           service:service_id (name_en, name_es)
         `)
@@ -57,6 +69,9 @@ export default function BarberToday() {
         id: apt.id,
         scheduled_start: apt.scheduled_start,
         status: apt.status,
+        services_total: Number(apt.services_total || 0),
+        tip_amount: Number(apt.tip_amount || 0),
+        service_due_to_barber: Number(apt.service_due_to_barber || 0),
         client: Array.isArray(apt.client) ? apt.client[0] : apt.client,
         service: Array.isArray(apt.service) ? apt.service[0] : apt.service,
       }));
@@ -81,6 +96,19 @@ export default function BarberToday() {
       month: 'long',
       day: 'numeric'
     });
+  };
+
+  const calculateEarnings = (): EarningsSummary => {
+    const completedAppts = appointments.filter(apt => apt.status === 'completed');
+
+    return completedAppts.reduce(
+      (acc, apt) => ({
+        servicesRevenue: acc.servicesRevenue + apt.services_total,
+        tips: acc.tips + apt.tip_amount,
+        commission: acc.commission + apt.service_due_to_barber,
+      }),
+      { servicesRevenue: 0, tips: 0, commission: 0 }
+    );
   };
 
   const handleMarkCompleted = async (appointmentId: string) => {
@@ -160,6 +188,8 @@ export default function BarberToday() {
     );
   }
 
+  const earnings = calculateEarnings();
+
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
       <Header />
@@ -168,6 +198,55 @@ export default function BarberToday() {
         <div style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '0.5rem' }}>{t.today}</h2>
           <p style={{ color: '#666', fontSize: '16px' }}>{formatDate()}</p>
+        </div>
+
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '1rem',
+          marginBottom: '2rem',
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '1.5rem',
+            borderRadius: '8px',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+          }}>
+            <div style={{ fontSize: '14px', color: '#666', marginBottom: '0.5rem' }}>
+              {language === 'en' ? 'Services Revenue' : 'Ingresos por Servicios'}
+            </div>
+            <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#000' }}>
+              ${earnings.servicesRevenue.toFixed(2)}
+            </div>
+          </div>
+
+          <div style={{
+            backgroundColor: 'white',
+            padding: '1.5rem',
+            borderRadius: '8px',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+          }}>
+            <div style={{ fontSize: '14px', color: '#666', marginBottom: '0.5rem' }}>
+              {language === 'en' ? 'Tips' : 'Propinas'}
+            </div>
+            <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#000' }}>
+              ${earnings.tips.toFixed(2)}
+            </div>
+          </div>
+
+          <div style={{
+            backgroundColor: 'white',
+            padding: '1.5rem',
+            borderRadius: '8px',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+          }}>
+            <div style={{ fontSize: '14px', color: '#666', marginBottom: '0.5rem' }}>
+              {language === 'en' ? 'My Commission' : 'Mi Comisión'}
+            </div>
+            <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#28a745' }}>
+              ${earnings.commission.toFixed(2)}
+            </div>
+          </div>
         </div>
 
         <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '1rem' }}>

@@ -1514,4 +1514,219 @@ The UI displays helper text: "These rules apply to all barbers. Barber-specific 
 
 ---
 
+## Barber App / PWA Experience
+
+This section documents the barber-focused views designed for mobile-first PWA usage.
+
+### Barber Today View (`/barber/today`)
+
+**Location:** `src/pages/BarberToday.tsx`
+
+**Purpose:** Daily dashboard for barbers showing today's appointments and earnings summary.
+
+**Earnings Summary Cards:**
+
+Three summary cards display real-time earnings for completed appointments:
+
+1. **Services Revenue:** Total `services_total` from completed appointments today
+2. **Tips:** Total `tip_amount` from completed appointments today
+3. **My Commission:** Total `service_due_to_barber` from completed appointments today
+
+**Calculations:**
+```typescript
+const earnings = appointments
+  .filter(apt => apt.status === 'completed')
+  .reduce((acc, apt) => ({
+    servicesRevenue: acc.servicesRevenue + apt.services_total,
+    tips: acc.tips + apt.tip_amount,
+    commission: acc.commission + apt.service_due_to_barber,
+  }), { servicesRevenue: 0, tips: 0, commission: 0 });
+```
+
+**Appointments Table:**
+
+Shows all appointments for today (regardless of status):
+- Time (formatted as 12-hour clock)
+- Client name
+- Service name (bilingual EN/ES)
+- Status badge (booked/completed/no_show)
+- Quick action buttons (for booked appointments only):
+  - Mark Completed
+  - Mark No Show
+
+**Data Loading:**
+- Queries appointments where `barber_id = userData.id`
+- Filters by today's date (`scheduled_start` >= today 00:00:00 AND < tomorrow 00:00:00)
+- Orders by `scheduled_start` ascending
+- Includes financial fields: `services_total`, `tip_amount`, `service_due_to_barber`
+
+**Mobile Optimization:**
+- Card layout with responsive grid (`repeat(auto-fit, minmax(200px, 1fr))`)
+- Large tap targets on action buttons
+- Clear visual hierarchy with status badges
+- Clean, uncluttered interface
+
+---
+
+### My Earnings View (`/barber/stats`)
+
+**Location:** `src/pages/BarberStats.tsx`
+
+**Purpose:** Historical earnings tracker with customizable date ranges and day-by-day breakdown.
+
+**Date Range Filter:**
+
+Two date input fields:
+- Start Date (default: 30 days ago)
+- End Date (default: today)
+
+**Summary Cards:**
+
+Four total cards showing aggregated earnings:
+
+1. **Total Appointments:** Count of completed appointments in range
+2. **Services Revenue:** Sum of `services_total`
+3. **Total Tips:** Sum of `tip_amount`
+4. **My Commission:** Sum of `service_due_to_barber` (highlighted in green)
+
+**Daily Breakdown Table:**
+
+Grouped by day with columns:
+- Date (formatted as "Weekday, Month Day, Year")
+- Appointments (count of completed appointments that day)
+- Services (services revenue for that day)
+- Tips (tips for that day)
+- Commission (barber's commission for that day, highlighted in green)
+
+**Data Processing:**
+```typescript
+const groupedByDay = new Map<string, DailyEarnings>();
+
+appointments.forEach(apt => {
+  const date = new Date(apt.scheduled_start).toISOString().split('T')[0];
+  // Aggregate by day: appointmentCount, servicesRevenue, tips, commission
+});
+
+// Sort by date descending (most recent first)
+```
+
+**Permissions:**
+- Requires `userData.can_view_own_stats` permission
+- Only shows data for `barber_id = userData.id`
+- RLS policies enforce barber can only see their own appointments
+
+---
+
+### Barber Navigation
+
+**Desktop Navigation:**
+- Today (highlighted with background)
+- Calendar (link to `/barber/appointments`)
+- My Earnings (conditional: requires `can_view_own_stats`)
+- Language toggle (EN/ES)
+- Logout button
+
+**Mobile Navigation:**
+- Hamburger menu
+- Same links as desktop in vertical layout
+- Large tap targets (1rem padding)
+- Full-width links
+- Language selector and logout at bottom
+
+**Barbers Cannot Access:**
+- Owner-only pages (Reports, Payouts, Inventory, Products, Services, Settings, Engage)
+- Other barbers' data
+- Global shop analytics
+- Client management (future: read-only client list may be added)
+
+---
+
+### Security & Permissions
+
+**Row-Level Security (RLS):**
+
+Appointments table policies ensure:
+- Barbers can only `SELECT` appointments where `barber_id = auth.uid()`
+- Barbers can `UPDATE` their own appointments (status changes)
+- Owners can see/update all appointments
+
+**Application-Level Filters:**
+
+Both barber views explicitly filter queries:
+```typescript
+.eq('barber_id', userData.id)
+```
+
+This provides defense-in-depth: both RLS and application logic enforce barber isolation.
+
+**Permission Checks:**
+
+1. **Barber Today:** Accessible to all active barbers (no special permission)
+2. **My Earnings:** Requires `userData.can_view_own_stats === true`
+
+**Inactive Barbers:**
+
+If `userData.active === false`:
+- Barber sees a special "Account Inactive" message
+- Cannot access any appointment or earnings data
+- Only action available is Logout
+- Must contact shop owner to reactivate
+
+---
+
+### Bilingual Support
+
+All barber views fully support EN/ES:
+
+**Barber Today:**
+- "Today" / "Hoy"
+- "Services Revenue" / "Ingresos por Servicios"
+- "Tips" / "Propinas"
+- "My Commission" / "Mi Comisión"
+- "Today's Appointments" / "Citas de Hoy"
+- Status labels: "Booked" / "Reservado", "Completed" / "Completado", "No Show" / "No Asistió"
+
+**My Earnings:**
+- "My Earnings" / "Mis Ganancias"
+- "Date Range" / "Rango de Fechas"
+- "Start Date" / "Fecha Inicio"
+- "End Date" / "Fecha Fin"
+- "Daily Breakdown" / "Desglose Diario"
+- All table headers and card labels
+
+---
+
+### Commission Calculation
+
+**Commission Source:** Uses existing `service_due_to_barber` field from appointments table.
+
+**How It's Calculated (Owner Side):**
+
+When an appointment is marked as completed and paid, the `service_due_to_barber` field is populated (see `PaymentModal.tsx`).
+
+**Current Logic:**
+- 50% commission rate on services revenue
+- `service_due_to_barber = services_total * 0.50`
+- Products commission: Not yet implemented (Phase 7)
+- Tiered commission rates: Not yet implemented (Phase 7)
+
+**Barber View:**
+- Barbers see their commission totals
+- No ability to edit commission rates (owner-only)
+- Historical data preserved even if rates change in future
+
+---
+
+### Future Enhancements (Barber App)
+
+**Planned Features:**
+- Read-only client list for barbers
+- Push notifications for new bookings
+- Offline mode for viewing today's schedule
+- Tips tracking trends (weekly/monthly comparison)
+- Personal performance dashboard (clients served, avg rating)
+- Clock in/out for time tracking integration
+
+---
+
 **End of Architecture Document**

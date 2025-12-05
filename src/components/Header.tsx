@@ -273,6 +273,18 @@ export default function Header() {
                     >
                       {t.today}
                     </Link>
+                    <Link
+                      to="/barber/appointments"
+                      style={{
+                        color: 'white',
+                        textDecoration: 'none',
+                        padding: '0.5rem 0.75rem',
+                        whiteSpace: 'nowrap',
+                        fontSize: '14px',
+                      }}
+                    >
+                      {language === 'en' ? 'Calendar' : 'Calendario'}
+                    </Link>
                     {userData.can_view_own_stats && (
                       <Link
                         to="/barber/stats"
@@ -284,7 +296,7 @@ export default function Header() {
                           fontSize: '14px',
                         }}
                       >
-                        {language === 'en' ? 'My Stats' : 'Mis Estadísticas'}
+                        {language === 'en' ? 'My Earnings' : 'Mis Ganancias'}
                       </Link>
                     )}
                   </>
@@ -442,6 +454,20 @@ export default function Header() {
                 >
                   {t.today}
                 </Link>
+                <Link
+                  to="/barber/appointments"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  style={{
+                    color: 'white',
+                    textDecoration: 'none',
+                    padding: '1rem',
+                    borderBottom: '1px solid rgba(255,255,255,0.1)',
+                    fontSize: '16px',
+                    display: 'block',
+                  }}
+                >
+                  {language === 'en' ? 'Calendar' : 'Calendario'}
+                </Link>
                 {userData.can_view_own_stats && (
                   <Link
                     to="/barber/stats"
@@ -455,7 +481,7 @@ export default function Header() {
                       display: 'block',
                     }}
                   >
-                    {language === 'en' ? 'My Stats' : 'Mis Estadísticas'}
+                    {language === 'en' ? 'My Earnings' : 'Mis Ganancias'}
                   </Link>
                 )}
               </>
