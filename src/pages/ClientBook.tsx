@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import { validateBookingRules, formatBookingRuleError, getShopConfig } from '../lib/bookingRules';
+import { sendConfirmation } from '../lib/notificationHelper';
 import ClientHeader from '../components/ClientHeader';
 
 type Barber = {
@@ -42,6 +43,7 @@ export default function ClientBook() {
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
   const [config, setConfig] = useState<{ days_bookable_in_advance: number; min_book_ahead_hours: number; client_booking_interval_minutes: number } | null>(null);
   const [configWarning, setConfigWarning] = useState<string>('');
+  const [shopInfo, setShopInfo] = useState<{ shop_name: string; phone: string | null }>({ shop_name: "Lupe's Barber", phone: null });
 
   useEffect(() => {
     loadInitialData();
@@ -76,10 +78,11 @@ export default function ClientBook() {
   const loadInitialData = async () => {
     setLoading(true);
     try {
-      const [barbersRes, servicesRes, shopConfig] = await Promise.all([
+      const [barbersRes, servicesRes, shopConfig, shopConfigFull] = await Promise.all([
         supabase.from('users').select('id, first_name, last_name').eq('role', 'BARBER').eq('active', true).order('first_name'),
         supabase.from('services').select('id, name_en, name_es, price, duration_minutes').eq('active', true).order('name_en'),
-        getShopConfig()
+        getShopConfig(),
+        supabase.from('shop_config').select('shop_name, phone, enable_confirmations').single()
       ]);
 
       if (barbersRes.error) throw barbersRes.error;
@@ -87,6 +90,14 @@ export default function ClientBook() {
 
       setBarbers(barbersRes.data || []);
       setServices(servicesRes.data || []);
+
+      // Store shop info for confirmations
+      if (shopConfigFull.data) {
+        setShopInfo({
+          shop_name: shopConfigFull.data.shop_name || "Lupe's Barber",
+          phone: shopConfigFull.data.phone || null
+        });
+      }
 
       if (shopConfig) {
         setConfig(shopConfig);
@@ -245,7 +256,7 @@ export default function ClientBook() {
       const appointmentDateTime = new Date(`${selectedDate}T${selectedTime}:00`);
       const selectedServiceData = services.find(s => s.id === selectedService);
 
-      const { error: appointmentError } = await supabase
+      const { data: newAppointment, error: appointmentError } = await supabase
         .from('appointments')
         .insert({
           barber_id: selectedBarber,
@@ -256,9 +267,32 @@ export default function ClientBook() {
           status: 'booked',
           notes: clientNotes || null,
           source: 'client_web',
-        });
+        })
+        .select('id')
+        .single();
 
       if (appointmentError) throw appointmentError;
+
+      // Send confirmation SMS (don't block on failure)
+      if (newAppointment && selectedBarberObj && selectedServiceData) {
+        const barberName = `${selectedBarberObj.first_name} ${selectedBarberObj.last_name}`;
+        const serviceName = language === 'es' ? selectedServiceData.name_es : selectedServiceData.name_en;
+
+        sendConfirmation({
+          appointmentId: newAppointment.id,
+          clientId: clientId,
+          phoneNumber: clientPhone,
+          scheduledStart: appointmentDateTime.toISOString(),
+          barberName,
+          serviceName,
+          shopName: shopInfo.shop_name,
+          shopPhone: shopInfo.phone || undefined,
+          language,
+        }).catch(err => {
+          console.error('Failed to send confirmation:', err);
+          // Don't block booking on notification failure
+        });
+      }
 
       alert(language === 'en'
         ? 'Booking confirmed! We look forward to seeing you.'

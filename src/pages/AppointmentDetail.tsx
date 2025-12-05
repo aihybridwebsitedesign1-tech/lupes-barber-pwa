@@ -90,6 +90,7 @@ export default function AppointmentDetail() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [_notifications, setNotifications] = useState<Array<{ notification_type: string; status: string; created_at: string }>>([]);
 
   useEffect(() => {
     if (appointmentId) {
@@ -138,7 +139,7 @@ export default function AppointmentDetail() {
         setActualDuration(aptData.actual_duration_minutes?.toString() || aptData.services.duration_minutes.toString());
       }
 
-      const [productsRes, photosRes, availableProductsRes] = await Promise.all([
+      const [productsRes, photosRes, availableProductsRes, notificationsRes] = await Promise.all([
         supabase
           .from('appointment_products')
           .select('*, products(name_en, name_es)')
@@ -149,6 +150,12 @@ export default function AppointmentDetail() {
           .eq('appointment_id', appointmentId)
           .order('created_at', { ascending: false }),
         supabase.from('products').select('*').eq('active', true).order('name_en'),
+        supabase
+          .from('client_messages')
+          .select('notification_type, status, created_at')
+          .eq('appointment_id', appointmentId)
+          .order('created_at', { ascending: false })
+          .limit(5),
       ]);
 
       if (productsRes.data) {
@@ -169,6 +176,10 @@ export default function AppointmentDetail() {
 
       if (availableProductsRes.data) {
         setAvailableProducts(availableProductsRes.data);
+      }
+
+      if (notificationsRes.data) {
+        setNotifications(notificationsRes.data);
       }
     } catch (error) {
       console.error('Error loading appointment:', error);

@@ -3043,4 +3043,230 @@ export function exportToCSV(
 
 ---
 
+## Client Communication & Self-Service
+
+This section documents the automated communication system and client self-service portal implemented to reduce no-shows and empower clients to manage their own appointments.
+
+### Overview
+
+**Purpose:** Automate appointment confirmations and reminders, and provide a secure self-service portal where clients can view appointments without staff intervention.
+
+**Key Features:**
+- Automatic SMS confirmations when appointments are booked
+- Scheduled SMS reminders 24 hours before appointments (configurable)
+- Secure OTP-based client authentication
+- Client portal for viewing upcoming and past appointments
+- Owner visibility into notification history and status
+
+### Appointment Confirmations
+
+**When Sent:**
+- Client books online via `/client/book`
+- Owner creates/reschedules appointment (future enhancement)
+
+**Implementation:** `src/lib/notificationHelper.ts` + `ClientBook.tsx`
+
+**Message Templates:**
+
+English: `{ShopName}: Your appointment is scheduled for {Date} at {Time} with {Barber}. Service: {Service}.`
+
+Spanish: `{ShopName}: Su cita está reservada para {Date} a las {Time} con {Barber}. Servicio: {Service}.`
+
+**Configuration:** `shop_config.enable_confirmations` (default: true)
+
+**Error Handling:** Booking succeeds even if SMS fails. Failures logged to `client_messages` table.
+
+### Appointment Reminders
+
+**Timing:** 24 hours before appointment (configurable via `shop_config.reminder_hours_before`)
+
+**Edge Function:** `send-reminders`
+
+**How It Works:**
+1. Queries appointments in 24-hour window
+2. Filters `status = 'booked'` only
+3. Checks `appointment_reminders_sent` to prevent duplicates
+4. Sends SMS and records in tracking table
+
+**Invocation:** Currently manual. Future: cron job or scheduled trigger.
+
+```bash
+curl -X POST {SUPABASE_URL}/functions/v1/send-reminders \
+  -H "Authorization: Bearer {SERVICE_ROLE_KEY}"
+```
+
+**Configuration:**
+- `shop_config.enable_reminders` (boolean, default: true)
+- `shop_config.reminder_hours_before` (integer, default: 24)
+
+### Client Self-Service Portal
+
+**Route:** `/client/appointments`
+
+**Access:** Public with OTP verification
+
+#### OTP Verification Flow
+
+**Step 1: Phone Entry**
+Client enters phone number.
+
+**Step 2: OTP Request**
+- Edge function `client-otp?action=request` generates 6-digit code
+- Code stored in `otp_verification` table (10-minute expiry)
+- SMS sent to client
+- Rate limit: 3 requests per phone per 5 minutes
+
+**Step 3: Code Verification**
+- Edge function `client-otp?action=verify` validates code
+- Marks code as used (`verified_at`)
+- Returns session token
+- Max 5 verification attempts per code
+
+#### Appointments View
+
+After verification, client sees:
+
+**Upcoming Appointments:**
+- `status = 'booked'` and `scheduled_start >= now()`
+- Shows: service, date/time, barber, status badge
+- Future: Cancel/Reschedule buttons (planned)
+
+**Past Appointments:**
+- `scheduled_start < now()` or completed/cancelled status
+- Read-only display
+
+**Security:**
+- Appointments filtered by phone number only
+- No cross-client data exposure
+- Session token stored in component state (no persistence)
+
+### Notification Tracking
+
+**Table:** `client_messages`
+
+**Fields:**
+- `appointment_id` - Links to appointment
+- `notification_type` - confirmation, reminder, cancellation, reschedule, otp
+- `status` - sent, disabled, error
+- `error_message` - Failure details
+- `created_at` - Timestamp
+
+**Owner Visibility:**
+
+AppointmentDetail page loads recent notifications:
+```typescript
+const { data: notifications } = await supabase
+  .from('client_messages')
+  .select('notification_type, status, created_at')
+  .eq('appointment_id', appointmentId)
+  .order('created_at', { ascending: false })
+  .limit(5);
+```
+
+Displays notification type, status, and timestamp. Future: dashboard with success rates and error analytics.
+
+### Edge Functions
+
+**1. send-notification**
+- Sends system-generated SMS (confirmations, reminders, cancellations)
+- No authentication required (uses service role internally)
+- Logs to `client_messages` table
+
+**2. client-otp**
+- `?action=request` - Generate and send OTP
+- `?action=verify` - Validate OTP code
+- Public endpoints with rate limiting
+
+**3. send-reminders**
+- Batch sends reminders for upcoming appointments
+- Service role authentication required
+- Idempotent (prevents duplicates)
+
+### Database Schema
+
+**New Tables:**
+
+**otp_verification:**
+- Stores verification codes for client portal
+- Fields: phone_number, code, expires_at, attempts, verified_at
+- Indexed by phone and expiry
+
+**appointment_reminders_sent:**
+- Tracks sent reminders (idempotency)
+- Unique constraint on (appointment_id, reminder_type)
+
+**Extended Tables:**
+
+**client_messages:** Added `appointment_id` and `notification_type`
+
+**shop_config:** Added `reminder_hours_before`, `enable_confirmations`, `enable_reminders`
+
+### Operational Playbook
+
+**SMS Not Sending:**
+1. Check environment variables: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER, SMS_ENABLED
+2. Check `shop_config.enable_confirmations` and `enable_reminders`
+3. Verify Twilio account status and balance
+4. Review `client_messages` table for error_message details
+
+**Client Didn't Receive Reminder:**
+1. Query `client_messages` for appointment_id and notification_type='reminder'
+2. Check status (sent/error/disabled)
+3. Verify phone number in clients table
+4. Check reminder timing vs scheduled_start
+5. Manual resend via `/owner/engage` if needed
+
+**Disable Reminders Temporarily:**
+```sql
+UPDATE shop_config SET enable_reminders = false;
+```
+
+**Client Can't Access Portal:**
+1. Check OTP SMS in `client_messages` (notification_type='otp')
+2. Verify code not expired (10-minute window)
+3. Check rate limiting (max 3 requests per 5 minutes)
+4. Manual code lookup for phone support if needed
+
+**Cleanup Old OTP Codes:**
+```sql
+SELECT cleanup_expired_otp_codes();
+```
+Run daily (deletes codes >24 hours old).
+
+### Testing Checklist
+
+**Confirmations:**
+- [ ] Book via /client/book - SMS sent
+- [ ] Verify SMS received
+- [ ] Test EN/ES templates
+- [ ] Test with SMS disabled
+
+**Reminders:**
+- [ ] Create appointment 23-25 hours ahead
+- [ ] Run send-reminders function
+- [ ] Verify SMS sent and recorded
+- [ ] Verify idempotency (no duplicates)
+- [ ] Test EN/ES templates
+
+**Client Portal:**
+- [ ] Request OTP - SMS received
+- [ ] Verify with correct code - shows appointments
+- [ ] Verify with incorrect code - error shown
+- [ ] Test rate limiting
+- [ ] Test code expiry
+- [ ] View upcoming/past appointments
+- [ ] Test bilingual display
+- [ ] Sign out functionality
+
+**Owner Tracking:**
+- [ ] View notification history in AppointmentDetail
+- [ ] Verify status indicators
+
+**Regression:**
+- [ ] Existing booking flows work
+- [ ] Owner/barber views unchanged
+- [ ] Analytics unchanged
+
+---
+
 **End of Architecture Document**

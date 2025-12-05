@@ -23,6 +23,7 @@ export default function ClientHeader() {
     { label: language === 'en' ? 'Services' : 'Servicios', path: '/client/services' },
     { label: language === 'en' ? 'Barbers' : 'Barberos', path: '/client/barbers' },
     { label: language === 'en' ? 'Products' : 'Productos', path: '/client/products' },
+    { label: language === 'en' ? 'My Appointments' : 'Mis Citas', path: '/client/appointments' },
     { label: language === 'en' ? 'Book Now' : 'Reservar', path: '/client/book' },
   ];
 
