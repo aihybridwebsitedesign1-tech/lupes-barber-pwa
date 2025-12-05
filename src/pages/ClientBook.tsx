@@ -255,6 +255,7 @@ export default function ClientBook() {
 
       const appointmentDateTime = new Date(`${selectedDate}T${selectedTime}:00`);
       const selectedServiceData = services.find(s => s.id === selectedService);
+      const amountDue = selectedServiceData?.price || 0;
 
       const { data: newAppointment, error: appointmentError } = await supabase
         .from('appointments')
@@ -267,6 +268,9 @@ export default function ClientBook() {
           status: 'booked',
           notes: clientNotes || null,
           source: 'client_web',
+          payment_status: 'unpaid',
+          amount_due: amountDue,
+          amount_paid: 0,
         })
         .select('id')
         .single();
@@ -290,15 +294,40 @@ export default function ClientBook() {
           language,
         }).catch(err => {
           console.error('Failed to send confirmation:', err);
-          // Don't block booking on notification failure
         });
       }
 
-      alert(language === 'en'
-        ? 'Booking confirmed! We look forward to seeing you.'
-        : '¡Reserva confirmada! Esperamos verte pronto.');
+      // Create Stripe checkout session
+      try {
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 
-      navigate('/client/home');
+        const response = await fetch(`${supabaseUrl}/functions/v1/create-checkout`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ appointmentId: newAppointment.id }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to create checkout session');
+        }
+
+        const { url } = await response.json();
+
+        if (url) {
+          window.location.href = url;
+        } else {
+          throw new Error('No checkout URL returned');
+        }
+      } catch (stripeError) {
+        console.error('Stripe checkout error:', stripeError);
+        alert(language === 'en'
+          ? 'Booking confirmed, but payment setup failed. You can pay when you arrive.'
+          : 'Reserva confirmada, pero falló la configuración de pago. Puedes pagar cuando llegues.');
+        navigate('/client/home');
+      }
     } catch (error) {
       console.error('Error creating booking:', error);
       setError(language === 'en' ? 'Failed to create booking. Please try again.' : 'Error al crear la reserva. Por favor intenta de nuevo.');
@@ -601,8 +630,8 @@ export default function ClientBook() {
                 }}
               >
                 {submitting
-                  ? (language === 'en' ? 'Booking...' : 'Reservando...')
-                  : (language === 'en' ? 'Confirm Booking' : 'Confirmar Reserva')}
+                  ? (language === 'en' ? 'Processing...' : 'Procesando...')
+                  : (language === 'en' ? 'Pay & Confirm' : 'Pagar y Confirmar')}
               </button>
             </div>
           )}

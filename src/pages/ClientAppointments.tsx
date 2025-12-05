@@ -4,6 +4,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { validateBookingRules, formatBookingRuleError, getShopConfig } from '../lib/bookingRules';
 import { sendCancellation, sendReschedule, formatAppointmentDate, formatAppointmentTime } from '../lib/notificationHelper';
 import ClientHeader from '../components/ClientHeader';
+import PaymentStatusBadge from '../components/PaymentStatusBadge';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -16,6 +17,8 @@ type Appointment = {
   barber_name: string | null;
   service_name_en: string;
   service_name_es: string;
+  payment_status: 'paid' | 'unpaid' | 'refunded' | 'partial' | null;
+  amount_due: number;
 };
 
 export default function ClientAppointments() {
@@ -181,6 +184,8 @@ export default function ClientAppointments() {
           scheduled_end,
           status,
           notes,
+          payment_status,
+          amount_due,
           users!appointments_barber_id_fkey (name),
           services!inner (name_en, name_es)
         `)
@@ -203,6 +208,8 @@ export default function ClientAppointments() {
           barber_name: apt.users?.name || null,
           service_name_en: apt.services.name_en,
           service_name_es: apt.services.name_es,
+          payment_status: apt.payment_status,
+          amount_due: apt.amount_due || 0,
         };
 
         const aptDate = new Date(apt.scheduled_start);
@@ -699,20 +706,78 @@ export default function ClientAppointments() {
                             </div>
                           )}
                         </div>
-                        <span
-                          style={{
-                            display: 'inline-block',
-                            padding: '0.5rem 1rem',
-                            backgroundColor: '#e3f2fd',
-                            color: getStatusLabel(apt.status).color,
-                            borderRadius: '20px',
-                            fontSize: '14px',
-                            fontWeight: '500',
-                          }}
-                        >
-                          {getStatusLabel(apt.status).text}
-                        </span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
+                          <span
+                            style={{
+                              display: 'inline-block',
+                              padding: '0.5rem 1rem',
+                              backgroundColor: '#e3f2fd',
+                              color: getStatusLabel(apt.status).color,
+                              borderRadius: '20px',
+                              fontSize: '14px',
+                              fontWeight: '500',
+                            }}
+                          >
+                            {getStatusLabel(apt.status).text}
+                          </span>
+                          <PaymentStatusBadge status={apt.payment_status} size="small" />
+                        </div>
                       </div>
+
+                      {/* Payment info */}
+                      {apt.payment_status === 'unpaid' && apt.amount_due > 0 && (
+                        <div style={{
+                          marginTop: '1rem',
+                          padding: '0.75rem',
+                          backgroundColor: '#fff3cd',
+                          borderRadius: '8px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}>
+                          <div>
+                            <div style={{ fontSize: '12px', color: '#856404' }}>
+                              {language === 'en' ? 'Amount Due' : 'Monto Pendiente'}
+                            </div>
+                            <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#856404' }}>
+                              ${apt.amount_due.toFixed(2)}
+                            </div>
+                          </div>
+                          <button
+                            onClick={async () => {
+                              try {
+                                const response = await fetch(`${SUPABASE_URL}/functions/v1/create-checkout`, {
+                                  method: 'POST',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+                                  },
+                                  body: JSON.stringify({ appointmentId: apt.id }),
+                                });
+                                const { url } = await response.json();
+                                if (url) {
+                                  window.location.href = url;
+                                }
+                              } catch (err) {
+                                console.error('Error creating checkout:', err);
+                                alert(language === 'en' ? 'Payment setup failed. Please try again.' : 'Configuración de pago falló. Intenta de nuevo.');
+                              }
+                            }}
+                            style={{
+                              padding: '0.5rem 1rem',
+                              backgroundColor: '#10b981',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              fontSize: '14px',
+                              fontWeight: '600',
+                            }}
+                          >
+                            {language === 'en' ? 'Pay Now' : 'Pagar Ahora'}
+                          </button>
+                        </div>
+                      )}
 
                       {/* Action buttons */}
                       <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>

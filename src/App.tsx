@@ -28,6 +28,7 @@ import ClientHome from './pages/ClientHome';
 import ClientServices from './pages/ClientServices';
 import ClientBarbers from './pages/ClientBarbers';
 import ClientBook from './pages/ClientBook';
+import ClientBookSuccess from './pages/ClientBookSuccess';
 import ClientProducts from './pages/ClientProducts';
 import ClientAppointments from './pages/ClientAppointments';
 
@@ -79,6 +80,7 @@ function AppRoutes() {
       <Route path="/client/barbers" element={<ClientBarbers />} />
       <Route path="/client/products" element={<ClientProducts />} />
       <Route path="/client/book" element={<ClientBook />} />
+      <Route path="/client/book/success" element={<ClientBookSuccess />} />
       <Route path="/client/appointments" element={<ClientAppointments />} />
 
       <Route path="/owner/today" element={<ProtectedRoute allowedRole="OWNER"><OwnerToday /></ProtectedRoute>} />
