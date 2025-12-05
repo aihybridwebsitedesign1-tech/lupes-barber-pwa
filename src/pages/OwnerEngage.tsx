@@ -18,6 +18,7 @@ export default function OwnerEngage() {
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const { language } = useLanguage();
   const { userData } = useAuth();
   const navigate = useNavigate();
@@ -45,34 +46,115 @@ export default function OwnerEngage() {
     }
   };
 
+  const showToast = (message: string, type: 'success' | 'error' | 'info') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 5000);
+  };
+
   const handleSend = async () => {
+    if (!(userData as any)?.can_send_sms) {
+      showToast(
+        language === 'en'
+          ? "You don't have permission to send SMS."
+          : "No tienes permiso para enviar SMS.",
+        'error'
+      );
+      return;
+    }
+
     if (!selectedClientId || !message.trim()) {
-      alert(language === 'en' ? 'Please select a client and enter a message' : 'Por favor selecciona un cliente y escribe un mensaje');
+      showToast(
+        language === 'en'
+          ? 'Please select a client and enter a message'
+          : 'Por favor selecciona un cliente y escribe un mensaje',
+        'error'
+      );
+      return;
+    }
+
+    if (message.length > 160) {
+      showToast(
+        language === 'en'
+          ? 'Message must be 160 characters or less'
+          : 'El mensaje debe tener 160 caracteres o menos',
+        'error'
+      );
       return;
     }
 
     setSending(true);
     try {
       const client = clients.find(c => c.id === selectedClientId);
-      if (!client) return;
+      if (!client || !client.phone) {
+        showToast(
+          language === 'en'
+            ? 'Client phone number not found'
+            : 'No se encontró el número de teléfono del cliente',
+          'error'
+        );
+        return;
+      }
 
-      console.log('=== SIMULATED SMS SEND ===');
-      console.log(`To: ${client.first_name} ${client.last_name} (${client.phone})`);
-      console.log(`Message: ${message}`);
-      console.log(`Sent by: ${userData?.name || 'Unknown'}`);
-      console.log('==========================');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        showToast(
+          language === 'en'
+            ? 'Session expired. Please log in again.'
+            : 'Sesión expirada. Por favor inicia sesión de nuevo.',
+          'error'
+        );
+        return;
+      }
 
-      alert(
-        language === 'en'
-          ? `SMS simulated! Check console. Message would be sent to ${client.first_name} ${client.last_name}.`
-          : `SMS simulado! Verifica la consola. El mensaje se enviaría a ${client.first_name} ${client.last_name}.`
-      );
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-sms`;
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          clientId: selectedClientId,
+          phoneNumber: client.phone,
+          message: message,
+          source: 'engage_manual',
+        }),
+      });
 
-      setMessage('');
-      setSelectedClientId('');
+      const result = await response.json();
+
+      if (result.status === 'sent') {
+        showToast(
+          language === 'en'
+            ? `SMS sent successfully to ${client.first_name} ${client.last_name}!`
+            : `SMS enviado exitosamente a ${client.first_name} ${client.last_name}!`,
+          'success'
+        );
+        setMessage('');
+        setSelectedClientId('');
+      } else if (result.status === 'disabled') {
+        showToast(
+          language === 'en'
+            ? 'SMS sending is not configured yet. Please ask the owner to connect Twilio.'
+            : 'El envío de SMS aún no está configurado. Por favor, pide al dueño que conecte Twilio.',
+          'info'
+        );
+      } else if (result.status === 'error') {
+        showToast(
+          language === 'en'
+            ? 'There was a problem sending this SMS. Please try again.'
+            : 'Hubo un problema al enviar este SMS. Inténtalo de nuevo.',
+          'error'
+        );
+      }
     } catch (error) {
       console.error('Error sending SMS:', error);
-      alert(language === 'en' ? 'Error sending SMS' : 'Error al enviar SMS');
+      showToast(
+        language === 'en'
+          ? 'Network error. Please check your connection and try again.'
+          : 'Error de red. Por favor verifica tu conexión e inténtalo de nuevo.',
+        'error'
+      );
     } finally {
       setSending(false);
     }
@@ -86,24 +168,55 @@ export default function OwnerEngage() {
     `${c.first_name} ${c.last_name} ${c.phone}`.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const canSend = (userData as any)?.can_send_sms === true;
+
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
       <Header />
       <main style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
+        {toast && (
+          <div style={{
+            position: 'fixed',
+            top: '80px',
+            right: '20px',
+            zIndex: 1000,
+            backgroundColor: toast.type === 'success' ? '#d4edda' : toast.type === 'error' ? '#f8d7da' : '#d1ecf1',
+            color: toast.type === 'success' ? '#155724' : toast.type === 'error' ? '#721c24' : '#0c5460',
+            padding: '1rem 1.5rem',
+            borderRadius: '6px',
+            border: `1px solid ${toast.type === 'success' ? '#c3e6cb' : toast.type === 'error' ? '#f5c6cb' : '#bee5eb'}`,
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+            maxWidth: '400px',
+          }}>
+            {toast.message}
+          </div>
+        )}
+
         <div style={{ marginBottom: '1.5rem' }}>
           <h2 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '0.5rem' }}>
-            {language === 'en' ? 'Engage (Beta)' : 'Engage (Beta)'}
+            {language === 'en' ? 'Engage' : 'Engage'}
           </h2>
           <p style={{ fontSize: '14px', color: '#666', marginBottom: '1rem' }}>
             {language === 'en'
-              ? 'Send SMS messages to clients. This feature is only available to users with SMS permissions.'
-              : 'Enviar mensajes SMS a los clientes. Esta función solo está disponible para usuarios con permisos de SMS.'}
+              ? 'Send SMS messages to clients. SMS sending requires proper configuration.'
+              : 'Enviar mensajes SMS a los clientes. El envío de SMS requiere la configuración adecuada.'}
           </p>
-          <p style={{ fontSize: '13px', color: '#999', fontStyle: 'italic', backgroundColor: '#fff3cd', padding: '0.75rem', borderRadius: '6px', border: '1px solid #ffc107' }}>
-            {language === 'en'
-              ? 'TODO: Wire this to real SMS provider (Twilio or similar) at go-live. Currently messages are logged to console only.'
-              : 'TODO: Conectar esto a un proveedor de SMS real (Twilio o similar) en el lanzamiento. Actualmente los mensajes solo se registran en la consola.'}
-          </p>
+
+          {!canSend && (
+            <div style={{
+              fontSize: '14px',
+              color: '#721c24',
+              backgroundColor: '#f8d7da',
+              padding: '0.75rem',
+              borderRadius: '6px',
+              border: '1px solid #f5c6cb',
+              marginBottom: '1rem',
+            }}>
+              {language === 'en'
+                ? "You don't have permission to send SMS. Please contact the shop owner."
+                : "No tienes permiso para enviar SMS. Por favor contacta al dueño de la tienda."}
+            </div>
+          )}
         </div>
 
         <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
@@ -179,21 +292,21 @@ export default function OwnerEngage() {
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <button
               onClick={handleSend}
-              disabled={sending || !selectedClientId || !message.trim()}
+              disabled={!canSend || sending || !selectedClientId || !message.trim()}
               style={{
                 padding: '10px 24px',
-                backgroundColor: sending || !selectedClientId || !message.trim() ? '#ccc' : '#000',
+                backgroundColor: !canSend || sending || !selectedClientId || !message.trim() ? '#ccc' : '#000',
                 color: 'white',
                 border: 'none',
                 borderRadius: '6px',
-                cursor: sending || !selectedClientId || !message.trim() ? 'not-allowed' : 'pointer',
+                cursor: !canSend || sending || !selectedClientId || !message.trim() ? 'not-allowed' : 'pointer',
                 fontSize: '14px',
                 fontWeight: '500',
               }}
             >
               {sending
                 ? (language === 'en' ? 'Sending...' : 'Enviando...')
-                : (language === 'en' ? 'Send Test SMS' : 'Enviar SMS de Prueba')}
+                : (language === 'en' ? 'Send SMS' : 'Enviar SMS')}
             </button>
           </div>
         </div>

@@ -637,6 +637,207 @@ All tables use Row Level Security (RLS).
 
 ---
 
+## Messaging / SMS Integration
+
+### Overview
+
+The application includes a secure, plug-and-play Twilio SMS integration that allows owners and authorized staff to send SMS messages to clients. The system is designed to degrade gracefully when SMS is not configured, ensuring the application remains functional at all times.
+
+### Architecture
+
+**Server-Side Implementation:**
+- **Edge Function:** `supabase/functions/send-sms/index.ts`
+- **Path:** `/functions/v1/send-sms`
+- **Method:** POST
+- **Authentication:** Requires valid JWT token (verified)
+
+**Database:**
+- **Table:** `client_messages` - Logs all SMS attempts with status tracking
+- **Schema:**
+  - `id` (uuid) - Primary key
+  - `client_id` (uuid) - References clients table
+  - `phone_number` (text) - Recipient phone number
+  - `message` (text) - Message content
+  - `channel` (text) - Communication channel ('sms', 'email', etc.)
+  - `source` (text) - Origin of message (e.g., 'engage_manual')
+  - `twilio_sid` (text, nullable) - Twilio message SID when available
+  - `status` (text) - Delivery status ('sent', 'disabled', 'error')
+  - `error_message` (text, nullable) - Error details if status is error
+  - `sent_by_user_id` (uuid) - User who sent the message
+  - `created_at` (timestamptz) - Timestamp
+
+### Environment Variables
+
+**Required Configuration (Server-Side Only):**
+```
+TWILIO_ACCOUNT_SID=your-account-sid
+TWILIO_AUTH_TOKEN=your-auth-token
+TWILIO_FROM_NUMBER=+15551234567
+SMS_ENABLED=true
+```
+
+**Important Notes:**
+- These are server-side environment variables set in Supabase Edge Functions configuration
+- Never exposed to the client/browser
+- SMS functionality is disabled if any required variable is missing or SMS_ENABLED ≠ "true"
+- The application continues to work normally when SMS is not configured
+
+### Edge Function Behavior
+
+**Request Body:**
+```typescript
+{
+  clientId: string,
+  phoneNumber: string,
+  message: string,
+  source: string  // e.g., 'engage_manual'
+}
+```
+
+**Response Types:**
+
+1. **Success (status: 'sent'):**
+   ```json
+   { "status": "sent", "sid": "SM..." }
+   ```
+   - SMS sent successfully via Twilio
+   - Message logged in `client_messages` with Twilio SID
+
+2. **Not Configured (status: 'disabled'):**
+   ```json
+   { "status": "disabled" }
+   ```
+   - One or more env vars missing or SMS_ENABLED ≠ "true"
+   - Server logs: `[SMS] Disabled: missing configuration`
+   - Message not sent, not logged
+
+3. **Error (status: 'error'):**
+   ```json
+   { "status": "error", "message": "..." }
+   ```
+   - Twilio API error or other failure
+   - Message logged with error status
+
+**Security Features:**
+- Checks `can_send_sms` permission from users table
+- Returns 403 if user lacks permission
+- Validates phone number and message presence
+- Masks phone numbers in server logs (e.g., "+1555...")
+
+**Twilio API Integration:**
+- Uses Basic Authentication with Account SID and Auth Token
+- Sends POST to `https://api.twilio.com/2010-04-01/Accounts/{SID}/Messages.json`
+- Content-Type: `application/x-www-form-urlencoded`
+
+### Client-Side Implementation
+
+**Location:** `src/pages/OwnerEngage.tsx`
+
+**Permission Check:**
+- Reads `userData.can_send_sms` from authenticated user
+- Disables form and shows warning if permission denied
+
+**API Call Pattern:**
+```typescript
+const apiUrl = `${VITE_SUPABASE_URL}/functions/v1/send-sms`;
+const response = await fetch(apiUrl, {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${session.access_token}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    clientId, phoneNumber, message, source: 'engage_manual'
+  })
+});
+```
+
+**User Feedback (Toast Notifications):**
+- **Success:** Green toast - "SMS sent successfully to {Client Name}!"
+- **Disabled:** Blue info toast - "SMS sending is not configured yet. Please ask the owner to connect Twilio."
+- **Error:** Red error toast - "There was a problem sending this SMS. Please try again."
+- **Network Error:** Red error toast - "Network error. Please check your connection and try again."
+
+**Validation:**
+- Client must be selected
+- Phone number must be present
+- Message must be 1-160 characters
+
+### Current Capabilities
+
+**Manual SMS from Engage Page:**
+- Owner role can access `/owner/engage`
+- Search and select client from dropdown
+- Compose message (max 160 characters)
+- Real-time character count
+- Permission-based access control
+- Full audit trail in `client_messages` table
+
+### Current Limitations
+
+1. **Manual Only:** SMS can only be sent manually from Engage page
+2. **No Automation:** No appointment reminders or confirmations yet
+3. **No Bulk Messaging:** One message at a time
+4. **No Templates:** Each message must be typed manually
+5. **No Scheduling:** Messages sent immediately, no delayed sending
+
+### Future Enhancements
+
+**Phase 1: Automated Notifications**
+- Appointment confirmation SMS when booked
+- Reminder SMS 24 hours before appointment
+- Post-appointment thank you messages
+- Uses booking rules & retention settings for timing
+
+**Phase 2: Campaign Management**
+- Bulk SMS to client segments (regular, lapsed, new)
+- Message templates library
+- Scheduled campaigns
+- Response tracking
+
+**Phase 3: Two-Way Messaging**
+- Receive SMS replies from clients
+- Conversation threads
+- Client-initiated appointment requests
+- Opt-out management
+
+**Phase 4: Advanced Features**
+- A/B testing for message content
+- Delivery analytics and reporting
+- Cost tracking per message
+- Integration with marketing automation
+
+### Configuration Guide
+
+**For Developers/Shop Owners:**
+
+1. **Get Twilio Credentials:**
+   - Sign up at https://www.twilio.com
+   - Get Account SID and Auth Token from console
+   - Purchase a phone number or messaging service
+
+2. **Set Environment Variables:**
+   - In Supabase dashboard, go to Edge Functions settings
+   - Add the four environment variables listed above
+   - Set `SMS_ENABLED=true` when ready to go live
+
+3. **Grant Permissions:**
+   - Update user's `can_send_sms` field to `true` in users table
+   - Currently only owners have this permission by default
+
+4. **Test:**
+   - Navigate to `/owner/engage`
+   - Select a test client with valid phone number
+   - Send test message
+   - Check `client_messages` table for logged entry
+
+**No Configuration Needed for Development:**
+- Application works without SMS configured
+- Shows "disabled" status instead of errors
+- All other features remain functional
+
+---
+
 ## Future Enhancements (Roadmap)
 
 ### Phase 6: Client-Facing Website
