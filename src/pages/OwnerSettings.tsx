@@ -332,9 +332,14 @@ export default function OwnerSettings() {
 
                 {activeTab === 'booking_rules' && (
                   <div>
-                    <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '1.5rem' }}>
+                    <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '0.5rem' }}>
                       {language === 'en' ? 'Booking Rules' : 'Reglas de Reserva'}
                     </h3>
+                    <p style={{ fontSize: '14px', color: '#666', marginBottom: '1.5rem' }}>
+                      {language === 'en'
+                        ? 'These rules apply to all barbers. Barber-specific overrides may be added in a future update.'
+                        : 'Estas reglas se aplican a todos los barberos. Las excepciones por barbero pueden agregarse en una actualización futura.'}
+                    </p>
 
                     <div style={{ marginBottom: '1.5rem' }}>
                       <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '0.5rem' }}>

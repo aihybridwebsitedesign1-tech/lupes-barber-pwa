@@ -995,20 +995,40 @@ const error = await validateBookingRules(new Date('2025-12-10T14:00:00'), 'creat
 
 #### 3.3 Booking Rules Tab
 
+**Scope: Global Shop Settings**
+
+IMPORTANT: Booking rules are currently **global shop settings** stored in the `shop_config` table. These rules apply to **all barbers** without exception.
+
+**Future Enhancement:**
+- Per-barber overrides may be added in a future phase
+- This would allow specific barbers to have different rules (e.g., senior barber can accept same-day bookings)
+- Implementation would likely involve:
+  - A new `barber_booking_overrides` table OR
+  - Additional fields on the `users` table for barber-specific rules
+  - Validation logic that checks barber overrides first, then falls back to shop defaults
+
+**Current Implementation:**
+The UI displays helper text: "These rules apply to all barbers. Barber-specific overrides may be added in a future update."
+
 **Fields:**
 1. **Days Bookable in Advance** (1-365)
    - Controls max booking window
+   - Applied globally to all barbers
 2. **Minimum Hours Before Booking** (0-72)
    - Prevents last-minute bookings
+   - Applied globally to all barbers
 3. **Minimum Hours Before Cancellation** (0-72)
    - Enforces cancellation policy
+   - Applied globally to all barbers
 4. **Booking Interval** (dropdown: 10, 15, 20, 30, 60 minutes)
    - Controls available time slots
+   - Applied globally to all barbers
 
 **Persistence:**
 - Updates corresponding `shop_config` fields
 - Changes take effect immediately (no restart needed)
 - Used by `validateBookingRules()` function
+- All barbers inherit these global rules
 
 #### 3.4 Clients & Retention Tab
 

@@ -13,6 +13,14 @@ type Product = {
   price: number;
   active: boolean;
   image_url: string | null;
+  sku: string | null;
+  brand: string | null;
+  category: string | null;
+  retail_price: number;
+  supply_cost: number;
+  current_stock: number;
+  low_stock_threshold: number;
+  high_stock_threshold: number;
 };
 
 export default function OwnerProducts() {
@@ -27,6 +35,14 @@ export default function OwnerProducts() {
   const [price, setPrice] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [active, setActive] = useState(true);
+  const [sku, setSku] = useState('');
+  const [brand, setBrand] = useState('');
+  const [category, setCategory] = useState('');
+  const [retailPrice, setRetailPrice] = useState('');
+  const [supplyCost, setSupplyCost] = useState('');
+  const [currentStock, setCurrentStock] = useState('');
+  const [lowStockThreshold, setLowStockThreshold] = useState('5');
+  const [highStockThreshold, setHighStockThreshold] = useState('100');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -46,6 +62,14 @@ export default function OwnerProducts() {
       setPrice(String(editingProduct.price));
       setImageUrl(editingProduct.image_url || '');
       setActive(editingProduct.active);
+      setSku(editingProduct.sku || '');
+      setBrand(editingProduct.brand || '');
+      setCategory(editingProduct.category || '');
+      setRetailPrice(String(editingProduct.retail_price || ''));
+      setSupplyCost(String(editingProduct.supply_cost || ''));
+      setCurrentStock(String(editingProduct.current_stock ?? ''));
+      setLowStockThreshold(String(editingProduct.low_stock_threshold || 5));
+      setHighStockThreshold(String(editingProduct.high_stock_threshold || 100));
     }
   }, [editingProduct]);
 
@@ -70,6 +94,14 @@ export default function OwnerProducts() {
     setPrice('');
     setImageUrl('');
     setActive(true);
+    setSku('');
+    setBrand('');
+    setCategory('');
+    setRetailPrice('');
+    setSupplyCost('');
+    setCurrentStock('');
+    setLowStockThreshold('5');
+    setHighStockThreshold('100');
     setSelectedFile(null);
     setShowModal(true);
   };
@@ -151,6 +183,17 @@ export default function OwnerProducts() {
       return;
     }
 
+    const retailPriceNum = retailPrice ? parseFloat(retailPrice) : 0;
+    const supplyCostNum = supplyCost ? parseFloat(supplyCost) : 0;
+    const currentStockNum = currentStock ? parseInt(currentStock) : 0;
+    const lowThresholdNum = lowStockThreshold ? parseInt(lowStockThreshold) : 5;
+    const highThresholdNum = highStockThreshold ? parseInt(highStockThreshold) : 100;
+
+    if (retailPriceNum < 0 || supplyCostNum < 0 || currentStockNum < 0 || lowThresholdNum < 0 || highThresholdNum < 0) {
+      alert(language === 'en' ? 'Numeric values must be ≥ 0' : 'Los valores numéricos deben ser ≥ 0');
+      return;
+    }
+
     setSaving(true);
     try {
       const productData = {
@@ -161,6 +204,14 @@ export default function OwnerProducts() {
         price: priceNum,
         image_url: imageUrl || null,
         active,
+        sku: sku || null,
+        brand: brand || null,
+        category: category || null,
+        retail_price: retailPriceNum,
+        supply_cost: supplyCostNum,
+        current_stock: currentStockNum,
+        low_stock_threshold: lowThresholdNum,
+        high_stock_threshold: highThresholdNum,
       };
 
       if (editingProduct) {
@@ -603,6 +654,129 @@ export default function OwnerProducts() {
                     )}
                   </div>
                 </div>
+              </div>
+            </div>
+
+            <div style={{ marginTop: '1.5rem', marginBottom: '1rem', paddingTop: '1rem', borderTop: '2px solid #e5e5e5' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '1rem', color: '#333' }}>
+                {language === 'en' ? 'Inventory Details' : 'Detalles de Inventario'}
+              </h3>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
+                  {language === 'en' ? 'SKU' : 'SKU'}
+                </label>
+                <input
+                  type="text"
+                  value={sku}
+                  onChange={(e) => setSku(e.target.value)}
+                  placeholder={language === 'en' ? 'Product code' : 'Código de producto'}
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
+                  {language === 'en' ? 'Category' : 'Categoría'}
+                </label>
+                <input
+                  type="text"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  placeholder={language === 'en' ? 'e.g., Hair Care' : 'ej., Cuidado del Cabello'}
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
+                {language === 'en' ? 'Brand' : 'Marca'}
+              </label>
+              <input
+                type="text"
+                value={brand}
+                onChange={(e) => setBrand(e.target.value)}
+                placeholder={language === 'en' ? 'Brand name' : 'Nombre de marca'}
+                style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
+                  {language === 'en' ? 'Retail Price ($)' : 'Precio Retail ($)'}
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={retailPrice}
+                  onChange={(e) => setRetailPrice(e.target.value)}
+                  placeholder="0.00"
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
+                  {language === 'en' ? 'Supply Cost ($)' : 'Costo de Suministro ($)'}
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={supplyCost}
+                  onChange={(e) => setSupplyCost(e.target.value)}
+                  placeholder="0.00"
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
+                  {language === 'en' ? 'Current Stock' : 'Stock Actual'}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={currentStock}
+                  onChange={(e) => setCurrentStock(e.target.value)}
+                  placeholder="0"
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
+                  {language === 'en' ? 'Low Threshold' : 'Umbral Bajo'}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={lowStockThreshold}
+                  onChange={(e) => setLowStockThreshold(e.target.value)}
+                  placeholder="5"
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
+                  {language === 'en' ? 'High Threshold' : 'Umbral Alto'}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={highStockThreshold}
+                  onChange={(e) => setHighStockThreshold(e.target.value)}
+                  placeholder="100"
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
+                />
               </div>
             </div>
 

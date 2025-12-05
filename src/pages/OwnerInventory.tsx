@@ -58,8 +58,11 @@ export default function OwnerInventory() {
   };
 
   const getStockStatus = (product: Product): StockStatus => {
-    if (product.current_stock <= 0) return 'OUT';
-    if (product.current_stock <= product.low_stock_threshold) return 'LOW';
+    const stock = product.current_stock ?? 0;
+    const lowThreshold = product.low_stock_threshold ?? 5;
+
+    if (stock <= 0) return 'OUT';
+    if (stock <= lowThreshold) return 'LOW';
     return 'OK';
   };
 
@@ -90,7 +93,7 @@ export default function OwnerInventory() {
 
   const openAdjustModal = (product: Product) => {
     setSelectedProduct(product);
-    setNewQuantity(product.current_stock);
+    setNewQuantity(product.current_stock ?? 0);
     setAdjustReason('');
     setError('');
     setSuccess('');
@@ -112,7 +115,8 @@ export default function OwnerInventory() {
     setError('');
     setSuccess('');
 
-    const delta = newQuantity - selectedProduct.current_stock;
+    const currentStock = selectedProduct.current_stock ?? 0;
+    const delta = newQuantity - currentStock;
     if (delta === 0) {
       setError(language === 'en' ? 'No change in quantity.' : 'Sin cambio en cantidad.');
       setSaving(false);
@@ -242,11 +246,11 @@ export default function OwnerInventory() {
                         <td style={{ padding: '1rem', color: '#666' }}>{product.sku || '—'}</td>
                         <td style={{ padding: '1rem', color: '#666' }}>{product.category || '—'}</td>
                         <td style={{ padding: '1rem', color: '#666' }}>{product.brand || '—'}</td>
-                        <td style={{ padding: '1rem', textAlign: 'right' }}>${product.retail_price.toFixed(2)}</td>
-                        <td style={{ padding: '1rem', textAlign: 'right' }}>${product.supply_cost.toFixed(2)}</td>
-                        <td style={{ padding: '1rem', textAlign: 'center', fontWeight: '600' }}>{product.current_stock}</td>
-                        <td style={{ padding: '1rem', textAlign: 'center', color: '#999' }}>{product.low_stock_threshold}</td>
-                        <td style={{ padding: '1rem', textAlign: 'center', color: '#999' }}>{product.high_stock_threshold}</td>
+                        <td style={{ padding: '1rem', textAlign: 'right' }}>${(product.retail_price ?? 0).toFixed(2)}</td>
+                        <td style={{ padding: '1rem', textAlign: 'right' }}>${(product.supply_cost ?? 0).toFixed(2)}</td>
+                        <td style={{ padding: '1rem', textAlign: 'center', fontWeight: '600' }}>{product.current_stock ?? 0}</td>
+                        <td style={{ padding: '1rem', textAlign: 'center', color: '#999' }}>{product.low_stock_threshold ?? 5}</td>
+                        <td style={{ padding: '1rem', textAlign: 'center', color: '#999' }}>{product.high_stock_threshold ?? 100}</td>
                         <td style={{ padding: '1rem', textAlign: 'center' }}>{getStatusBadge(status)}</td>
                         <td style={{ padding: '1rem', textAlign: 'center' }}>
                           <button
@@ -363,7 +367,7 @@ export default function OwnerInventory() {
                 </label>
                 <input
                   type="text"
-                  value={selectedProduct.current_stock}
+                  value={selectedProduct.current_stock ?? 0}
                   readOnly
                   style={{
                     width: '100%',

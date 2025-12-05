@@ -49,8 +49,11 @@ export default function OwnerInventoryReports() {
   };
 
   const getStockStatus = (product: Product): StockStatus => {
-    if (product.current_stock <= 0) return 'OUT';
-    if (product.current_stock <= product.low_stock_threshold) return 'LOW';
+    const stock = product.current_stock ?? 0;
+    const lowThreshold = product.low_stock_threshold ?? 5;
+
+    if (stock <= 0) return 'OUT';
+    if (stock <= lowThreshold) return 'LOW';
     return 'OK';
   };
 
@@ -79,8 +82,8 @@ export default function OwnerInventoryReports() {
     );
   };
 
-  const totalRetailValue = products.reduce((sum, p) => sum + p.current_stock * p.retail_price, 0);
-  const totalCostValue = products.reduce((sum, p) => sum + p.current_stock * p.supply_cost, 0);
+  const totalRetailValue = products.reduce((sum, p) => sum + (p.current_stock ?? 0) * (p.retail_price ?? 0), 0);
+  const totalCostValue = products.reduce((sum, p) => sum + (p.current_stock ?? 0) * (p.supply_cost ?? 0), 0);
   const potentialMargin = totalRetailValue - totalCostValue;
 
   if (!userData || userData.role !== 'OWNER') {
@@ -209,13 +212,13 @@ export default function OwnerInventoryReports() {
                   {products.map((product) => {
                     const status = getStockStatus(product);
                     const rowBg = status === 'OUT' ? '#fff5f5' : status === 'LOW' ? '#fffef0' : 'white';
-                    const retailVal = product.current_stock * product.retail_price;
-                    const costVal = product.current_stock * product.supply_cost;
+                    const retailVal = (product.current_stock ?? 0) * (product.retail_price ?? 0);
+                    const costVal = (product.current_stock ?? 0) * (product.supply_cost ?? 0);
                     return (
                       <tr key={product.id} style={{ borderBottom: '1px solid #e5e5e5', backgroundColor: rowBg }}>
                         <td style={{ padding: '1rem', fontWeight: '500' }}>{product.name}</td>
                         <td style={{ padding: '1rem', color: '#666' }}>{product.sku || '—'}</td>
-                        <td style={{ padding: '1rem', textAlign: 'center', fontWeight: '600' }}>{product.current_stock}</td>
+                        <td style={{ padding: '1rem', textAlign: 'center', fontWeight: '600' }}>{product.current_stock ?? 0}</td>
                         <td style={{ padding: '1rem', textAlign: 'center' }}>{getStatusBadge(status)}</td>
                         <td style={{ padding: '1rem', textAlign: 'right' }}>${retailVal.toFixed(2)}</td>
                         <td style={{ padding: '1rem', textAlign: 'right' }}>${costVal.toFixed(2)}</td>
