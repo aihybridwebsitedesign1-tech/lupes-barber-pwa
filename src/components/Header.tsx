@@ -3,16 +3,29 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 
+type DropdownItem = {
+  label: string;
+  path: string;
+  condition?: boolean;
+};
+
+type DropdownMenu = {
+  label: string;
+  items: DropdownItem[];
+};
+
 export default function Header() {
   const { userData, signOut } = useAuth();
   const { language, setLanguage, t } = useLanguage();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [activeDesktopDropdown, setActiveDesktopDropdown] = useState<string | null>(null);
+  const [activeMobileDropdown, setActiveMobileDropdown] = useState<string | null>(null);
 
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 1024);
+      setIsMobile(window.innerWidth < 1100);
     };
 
     checkMobile();
@@ -27,66 +40,249 @@ export default function Header() {
 
   const isOwner = userData?.role === 'OWNER';
 
+  const clientsMenu: DropdownMenu = {
+    label: language === 'en' ? 'Clients' : 'Clientes',
+    items: [
+      { label: language === 'en' ? 'Clients List' : 'Lista de Clientes', path: '/owner/clients' },
+      { label: language === 'en' ? 'Retention & Acquisition' : 'Retención y Adquisición', path: '/owner/clients-report' },
+    ],
+  };
+
+  const barbersMenu: DropdownMenu = {
+    label: language === 'en' ? 'Barbers' : 'Barberos',
+    items: [
+      { label: language === 'en' ? 'Barbers List' : 'Lista de Barberos', path: '/owner/barbers' },
+      { label: language === 'en' ? 'Time Tracking' : 'Seguimiento de Tiempo', path: '/owner/barbers-time-tracking' },
+    ],
+  };
+
+  const analyticsMenu: DropdownMenu = {
+    label: language === 'en' ? 'Analytics' : 'Análisis',
+    items: [
+      { label: language === 'en' ? 'Overview Reports' : 'Reportes Generales', path: '/owner/reports', condition: userData?.role === 'OWNER' || userData?.can_view_shop_reports },
+      { label: language === 'en' ? 'Payouts (Commissions)' : 'Pagos (Comisiones)', path: '/owner/payouts', condition: userData?.role === 'OWNER' },
+    ].filter(item => item.condition !== false),
+  };
+
+  const inventoryMenu: DropdownMenu = {
+    label: language === 'en' ? 'Inventory & Sales' : 'Inventario y Ventas',
+    items: [
+      { label: language === 'en' ? 'Services' : 'Servicios', path: '/owner/services', condition: userData?.role === 'OWNER' || userData?.can_manage_services },
+      { label: language === 'en' ? 'Products' : 'Productos', path: '/owner/products', condition: userData?.role === 'OWNER' || userData?.can_manage_products },
+      { label: language === 'en' ? 'Inventory Management' : 'Gestión de Inventario', path: '/owner/inventory', condition: userData?.role === 'OWNER' },
+    ].filter(item => item.condition !== false),
+  };
+
+  const messagesMenu: DropdownMenu = {
+    label: language === 'en' ? 'Messages' : 'Mensajes',
+    items: [
+      { label: language === 'en' ? 'SMS Campaigns (Engage)' : 'Campañas SMS (Engage)', path: '/owner/engage' },
+      { label: language === 'en' ? 'Templates & Automations' : 'Plantillas y Automatizaciones', path: '/owner/sms-settings' },
+    ],
+  };
+
+  const settingsMenu: DropdownMenu = {
+    label: language === 'en' ? 'Settings' : 'Configuración',
+    items: [
+      { label: language === 'en' ? 'Shop Settings' : 'Configuración de Tienda', path: '/owner/settings' },
+    ],
+  };
+
+  const renderDropdown = (menu: DropdownMenu, isDesktop: boolean) => {
+    const isActive = isDesktop
+      ? activeDesktopDropdown === menu.label
+      : activeMobileDropdown === menu.label;
+
+    if (isDesktop) {
+      return (
+        <div
+          key={menu.label}
+          style={{ position: 'relative' }}
+          onMouseEnter={() => setActiveDesktopDropdown(menu.label)}
+          onMouseLeave={() => setActiveDesktopDropdown(null)}
+        >
+          <button
+            style={{
+              color: 'white',
+              textDecoration: 'none',
+              padding: '0.5rem 0.75rem',
+              whiteSpace: 'nowrap',
+              fontSize: '14px',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.25rem',
+            }}
+          >
+            {menu.label}
+            <span style={{ fontSize: '10px' }}>▾</span>
+          </button>
+          {isActive && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                backgroundColor: '#1a1a1a',
+                boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
+                borderRadius: '4px',
+                minWidth: '200px',
+                zIndex: 1000,
+                marginTop: '0.25rem',
+              }}
+            >
+              {menu.items.map((item) => (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  style={{
+                    display: 'block',
+                    color: 'white',
+                    textDecoration: 'none',
+                    padding: '0.75rem 1rem',
+                    fontSize: '14px',
+                    borderBottom: '1px solid rgba(255,255,255,0.1)',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    } else {
+      return (
+        <div key={menu.label}>
+          <button
+            onClick={() => setActiveMobileDropdown(isActive ? null : menu.label)}
+            style={{
+              width: '100%',
+              textAlign: 'left',
+              color: 'white',
+              background: 'none',
+              border: 'none',
+              padding: '1rem',
+              borderBottom: '1px solid rgba(255,255,255,0.1)',
+              fontSize: '16px',
+              cursor: 'pointer',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            {menu.label}
+            <span style={{ fontSize: '12px', transform: isActive ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>▾</span>
+          </button>
+          {isActive && (
+            <div style={{ backgroundColor: '#0a0a0a' }}>
+              {menu.items.map((item) => (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    setActiveMobileDropdown(null);
+                  }}
+                  style={{
+                    display: 'block',
+                    color: 'rgba(255,255,255,0.8)',
+                    textDecoration: 'none',
+                    padding: '0.75rem 1rem 0.75rem 2rem',
+                    fontSize: '14px',
+                    borderBottom: '1px solid rgba(255,255,255,0.05)',
+                  }}
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+  };
+
   return (
     <>
       <header style={{ backgroundColor: '#000', color: 'white', padding: '1rem', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', width: '100%', boxSizing: 'border-box', position: 'relative' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', maxWidth: '1200px', margin: '0 auto', gap: '1rem', width: '100%' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', maxWidth: '1400px', margin: '0 auto', gap: '1rem', width: '100%' }}>
           <h1 style={{ fontSize: '20px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>Lupe's Barber</h1>
 
-          {/* Desktop Navigation */}
           {!isMobile && userData && (
             <>
-              <nav style={{ display: 'flex', gap: '0.5rem', flex: '1', minWidth: 0 }}>
+              <nav style={{ display: 'flex', gap: '0.5rem', flex: '1', minWidth: 0, alignItems: 'center' }}>
                 {isOwner ? (
                   <>
-                    <Link to="/owner/today" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 0.75rem', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.1)', whiteSpace: 'nowrap', fontSize: '14px' }}>
+                    <Link
+                      to="/owner/today"
+                      style={{
+                        color: 'white',
+                        textDecoration: 'none',
+                        padding: '0.5rem 0.75rem',
+                        borderRadius: '4px',
+                        backgroundColor: 'rgba(255,255,255,0.1)',
+                        whiteSpace: 'nowrap',
+                        fontSize: '14px',
+                      }}
+                    >
                       {t.today}
                     </Link>
-                    <Link to="/owner/appointments" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 0.75rem', whiteSpace: 'nowrap', fontSize: '14px' }}>
-                      {t.appointments}
+                    <Link
+                      to="/owner/appointments"
+                      style={{
+                        color: 'white',
+                        textDecoration: 'none',
+                        padding: '0.5rem 0.75rem',
+                        whiteSpace: 'nowrap',
+                        fontSize: '14px',
+                      }}
+                    >
+                      {language === 'en' ? 'Calendar' : 'Calendario'}
                     </Link>
-                    {(userData.role === 'OWNER' || userData.can_view_shop_reports) && (
-                      <Link to="/owner/reports" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 0.75rem', whiteSpace: 'nowrap', fontSize: '14px' }}>
-                        {language === 'en' ? 'Reports' : 'Reportes'}
-                      </Link>
-                    )}
-                    {userData.role === 'OWNER' && (
-                      <Link to="/owner/payouts" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 0.75rem', whiteSpace: 'nowrap', fontSize: '14px' }}>
-                        {language === 'en' ? 'Payouts' : 'Pagos'}
-                      </Link>
-                    )}
-                    {userData.role === 'OWNER' && (
-                      <Link to="/owner/clients-report" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 0.75rem', whiteSpace: 'nowrap', fontSize: '14px' }}>
-                        {language === 'en' ? 'Clients Stats' : 'Estadísticas'}
-                      </Link>
-                    )}
-                    <Link to="/owner/clients" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 0.75rem', whiteSpace: 'nowrap', fontSize: '14px' }}>
-                      {t.clients}
-                    </Link>
-                    <Link to="/owner/barbers" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 0.75rem', whiteSpace: 'nowrap', fontSize: '14px' }}>
-                      {t.barbers}
-                    </Link>
-                    {(userData.role === 'OWNER' || userData.can_manage_services) && (
-                      <Link to="/owner/services" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 0.75rem', whiteSpace: 'nowrap', fontSize: '14px' }}>
-                        {t.services}
-                      </Link>
-                    )}
-                    {(userData.role === 'OWNER' || userData.can_manage_products) && (
-                      <Link to="/owner/products" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 0.75rem', whiteSpace: 'nowrap', fontSize: '14px' }}>
-                        {language === 'en' ? 'Products' : 'Productos'}
-                      </Link>
-                    )}
-                    <Link to="/owner/settings" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 0.75rem', whiteSpace: 'nowrap', fontSize: '14px' }}>
-                      {language === 'en' ? 'Settings' : 'Configuración'}
-                    </Link>
+                    {renderDropdown(clientsMenu, true)}
+                    {renderDropdown(barbersMenu, true)}
+                    {analyticsMenu.items.length > 0 && renderDropdown(analyticsMenu, true)}
+                    {inventoryMenu.items.length > 0 && renderDropdown(inventoryMenu, true)}
+                    {renderDropdown(messagesMenu, true)}
+                    <div style={{ flex: 1 }} />
+                    {renderDropdown(settingsMenu, true)}
                   </>
                 ) : (
                   <>
-                    <Link to="/barber/today" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 0.75rem', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.1)', whiteSpace: 'nowrap', fontSize: '14px' }}>
+                    <Link
+                      to="/barber/today"
+                      style={{
+                        color: 'white',
+                        textDecoration: 'none',
+                        padding: '0.5rem 0.75rem',
+                        borderRadius: '4px',
+                        backgroundColor: 'rgba(255,255,255,0.1)',
+                        whiteSpace: 'nowrap',
+                        fontSize: '14px',
+                      }}
+                    >
                       {t.today}
                     </Link>
                     {userData.can_view_own_stats && (
-                      <Link to="/barber/stats" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 0.75rem', whiteSpace: 'nowrap', fontSize: '14px' }}>
+                      <Link
+                        to="/barber/stats"
+                        style={{
+                          color: 'white',
+                          textDecoration: 'none',
+                          padding: '0.5rem 0.75rem',
+                          whiteSpace: 'nowrap',
+                          fontSize: '14px',
+                        }}
+                      >
                         {language === 'en' ? 'My Stats' : 'Mis Estadísticas'}
                       </Link>
                     )}
@@ -106,7 +302,7 @@ export default function Header() {
                       borderRadius: '4px',
                       cursor: 'pointer',
                       fontSize: '12px',
-                      minWidth: '32px'
+                      minWidth: '32px',
                     }}
                   >
                     EN
@@ -121,7 +317,7 @@ export default function Header() {
                       borderRadius: '4px',
                       cursor: 'pointer',
                       fontSize: '12px',
-                      minWidth: '32px'
+                      minWidth: '32px',
                     }}
                   >
                     ES
@@ -139,7 +335,7 @@ export default function Header() {
                     cursor: 'pointer',
                     fontSize: '14px',
                     fontWeight: '500',
-                    whiteSpace: 'nowrap'
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {t.logout}
@@ -148,7 +344,6 @@ export default function Header() {
             </>
           )}
 
-          {/* Mobile Hamburger Button */}
           {isMobile && userData && (
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -163,7 +358,7 @@ export default function Header() {
                 flexDirection: 'column',
                 gap: '4px',
                 alignItems: 'center',
-                justifyContent: 'center'
+                justifyContent: 'center',
               }}
               aria-label="Menu"
             >
@@ -175,7 +370,6 @@ export default function Header() {
         </div>
       </header>
 
-      {/* Mobile Menu Dropdown */}
       {isMobile && isMobileMenuOpen && userData && (
         <div
           style={{
@@ -190,7 +384,7 @@ export default function Header() {
             maxHeight: 'calc(100vh - 56px)',
             overflowY: 'auto',
             width: '100%',
-            boxSizing: 'border-box'
+            boxSizing: 'border-box',
           }}
         >
           <nav style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
@@ -205,7 +399,7 @@ export default function Header() {
                     padding: '1rem',
                     borderBottom: '1px solid rgba(255,255,255,0.1)',
                     fontSize: '16px',
-                    display: 'block'
+                    display: 'block',
                   }}
                 >
                   {t.today}
@@ -219,133 +413,17 @@ export default function Header() {
                     padding: '1rem',
                     borderBottom: '1px solid rgba(255,255,255,0.1)',
                     fontSize: '16px',
-                    display: 'block'
+                    display: 'block',
                   }}
                 >
-                  {t.appointments}
+                  {language === 'en' ? 'Calendar' : 'Calendario'}
                 </Link>
-                {(userData.role === 'OWNER' || userData.can_view_shop_reports) && (
-                  <Link
-                    to="/owner/reports"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    style={{
-                      color: 'white',
-                      textDecoration: 'none',
-                      padding: '1rem',
-                      borderBottom: '1px solid rgba(255,255,255,0.1)',
-                      fontSize: '16px',
-                      display: 'block'
-                    }}
-                  >
-                    {language === 'en' ? 'Reports' : 'Reportes'}
-                  </Link>
-                )}
-                {userData.role === 'OWNER' && (
-                  <Link
-                    to="/owner/payouts"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    style={{
-                      color: 'white',
-                      textDecoration: 'none',
-                      padding: '1rem',
-                      borderBottom: '1px solid rgba(255,255,255,0.1)',
-                      fontSize: '16px',
-                      display: 'block'
-                    }}
-                  >
-                    {language === 'en' ? 'Payouts' : 'Pagos'}
-                  </Link>
-                )}
-                {userData.role === 'OWNER' && (
-                  <Link
-                    to="/owner/clients-report"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    style={{
-                      color: 'white',
-                      textDecoration: 'none',
-                      padding: '1rem',
-                      borderBottom: '1px solid rgba(255,255,255,0.1)',
-                      fontSize: '16px',
-                      display: 'block'
-                    }}
-                  >
-                    {language === 'en' ? 'Clients Stats' : 'Estadísticas'}
-                  </Link>
-                )}
-                <Link
-                  to="/owner/clients"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  style={{
-                    color: 'white',
-                    textDecoration: 'none',
-                    padding: '1rem',
-                    borderBottom: '1px solid rgba(255,255,255,0.1)',
-                    fontSize: '16px',
-                    display: 'block'
-                  }}
-                >
-                  {t.clients}
-                </Link>
-                <Link
-                  to="/owner/barbers"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  style={{
-                    color: 'white',
-                    textDecoration: 'none',
-                    padding: '1rem',
-                    borderBottom: '1px solid rgba(255,255,255,0.1)',
-                    fontSize: '16px',
-                    display: 'block'
-                  }}
-                >
-                  {t.barbers}
-                </Link>
-                {(userData.role === 'OWNER' || userData.can_manage_services) && (
-                  <Link
-                    to="/owner/services"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    style={{
-                      color: 'white',
-                      textDecoration: 'none',
-                      padding: '1rem',
-                      borderBottom: '1px solid rgba(255,255,255,0.1)',
-                      fontSize: '16px',
-                      display: 'block'
-                    }}
-                  >
-                    {t.services}
-                  </Link>
-                )}
-                {(userData.role === 'OWNER' || userData.can_manage_products) && (
-                  <Link
-                    to="/owner/products"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    style={{
-                      color: 'white',
-                      textDecoration: 'none',
-                      padding: '1rem',
-                      borderBottom: '1px solid rgba(255,255,255,0.1)',
-                      fontSize: '16px',
-                      display: 'block'
-                    }}
-                  >
-                    {language === 'en' ? 'Products' : 'Productos'}
-                  </Link>
-                )}
-                <Link
-                  to="/owner/settings"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  style={{
-                    color: 'white',
-                    textDecoration: 'none',
-                    padding: '1rem',
-                    borderBottom: '1px solid rgba(255,255,255,0.1)',
-                    fontSize: '16px',
-                    display: 'block'
-                  }}
-                >
-                  {language === 'en' ? 'Settings' : 'Configuración'}
-                </Link>
+                {renderDropdown(clientsMenu, false)}
+                {renderDropdown(barbersMenu, false)}
+                {analyticsMenu.items.length > 0 && renderDropdown(analyticsMenu, false)}
+                {inventoryMenu.items.length > 0 && renderDropdown(inventoryMenu, false)}
+                {renderDropdown(messagesMenu, false)}
+                {renderDropdown(settingsMenu, false)}
               </>
             ) : (
               <>
@@ -358,7 +436,7 @@ export default function Header() {
                     padding: '1rem',
                     borderBottom: '1px solid rgba(255,255,255,0.1)',
                     fontSize: '16px',
-                    display: 'block'
+                    display: 'block',
                   }}
                 >
                   {t.today}
@@ -373,7 +451,7 @@ export default function Header() {
                       padding: '1rem',
                       borderBottom: '1px solid rgba(255,255,255,0.1)',
                       fontSize: '16px',
-                      display: 'block'
+                      display: 'block',
                     }}
                   >
                     {language === 'en' ? 'My Stats' : 'Mis Estadísticas'}
@@ -382,8 +460,15 @@ export default function Header() {
               </>
             )}
 
-            {/* Language Toggle in Mobile Menu */}
-            <div style={{ padding: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <div
+              style={{
+                padding: '1rem',
+                borderBottom: '1px solid rgba(255,255,255,0.1)',
+                display: 'flex',
+                gap: '0.5rem',
+                alignItems: 'center',
+              }}
+            >
               <span style={{ fontSize: '14px', marginRight: '0.5rem' }}>
                 {language === 'en' ? 'Language:' : 'Idioma:'}
               </span>
@@ -396,7 +481,7 @@ export default function Header() {
                   border: '1px solid white',
                   borderRadius: '4px',
                   cursor: 'pointer',
-                  fontSize: '14px'
+                  fontSize: '14px',
                 }}
               >
                 EN
@@ -410,14 +495,13 @@ export default function Header() {
                   border: '1px solid white',
                   borderRadius: '4px',
                   cursor: 'pointer',
-                  fontSize: '14px'
+                  fontSize: '14px',
                 }}
               >
                 ES
               </button>
             </div>
 
-            {/* Logout Button in Mobile Menu */}
             <button
               onClick={() => {
                 setIsMobileMenuOpen(false);
@@ -432,7 +516,7 @@ export default function Header() {
                 fontSize: '16px',
                 fontWeight: '500',
                 textAlign: 'left',
-                width: '100%'
+                width: '100%',
               }}
             >
               {t.logout}
