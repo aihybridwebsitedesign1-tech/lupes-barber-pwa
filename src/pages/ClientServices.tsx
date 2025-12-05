@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import ClientHeader from '../components/ClientHeader';
@@ -18,6 +19,7 @@ type Service = {
 
 export default function ClientServices() {
   const { language } = useLanguage();
+  const navigate = useNavigate();
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -98,12 +100,14 @@ export default function ClientServices() {
                 {groupedServices[category].map((service) => (
                   <div
                     key={service.id}
+                    onClick={() => navigate(`/client/book?service=${service.id}`)}
                     style={{
                       backgroundColor: 'white',
                       borderRadius: '12px',
                       boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
                       overflow: 'hidden',
                       transition: 'transform 0.2s, box-shadow 0.2s',
+                      cursor: 'pointer',
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.transform = 'translateY(-4px)';

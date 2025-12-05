@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import ClientHeader from '../components/ClientHeader';
+import BarberPole from '../components/BarberPole';
 
 export default function ClientHome() {
   const { language } = useLanguage();
@@ -55,6 +56,10 @@ export default function ClientHome() {
             </button>
           </div>
         </section>
+
+        <div style={{ maxWidth: '1200px', margin: '2rem auto', padding: '0 2rem' }}>
+          <BarberPole variant="banner" height={50} />
+        </div>
 
         <section style={{ maxWidth: '1200px', margin: '0 auto', padding: '4rem 2rem' }}>
           <h2 style={{ fontSize: '36px', fontWeight: 'bold', marginBottom: '2rem', textAlign: 'center' }}>

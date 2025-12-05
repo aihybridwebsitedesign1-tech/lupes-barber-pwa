@@ -1944,32 +1944,70 @@ supabase.from('appointments').insert({
 
 **Location:** `src/components/BarberPole.tsx`
 
-**Purpose:** Lightweight CSS-only animation for brand identity
+**Purpose:** Realistic 3D barber pole with glass tube effect for brand identity
 
-**Implementation:**
-```typescript
-<div style={{
-  background: 'linear-gradient(45deg, #e74c3c 25%, transparent 25%, ...)',
-  backgroundSize: '20px 20px',
-  animation: 'barberPoleRotate 1s linear infinite'
-}} />
+**Visual Design:**
+- **Glass Tube:**
+  - Gradient background simulating glass reflection
+  - Horizontal gradient (90deg) with white highlights for cylindrical effect
+  - Box shadows: inset for depth, outer for elevation
+  - Red/white/blue diagonal stripes visible through the glass
+- **Gold End Caps:**
+  - Gold gradient (`#f6c453`, `#d4a017`, `#b8860b`)
+  - Inset shadows for 3D beveled appearance
+  - Outer shadow for depth
+  - Different border radius for top/bottom (icon) or left/right (banner)
+- **Animated Stripes:**
+  - Red (`#dc143c`), white, and blue (`#003d7a`) repeating pattern
+  - Diagonal gradient (45deg for vertical, 135deg for horizontal)
+  - CSS animation using `background-position` for continuous twist
+  - 3-second smooth linear loop
+- **Glass Highlight:**
+  - Vertical or horizontal gradient overlay
+  - Simulates light reflection on glass surface
+  - Semi-transparent white layer with pointer-events: none
 
-@keyframes barberPoleRotate {
-  0% { background-position: 0 0; }
-  100% { background-position: 0 20px; }
-}
-```
+**Component Variants:**
 
-**Features:**
-- Pure CSS (no images)
-- Diagonal red stripes on transparent
-- Continuous smooth rotation
-- Configurable size (default: 50px width, 75px height)
-- Minimal performance impact
+1. **Icon Variant (`variant="icon"`)**:
+   - Vertical orientation
+   - Width: `height * 0.6px`, Height: configurable (default 40-50px)
+   - Gold caps on top and bottom
+   - Stripes twist vertically upward
+   - Used in navigation headers
+
+2. **Banner Variant (`variant="banner"`)**:
+   - Horizontal orientation
+   - Width: 100% (fills container), Height: configurable (default 50px)
+   - Gold caps on left and right
+   - Stripes twist horizontally
+   - Used as page section divider
+
+**Performance:**
+- Pure CSS and inline styles (no external images)
+- CSS transforms only (GPU-accelerated)
+- No JavaScript animation (uses @keyframes)
+- Minimal CPU impact on mobile
+- Single animation loop shared across instances
 
 **Usage:**
-- Client header: Next to logo (40px size)
-- Optional: Can be added to owner/barber headers if desired
+
+1. **Client Header** (`ClientHeader.tsx`):
+   ```typescript
+   <BarberPole variant="icon" height={40} />
+   ```
+   - Positioned next to "Lupe's Barber" logo
+   - Visible on all client pages
+   - Part of brand identity
+
+2. **Client Home Banner** (`ClientHome.tsx`):
+   ```typescript
+   <BarberPole variant="banner" height={50} />
+   ```
+   - Placed between hero section (black gradient) and Quick Info section
+   - Spans full content width with container padding
+   - Serves as visual separator and brand reinforcement
+   - Margin: `2rem auto` for spacing
 
 ---
 
@@ -1988,6 +2026,7 @@ supabase.from('appointments').insert({
 - Home → `/client/home`
 - Services → `/client/services`
 - Barbers → `/client/barbers`
+- Products → `/client/products`
 - Book Now → `/client/book`
 
 **Responsive:**
@@ -2035,6 +2074,190 @@ source: 'barber'
 
 ---
 
+### Client Products Page (`/client/products`) - MVP
+
+**Location:** `src/pages/ClientProducts.tsx`
+
+**Purpose:** Read-only products catalog for clients to browse available products
+
+**Data Source:** `products` table
+
+**Query:**
+```typescript
+supabase
+  .from('products')
+  .select('*')
+  .eq('active', true)
+  .gt('current_stock', 0)
+  .order('category', 'name_en')
+```
+
+**Filtering:**
+- Only active products (`active = true`)
+- Only products in stock (`current_stock > 0`)
+- Sorted by category, then name
+
+**Display:**
+- Groups products by `category` field
+- Responsive grid: `repeat(auto-fill, minmax(280px, 1fr))`
+- Similar styling to ClientServices page
+
+**Product Card Shows:**
+- Stock status badge (using `getInventoryStatus()` helper):
+  - "In Stock" / "En Stock" (green)
+  - "Low Stock" / "Stock Bajo" (yellow)
+  - "Out of Stock" / "Agotado" (red)
+- Product name (bilingual: `name_en` / `name_es`)
+- Brand
+- Retail price (uses `retail_price`, falls back to `price`)
+- Image (if `image_url` exists) or gradient placeholder with initials
+
+**Image Fallback:**
+- No image: Purple-to-violet gradient
+- Displays first letter of product name + first letter of brand
+- Example: "Hair Gel" by "American Crew" → "HA"
+
+**Info Banner:**
+- Top of page (before product grid)
+- Blue info box: "Ask your barber about these products at checkout."
+- Bilingual: EN/ES
+
+**No E-Commerce:**
+- Browse-only, no cart functionality
+- No checkout or online ordering
+- Encourages in-person sales
+
+**Navigation:**
+- Added to ClientHeader as "Products" / "Productos"
+- Route: `/client/products`
+
+---
+
+### Deep-Linking to Booking
+
+**Purpose:** Allow direct navigation from Services and Barbers pages to Booking with pre-selected options
+
+**Query Parameters:**
+
+1. **`?barber={barberId}`**
+   - Pre-selects barber in Step 1 of booking flow
+   - Used by ClientBarbers page
+   - Example: `/client/book?barber=abc123`
+
+2. **`?service={serviceId}`**
+   - Pre-selects service in Step 2 of booking flow
+   - Used by ClientServices page
+   - Example: `/client/book?service=xyz789`
+
+3. **Combined:**
+   - Both params can be used together
+   - Example: `/client/book?barber=abc123&service=xyz789`
+
+**Implementation in ClientBook:**
+
+```typescript
+useEffect(() => {
+  const preselectedBarber = searchParams.get('barber');
+  if (preselectedBarber && barbers.length > 0) {
+    const barber = barbers.find(b => b.id === preselectedBarber);
+    if (barber) {
+      setSelectedBarber(preselectedBarber);
+    }
+  }
+}, [searchParams, barbers]);
+
+useEffect(() => {
+  const preselectedService = searchParams.get('service');
+  if (preselectedService && services.length > 0) {
+    const service = services.find(s => s.id === preselectedService);
+    if (service) {
+      setSelectedService(preselectedService);
+    }
+  }
+}, [searchParams, services]);
+```
+
+**Behavior:**
+- Validates that ID exists and record is active
+- Pre-selects the option (does NOT auto-skip steps)
+- User can still change their selection
+- Invalid IDs are silently ignored
+- No error messages for invalid query params
+
+**User Experience:**
+- Click service card → Book page with service pre-selected
+- Click "Book with [Barber]" → Book page with barber pre-selected
+- Natural, predictable flow
+- Reduces friction in booking process
+
+---
+
+### Booking Fallback Configuration
+
+**Purpose:** Prevent booking page from completely failing if shop_config cannot be loaded
+
+**Problem Solved:**
+- Previously, if `shop_config` fetch failed, booking was completely blocked
+- User saw hard error: "Failed to load booking data"
+- No way to proceed with booking
+
+**Solution: Fallback Defaults**
+
+When `shop_config` fails to load or returns null:
+- Use sensible default values:
+  ```typescript
+  {
+    days_bookable_in_advance: 30,
+    min_book_ahead_hours: 2,
+    client_booking_interval_minutes: 15
+  }
+  ```
+- Show non-blocking info banner (yellow warning)
+- Allow user to continue booking
+
+**Info Banner Text:**
+
+- EN: "Some booking settings could not be loaded. Using default rules. Please contact the shop for details."
+- ES: "Algunas configuraciones de reserva no se pudieron cargar. Usando reglas predeterminadas. Por favor contacta a la tienda para más detalles."
+
+**Banner Styling:**
+- Background: `#fff3cd` (light yellow)
+- Text: `#856404` (dark yellow-brown)
+- Border: `#ffeaa7`
+- Positioned above error banner, below step indicators
+
+**Fallback Behavior:**
+- Booking rules validation still runs
+- Uses fallback config values
+- Date picker limits use fallback values
+- Time slots generated using fallback interval
+- User can successfully complete booking
+
+**Error Handling:**
+- Try/catch around `getShopConfig()` call
+- Fallback applied in both success (null) and error cases
+- Console logs error for debugging
+- User experience is minimally disrupted
+
+**Implementation:**
+```typescript
+if (shopConfig) {
+  setConfig(shopConfig);
+} else {
+  const fallbackConfig = { ... };
+  setConfig(fallbackConfig);
+  setConfigWarning(message);
+}
+```
+
+**Benefits:**
+- Graceful degradation
+- User can still book appointments
+- Clear communication about limitation
+- Owner can fix shop_config without blocking all bookings
+
+---
+
 ### Data Integration
 
 **Services:**
@@ -2068,6 +2291,16 @@ source: 'barber'
 - Uses `days_bookable_in_advance`
 - Uses `min_book_ahead_hours`
 - Uses `client_booking_interval_minutes`
+- Fallback defaults if config unavailable (see Booking Fallback Configuration)
+
+**Products:**
+- Uses existing `products` table
+- Filters by `active = true` AND `current_stock > 0`
+- Shows bilingual names (`name_en` / `name_es`)
+- Displays retail_price (falls back to price)
+- Stock status using `getInventoryStatus()` helper
+- Groups by `category`
+- Image with initials fallback
 
 ---
 
@@ -2087,6 +2320,7 @@ Client pages query these tables:
 2. **users (barbers):** Public read for active barbers only
 3. **clients:** Can insert new clients
 4. **appointments:** Can insert new appointments
+5. **products:** Public read for active products with stock
 
 **Validation:**
 - All booking rules enforced client-side and could be enforced server-side via RLS

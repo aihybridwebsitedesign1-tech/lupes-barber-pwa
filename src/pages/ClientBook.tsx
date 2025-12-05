@@ -41,6 +41,7 @@ export default function ClientBook() {
 
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
   const [config, setConfig] = useState<{ days_bookable_in_advance: number; min_book_ahead_hours: number; client_booking_interval_minutes: number } | null>(null);
+  const [configWarning, setConfigWarning] = useState<string>('');
 
   useEffect(() => {
     loadInitialData();
@@ -55,6 +56,16 @@ export default function ClientBook() {
       }
     }
   }, [searchParams, barbers]);
+
+  useEffect(() => {
+    const preselectedService = searchParams.get('service');
+    if (preselectedService && services.length > 0) {
+      const service = services.find(s => s.id === preselectedService);
+      if (service) {
+        setSelectedService(preselectedService);
+      }
+    }
+  }, [searchParams, services]);
 
   useEffect(() => {
     if (selectedDate && config) {
@@ -76,10 +87,35 @@ export default function ClientBook() {
 
       setBarbers(barbersRes.data || []);
       setServices(servicesRes.data || []);
-      setConfig(shopConfig);
+
+      if (shopConfig) {
+        setConfig(shopConfig);
+      } else {
+        const fallbackConfig = {
+          days_bookable_in_advance: 30,
+          min_book_ahead_hours: 2,
+          client_booking_interval_minutes: 15,
+        };
+        setConfig(fallbackConfig);
+        setConfigWarning(
+          language === 'en'
+            ? 'Some booking settings could not be loaded. Using default rules. Please contact the shop for details.'
+            : 'Algunas configuraciones de reserva no se pudieron cargar. Usando reglas predeterminadas. Por favor contacta a la tienda para más detalles.'
+        );
+      }
     } catch (error) {
       console.error('Error loading data:', error);
-      setError(language === 'en' ? 'Failed to load booking data' : 'Error al cargar datos de reserva');
+      const fallbackConfig = {
+        days_bookable_in_advance: 30,
+        min_book_ahead_hours: 2,
+        client_booking_interval_minutes: 15,
+      };
+      setConfig(fallbackConfig);
+      setConfigWarning(
+        language === 'en'
+          ? 'Some booking settings could not be loaded. Using default rules. Please contact the shop for details.'
+          : 'Algunas configuraciones de reserva no se pudieron cargar. Usando reglas predeterminadas. Por favor contacta a la tienda para más detalles.'
+      );
     } finally {
       setLoading(false);
     }
@@ -280,6 +316,12 @@ export default function ClientBook() {
             </div>
           ))}
         </div>
+
+        {configWarning && (
+          <div style={{ backgroundColor: '#fff3cd', color: '#856404', padding: '1rem', borderRadius: '6px', marginBottom: '1.5rem', border: '1px solid #ffeaa7' }}>
+            {configWarning}
+          </div>
+        )}
 
         {error && (
           <div style={{ backgroundColor: '#f8d7da', color: '#721c24', padding: '1rem', borderRadius: '6px', marginBottom: '1.5rem', border: '1px solid #f5c6cb' }}>

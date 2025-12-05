@@ -22,6 +22,7 @@ export default function ClientHeader() {
     { label: language === 'en' ? 'Home' : 'Inicio', path: '/client/home' },
     { label: language === 'en' ? 'Services' : 'Servicios', path: '/client/services' },
     { label: language === 'en' ? 'Barbers' : 'Barberos', path: '/client/barbers' },
+    { label: language === 'en' ? 'Products' : 'Productos', path: '/client/products' },
     { label: language === 'en' ? 'Book Now' : 'Reservar', path: '/client/book' },
   ];
 
@@ -30,7 +31,7 @@ export default function ClientHeader() {
       <header style={{ backgroundColor: '#000', color: 'white', padding: '1rem', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', width: '100%', boxSizing: 'border-box', position: 'relative' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', maxWidth: '1400px', margin: '0 auto', gap: '1rem', width: '100%' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <BarberPole size={40} />
+            <BarberPole variant="icon" height={40} />
             <Link to="/client/home" style={{ textDecoration: 'none' }}>
               <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: 'white', margin: 0 }}>
                 Lupe's Barber
