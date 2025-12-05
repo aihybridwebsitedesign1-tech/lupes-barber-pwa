@@ -238,7 +238,7 @@ export default function Header() {
                       {t.today}
                     </Link>
                     <Link
-                      to="/owner/appointments"
+                      to="/owner/calendar"
                       style={{
                         color: 'white',
                         textDecoration: 'none',
@@ -248,6 +248,18 @@ export default function Header() {
                       }}
                     >
                       {language === 'en' ? 'Calendar' : 'Calendario'}
+                    </Link>
+                    <Link
+                      to="/owner/appointments"
+                      style={{
+                        color: 'white',
+                        textDecoration: 'none',
+                        padding: '0.5rem 0.75rem',
+                        whiteSpace: 'nowrap',
+                        fontSize: '14px',
+                      }}
+                    >
+                      {language === 'en' ? 'Appointments' : 'Citas'}
                     </Link>
                     {renderDropdown(clientsMenu, true)}
                     {renderDropdown(barbersMenu, true)}
@@ -274,7 +286,7 @@ export default function Header() {
                       {t.today}
                     </Link>
                     <Link
-                      to="/barber/appointments"
+                      to="/barber/calendar"
                       style={{
                         color: 'white',
                         textDecoration: 'none',

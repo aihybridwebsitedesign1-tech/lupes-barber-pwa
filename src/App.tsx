@@ -17,10 +17,12 @@ import OwnerBarbersTimeTracking from './pages/OwnerBarbersTimeTracking';
 import OwnerInventory from './pages/OwnerInventory';
 import OwnerInventoryReports from './pages/OwnerInventoryReports';
 import OwnerSmsSettings from './pages/OwnerSmsSettings';
+import OwnerCalendar from './pages/OwnerCalendar';
 import ClientDetail from './pages/ClientDetail';
 import AppointmentDetail from './pages/AppointmentDetail';
 import BarberToday from './pages/BarberToday';
 import BarberStats from './pages/BarberStats';
+import BarberCalendar from './pages/BarberCalendar';
 import Book from './pages/Book';
 import ClientHome from './pages/ClientHome';
 import ClientServices from './pages/ClientServices';
@@ -94,10 +96,12 @@ function AppRoutes() {
       <Route path="/owner/inventory-reports" element={<ProtectedRoute allowedRole="OWNER"><OwnerInventoryReports /></ProtectedRoute>} />
       <Route path="/owner/engage" element={<ProtectedRoute allowedRole="OWNER"><OwnerEngage /></ProtectedRoute>} />
       <Route path="/owner/sms-settings" element={<ProtectedRoute allowedRole="OWNER"><OwnerSmsSettings /></ProtectedRoute>} />
+      <Route path="/owner/calendar" element={<ProtectedRoute allowedRole="OWNER"><OwnerCalendar /></ProtectedRoute>} />
       <Route path="/owner/clients/:clientId" element={<ProtectedRoute allowedRole="OWNER"><ClientDetail /></ProtectedRoute>} />
       <Route path="/owner/appointments/:appointmentId" element={<ProtectedRoute allowedRole="OWNER"><AppointmentDetail /></ProtectedRoute>} />
 
       <Route path="/barber/today" element={<ProtectedRoute allowedRole="BARBER"><BarberToday /></ProtectedRoute>} />
+      <Route path="/barber/calendar" element={<ProtectedRoute allowedRole="BARBER"><BarberCalendar /></ProtectedRoute>} />
       <Route path="/barber/stats" element={<ProtectedRoute allowedRole="BARBER"><BarberStats /></ProtectedRoute>} />
       <Route path="/barber/appointments/:appointmentId" element={<ProtectedRoute allowedRole="BARBER"><AppointmentDetail /></ProtectedRoute>} />
 
