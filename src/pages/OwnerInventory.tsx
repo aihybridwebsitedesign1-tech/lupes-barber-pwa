@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import Header from '../components/Header';
+import { getInventoryStatus } from '../lib/inventoryStatus';
 
 type Product = {
   id: string;
@@ -20,8 +21,6 @@ type Product = {
   active: boolean;
 };
 
-type StockStatus = 'OUT' | 'LOW' | 'OK';
-
 export default function OwnerInventory() {
   const { language } = useLanguage();
   const { userData } = useAuth();
@@ -29,11 +28,13 @@ export default function OwnerInventory() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [newQuantity, setNewQuantity] = useState<number>(0);
+  const [newQuantity, setNewQuantity] = useState<string>('');
   const [adjustReason, setAdjustReason] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const quantityInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!userData) return;
@@ -61,23 +62,13 @@ export default function OwnerInventory() {
     setLoading(false);
   };
 
-  const getStockStatus = (product: Product): StockStatus => {
-    const stock = product.current_stock ?? 0;
-    const lowThreshold = product.low_stock_threshold ?? 5;
+  const getStatusBadge = (product: Product) => {
+    const statusInfo = getInventoryStatus(
+      product.current_stock ?? 0,
+      product.low_stock_threshold,
+      product.high_stock_threshold
+    );
 
-    if (stock <= 0) return 'OUT';
-    if (stock <= lowThreshold) return 'LOW';
-    return 'OK';
-  };
-
-  const getStatusBadge = (status: StockStatus) => {
-    const styles: Record<StockStatus, { bg: string; text: string; label: string }> = {
-      OUT: { bg: '#fee', text: '#c00', label: language === 'en' ? 'Out of Stock' : 'Agotado' },
-      LOW: { bg: '#fffbeb', text: '#d97706', label: language === 'en' ? 'Low Stock' : 'Stock Bajo' },
-      OK: { bg: '#f0f9ff', text: '#0369a1', label: language === 'en' ? 'OK' : 'OK' },
-    };
-
-    const style = styles[status];
     return (
       <span
         style={{
@@ -86,29 +77,35 @@ export default function OwnerInventory() {
           borderRadius: '4px',
           fontSize: '12px',
           fontWeight: '600',
-          backgroundColor: style.bg,
-          color: style.text,
+          backgroundColor: statusInfo.backgroundColor,
+          color: statusInfo.color,
         }}
       >
-        {style.label}
+        {language === 'en' ? statusInfo.label.en : statusInfo.label.es}
       </span>
     );
   };
 
   const openAdjustModal = (product: Product) => {
     setSelectedProduct(product);
-    setNewQuantity(product.current_stock ?? 0);
+    setNewQuantity('');
+    setAdjustReason('');
+    setError('');
+    setSuccess('');
+    setTimeout(() => quantityInputRef.current?.focus(), 100);
+  };
+
+  const closeModal = () => {
+    setSelectedProduct(null);
+    setNewQuantity('');
     setAdjustReason('');
     setError('');
     setSuccess('');
   };
 
-  const closeModal = () => {
-    setSelectedProduct(null);
-    setNewQuantity(0);
-    setAdjustReason('');
-    setError('');
-    setSuccess('');
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
   };
 
   const handleAdjustSubmit = async (e: React.FormEvent) => {
@@ -119,8 +116,25 @@ export default function OwnerInventory() {
     setError('');
     setSuccess('');
 
+    if (newQuantity.trim() === '') {
+      setError(language === 'en' ? 'Please enter a quantity.' : 'Por favor ingresa una cantidad.');
+      setSaving(false);
+      return;
+    }
+
+    const parsedQuantity = parseInt(newQuantity, 10);
+    if (isNaN(parsedQuantity) || parsedQuantity < 0 || !Number.isInteger(Number(newQuantity))) {
+      setError(
+        language === 'en'
+          ? 'Quantity must be a whole number greater than or equal to 0.'
+          : 'La cantidad debe ser un número entero mayor o igual a 0.'
+      );
+      setSaving(false);
+      return;
+    }
+
     const currentStock = selectedProduct.current_stock ?? 0;
-    const delta = newQuantity - currentStock;
+    const delta = parsedQuantity - currentStock;
     if (delta === 0) {
       setError(language === 'en' ? 'No change in quantity.' : 'Sin cambio en cantidad.');
       setSaving(false);
@@ -131,7 +145,7 @@ export default function OwnerInventory() {
       product_id: selectedProduct.id,
       type: 'ADJUSTMENT',
       quantity_change: delta,
-      stock_after: newQuantity,
+      stock_after: parsedQuantity,
       reason: adjustReason || (language === 'en' ? 'Manual adjustment' : 'Ajuste manual'),
       created_by_user_id: userData.id,
     });
@@ -145,7 +159,7 @@ export default function OwnerInventory() {
 
     const { error: updateError } = await supabase
       .from('products')
-      .update({ current_stock: newQuantity })
+      .update({ current_stock: parsedQuantity })
       .eq('id', selectedProduct.id);
 
     if (updateError) {
@@ -155,13 +169,13 @@ export default function OwnerInventory() {
       return;
     }
 
-    setSuccess(language === 'en' ? 'Inventory adjusted successfully!' : 'Inventario ajustado exitosamente!');
+    showToast(
+      language === 'en' ? 'Inventory updated successfully!' : 'Inventario actualizado exitosamente!',
+      'success'
+    );
     setSaving(false);
-
-    setTimeout(() => {
-      closeModal();
-      fetchProducts();
-    }, 1000);
+    closeModal();
+    fetchProducts();
   };
 
   if (!userData || userData.role !== 'OWNER') {
@@ -171,6 +185,23 @@ export default function OwnerInventory() {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
       <Header />
+      {toast && (
+        <div style={{
+          position: 'fixed',
+          top: '80px',
+          right: '20px',
+          zIndex: 1000,
+          backgroundColor: toast.type === 'success' ? '#d4edda' : '#f8d7da',
+          color: toast.type === 'success' ? '#155724' : '#721c24',
+          padding: '1rem 1.5rem',
+          borderRadius: '6px',
+          border: `1px solid ${toast.type === 'success' ? '#c3e6cb' : '#f5c6cb'}`,
+          boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+          maxWidth: '400px',
+        }}>
+          {toast.message}
+        </div>
+      )}
       <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '1rem' }}>
         <div style={{ marginBottom: '1.5rem' }}>
           <h2 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '0.5rem' }}>
@@ -242,8 +273,12 @@ export default function OwnerInventory() {
                 </thead>
                 <tbody>
                   {products.map((product) => {
-                    const status = getStockStatus(product);
-                    const rowBg = status === 'OUT' ? '#fff5f5' : status === 'LOW' ? '#fffef0' : 'white';
+                    const statusInfo = getInventoryStatus(
+                      product.current_stock ?? 0,
+                      product.low_stock_threshold,
+                      product.high_stock_threshold
+                    );
+                    const rowBg = statusInfo.status === 'OUT' ? '#fff5f5' : statusInfo.status === 'LOW' ? '#fffef0' : 'white';
                     return (
                       <tr key={product.id} style={{ borderBottom: '1px solid #e5e5e5', backgroundColor: rowBg }}>
                         <td style={{ padding: '1rem', fontWeight: '500' }}>
@@ -257,7 +292,7 @@ export default function OwnerInventory() {
                         <td style={{ padding: '1rem', textAlign: 'center', fontWeight: '600' }}>{product.current_stock ?? 0}</td>
                         <td style={{ padding: '1rem', textAlign: 'center', color: '#999' }}>{product.low_stock_threshold ?? 5}</td>
                         <td style={{ padding: '1rem', textAlign: 'center', color: '#999' }}>{product.high_stock_threshold ?? 100}</td>
-                        <td style={{ padding: '1rem', textAlign: 'center' }}>{getStatusBadge(status)}</td>
+                        <td style={{ padding: '1rem', textAlign: 'center' }}>{getStatusBadge(product)}</td>
                         <td style={{ padding: '1rem', textAlign: 'center' }}>
                           <button
                             onClick={() => openAdjustModal(product)}
@@ -393,11 +428,13 @@ export default function OwnerInventory() {
                   <span style={{ color: '#c00' }}>*</span>
                 </label>
                 <input
+                  ref={quantityInputRef}
                   type="number"
                   min="0"
+                  step="1"
                   value={newQuantity}
-                  onChange={(e) => setNewQuantity(parseInt(e.target.value) || 0)}
-                  required
+                  onChange={(e) => setNewQuantity(e.target.value)}
+                  placeholder={language === 'en' ? 'Enter quantity' : 'Ingrese cantidad'}
                   style={{
                     width: '100%',
                     padding: '0.5rem',

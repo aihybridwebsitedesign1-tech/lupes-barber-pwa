@@ -1033,16 +1033,32 @@ Displays all products with comprehensive stock information:
 - Status badge (OUT, LOW, OK)
 
 **Status Determination:**
+
+Status logic is centralized in a shared helper function (`src/lib/inventoryStatus.ts`) to ensure consistency across all inventory pages:
+
 ```typescript
-- current_stock <= 0 → OUT (red background)
-- 0 < current_stock <= low_stock_threshold → LOW (yellow background)
-- otherwise → OK (blue background)
+- current_stock <= 0 → OUT (red badge, red row background)
+- current_stock <= low_stock_threshold → LOW (yellow badge, yellow row background)
+- current_stock >= high_stock_threshold → HIGH (blue badge, white row background)
+- otherwise → OK (green badge, white row background)
 ```
+
+**Helper Function:** `getInventoryStatus(currentStock, lowThreshold, highThreshold)`
+- Returns status type: 'OUT' | 'LOW' | 'HIGH' | 'OK'
+- Returns bilingual labels (EN/ES)
+- Returns colors (background and text)
+- Handles null thresholds with defaults (low: 5, high: 50)
 
 **Visual Highlighting:**
 - Rows with OUT status: `#fff5f5` background
 - Rows with LOW status: `#fffef0` background
-- Normal rows: white background
+- Rows with HIGH/OK status: white background
+
+**Bilingual Labels:**
+- OUT: "OUT OF STOCK" / "AGOTADO"
+- LOW: "LOW STOCK" / "STOCK BAJO"
+- HIGH: "HIGH STOCK" / "STOCK ALTO"
+- OK: "IN STOCK" / "EN STOCK"
 
 #### 1.2 Adjust Inventory Modal
 
@@ -1051,8 +1067,21 @@ Displays all products with comprehensive stock information:
 **Modal Fields:**
 - Product name (read-only)
 - Current quantity (read-only)
-- New quantity (number input, required)
+- New quantity (number input, required, auto-focused)
 - Reason (textarea, optional)
+
+**UX Improvements:**
+- New Quantity field starts empty (not prepopulated)
+- Cursor automatically focuses into New Quantity field on modal open
+- Allows full clear and re-entry of values
+- Placeholder text: "Enter quantity" / "Ingrese cantidad"
+
+**Validation:**
+- Value must be a whole number integer >= 0
+- Empty or invalid input shows friendly error in both EN/ES
+- No save if validation fails
+- Error: "Quantity must be a whole number greater than or equal to 0."
+- Error (ES): "La cantidad debe ser un número entero mayor o igual a 0."
 
 **Backend Logic:**
 1. Calculate delta = new_quantity - old_quantity
@@ -1060,10 +1089,12 @@ Displays all products with comprehensive stock information:
    - `type`: 'ADJUSTMENT'
    - `quantity_change`: delta
    - `stock_after`: new_quantity
-   - `reason`: user input or "Manual adjustment"
+   - `reason`: user input or "Manual adjustment" / "Ajuste manual"
    - `created_by_user_id`: current user
 3. Update `products.current_stock` to new_quantity
-4. Show success toast and refresh table
+4. Close modal immediately
+5. Show success toast: "Inventory updated successfully!" / "Inventario actualizado exitosamente!"
+6. Refresh product list to show new stock level
 
 #### 1.3 SALE Transactions on Product Sale
 
@@ -1117,6 +1148,13 @@ Read-only table showing:
 - CSV export for stock data
 - Shrinkage tracking report
 - Product performance analytics
+
+**Bilingual Support (EN/ES):**
+- All inventory pages fully support English and Spanish
+- Status badges show translated labels based on user's language preference
+- All form labels, buttons, error messages, and toasts are bilingual
+- Product names stored in both `name_en` and `name_es` fields
+- UI automatically switches language based on `userData.language` setting
 
 #### 1.5 Products Management & Pricing Model
 

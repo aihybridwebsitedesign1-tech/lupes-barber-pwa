@@ -4,6 +4,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import Header from '../components/Header';
+import { getInventoryStatus } from '../lib/inventoryStatus';
 
 type Product = {
   id: string;
@@ -14,10 +15,9 @@ type Product = {
   supply_cost: number;
   current_stock: number;
   low_stock_threshold: number;
+  high_stock_threshold: number;
   active: boolean;
 };
-
-type StockStatus = 'OUT' | 'LOW' | 'OK';
 
 export default function OwnerInventoryReports() {
   const { language } = useLanguage();
@@ -39,7 +39,7 @@ export default function OwnerInventoryReports() {
     setLoading(true);
     const { data, error } = await supabase
       .from('products')
-      .select('id, name_en, name_es, sku, retail_price, supply_cost, current_stock, low_stock_threshold, active')
+      .select('id, name_en, name_es, sku, retail_price, supply_cost, current_stock, low_stock_threshold, high_stock_threshold, active')
       .eq('active', true)
       .order('name_en');
 
@@ -52,23 +52,13 @@ export default function OwnerInventoryReports() {
     setLoading(false);
   };
 
-  const getStockStatus = (product: Product): StockStatus => {
-    const stock = product.current_stock ?? 0;
-    const lowThreshold = product.low_stock_threshold ?? 5;
+  const getStatusBadge = (product: Product) => {
+    const statusInfo = getInventoryStatus(
+      product.current_stock ?? 0,
+      product.low_stock_threshold,
+      product.high_stock_threshold
+    );
 
-    if (stock <= 0) return 'OUT';
-    if (stock <= lowThreshold) return 'LOW';
-    return 'OK';
-  };
-
-  const getStatusBadge = (status: StockStatus) => {
-    const styles: Record<StockStatus, { bg: string; text: string; label: string }> = {
-      OUT: { bg: '#fee', text: '#c00', label: language === 'en' ? 'Out' : 'Agotado' },
-      LOW: { bg: '#fffbeb', text: '#d97706', label: language === 'en' ? 'Low' : 'Bajo' },
-      OK: { bg: '#f0f9ff', text: '#0369a1', label: language === 'en' ? 'OK' : 'OK' },
-    };
-
-    const style = styles[status];
     return (
       <span
         style={{
@@ -77,11 +67,11 @@ export default function OwnerInventoryReports() {
           borderRadius: '4px',
           fontSize: '12px',
           fontWeight: '600',
-          backgroundColor: style.bg,
-          color: style.text,
+          backgroundColor: statusInfo.backgroundColor,
+          color: statusInfo.color,
         }}
       >
-        {style.label}
+        {language === 'en' ? statusInfo.label.en : statusInfo.label.es}
       </span>
     );
   };
@@ -214,8 +204,12 @@ export default function OwnerInventoryReports() {
                 </thead>
                 <tbody>
                   {products.map((product) => {
-                    const status = getStockStatus(product);
-                    const rowBg = status === 'OUT' ? '#fff5f5' : status === 'LOW' ? '#fffef0' : 'white';
+                    const statusInfo = getInventoryStatus(
+                      product.current_stock ?? 0,
+                      product.low_stock_threshold,
+                      product.high_stock_threshold
+                    );
+                    const rowBg = statusInfo.status === 'OUT' ? '#fff5f5' : statusInfo.status === 'LOW' ? '#fffef0' : 'white';
                     const retailVal = (product.current_stock ?? 0) * (product.retail_price ?? 0);
                     const costVal = (product.current_stock ?? 0) * (product.supply_cost ?? 0);
                     return (
@@ -225,7 +219,7 @@ export default function OwnerInventoryReports() {
                         </td>
                         <td style={{ padding: '1rem', color: '#666' }}>{product.sku || '—'}</td>
                         <td style={{ padding: '1rem', textAlign: 'center', fontWeight: '600' }}>{product.current_stock ?? 0}</td>
-                        <td style={{ padding: '1rem', textAlign: 'center' }}>{getStatusBadge(status)}</td>
+                        <td style={{ padding: '1rem', textAlign: 'center' }}>{getStatusBadge(product)}</td>
                         <td style={{ padding: '1rem', textAlign: 'right' }}>${retailVal.toFixed(2)}</td>
                         <td style={{ padding: '1rem', textAlign: 'right' }}>${costVal.toFixed(2)}</td>
                       </tr>
