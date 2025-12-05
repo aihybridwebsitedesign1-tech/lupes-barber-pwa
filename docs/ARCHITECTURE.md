@@ -1729,4 +1729,526 @@ When an appointment is marked as completed and paid, the `service_due_to_barber`
 
 ---
 
+## Client Website / Online Booking
+
+This section documents the public-facing client website that allows customers to book appointments online.
+
+### Overview
+
+**Purpose:** Mobile-first public website for clients to view services, barbers, and book appointments without authentication.
+
+**Technology:** Same React codebase, separate routes, no authentication required.
+
+**Visual Identity:** Features CSS-animated barber pole in header for brand recognition.
+
+---
+
+### Routes
+
+All client routes are public (no authentication):
+
+1. **`/client`** → Redirects to `/client/home`
+2. **`/client/home`** → Landing page with shop info
+3. **`/client/services`** → Browse services catalog
+4. **`/client/barbers`** → Meet the team
+5. **`/client/book`** → Online booking flow (MVP)
+
+---
+
+### Client Home Page (`/client/home`)
+
+**Location:** `src/pages/ClientHome.tsx`
+
+**Sections:**
+
+1. **Hero Section:**
+   - Shop name and tagline
+   - Primary CTA: "Book Appointment" → `/client/book`
+   - Gradient background (black to gray)
+
+2. **Quick Info Cards:**
+   - Location (placeholder: 123 Main Street)
+   - Phone (placeholder: 555-123-4567)
+   - Hours (placeholder static hours)
+   - Future: Pull from `shop_config` table
+
+3. **Why Choose Us:**
+   - Expert Barbers
+   - Bilingual Staff (EN/ES)
+   - Online Booking
+   - Walk-Ins Welcome
+
+4. **Bottom CTA:**
+   - Repeats "Book Now" button
+   - Black background for contrast
+
+**Bilingual:**
+- All headings and body text
+- EN/ES toggle in header
+
+---
+
+### Client Services Page (`/client/services`)
+
+**Location:** `src/pages/ClientServices.tsx`
+
+**Data Source:** `services` table (same as owner uses)
+
+**Query:**
+```typescript
+supabase
+  .from('services')
+  .select('*')
+  .eq('active', true)
+  .order('category', 'name_en')
+```
+
+**Display:**
+- Groups services by `category` field
+- Each category has section heading
+- Responsive grid: `repeat(auto-fill, minmax(300px, 1fr))`
+
+**Service Card Shows:**
+- Image (if `image_url` exists) or gradient placeholder with ✂️ emoji
+- Name (language-aware: `name_en` / `name_es`)
+- Description (if available: `description_en` / `description_es`)
+- Price (from `price` field)
+- Duration (formatted: "30 min" or "1h 15m")
+
+**Fallbacks:**
+- No image: Gradient background with scissors emoji
+- No description: Only shows name and price
+- Missing category: Groups under "Other" / "Otro"
+
+---
+
+### Client Barbers Page (`/client/barbers`)
+
+**Location:** `src/pages/ClientBarbers.tsx`
+
+**Data Source:** `users` table filtered by role
+
+**Query:**
+```typescript
+supabase
+  .from('users')
+  .select('id, first_name, last_name, profile_image_url, active')
+  .eq('role', 'BARBER')
+  .eq('active', true)
+  .order('first_name')
+```
+
+**Display:**
+- Responsive grid: `repeat(auto-fill, minmax(280px, 1fr))`
+- Card layout with hover effects
+
+**Barber Card Shows:**
+- Profile photo (if `profile_image_url` exists) or initials on gradient
+- Full name (`first_name` + `last_name`)
+- Title: "Professional Barber" / "Barbero Profesional"
+- "Book with [Name]" button
+
+**Click Action:**
+- Navigates to `/client/book?barber={barberId}`
+- Pre-selects that barber in booking flow
+
+---
+
+### Client Book Page (`/client/book`) - MVP
+
+**Location:** `src/pages/ClientBook.tsx`
+
+**Purpose:** Multi-step booking flow with validation
+
+**Flow Steps:**
+
+1. **Select Barber**
+   - Radio-style selection
+   - Pre-selected if coming from barbers page (`?barber=` query param)
+
+2. **Select Service**
+   - Shows all active services
+   - Displays name, price, duration
+   - Future: Filter by barber's assigned services
+
+3. **Select Date & Time**
+   - Date picker: Limited by `days_bookable_in_advance`
+   - Time slots: Generated based on `client_booking_interval_minutes`
+   - Enforces `min_book_ahead_hours`
+   - Only future dates allowed
+
+4. **Client Information**
+   - Full Name (required)
+   - Phone Number (required)
+   - Notes (optional)
+
+5. **Confirmation**
+   - Summary of all selections
+   - Shows barber, service, date/time, price
+   - "Confirm Booking" button
+
+**Validation & Rules:**
+
+Uses existing `validateBookingRules()` from `src/lib/bookingRules.ts`:
+
+```typescript
+import { validateBookingRules, formatBookingRuleError } from '../lib/bookingRules';
+
+const validationError = await validateBookingRules(appointmentDateTime, 'create');
+if (validationError) {
+  setError(formatBookingRuleError(validationError, language));
+  return false;
+}
+```
+
+**Rules Enforced:**
+- Cannot book more than `days_bookable_in_advance` days ahead
+- Must book at least `min_book_ahead_hours` hours in advance
+- Times must align with `client_booking_interval_minutes` (e.g., :00, :15, :30, :45)
+- Only future appointments allowed
+
+**Client Handling:**
+
+1. **Existing Client:** Looks up by phone number
+   ```typescript
+   supabase.from('clients').select('id').eq('phone', clientPhone).maybeSingle()
+   ```
+
+2. **New Client:** Creates record
+   - Splits `clientName` into `first_name` and `last_name`
+   - Stores `phone` and optional `notes`
+
+**Appointment Creation:**
+
+```typescript
+supabase.from('appointments').insert({
+  barber_id: selectedBarber,
+  client_id: clientId,
+  service_id: selectedService,
+  scheduled_start: appointmentDateTime.toISOString(),
+  scheduled_end: calculatedEndTime.toISOString(),
+  status: 'booked',
+  notes: clientNotes || null,
+  source: 'client_web',  // Tracking field
+})
+```
+
+**Success:**
+- Shows alert confirmation
+- Redirects to `/client/home`
+- Future: Send SMS confirmation
+
+---
+
+### Barber Pole Animation
+
+**Location:** `src/components/BarberPole.tsx`
+
+**Purpose:** Lightweight CSS-only animation for brand identity
+
+**Implementation:**
+```typescript
+<div style={{
+  background: 'linear-gradient(45deg, #e74c3c 25%, transparent 25%, ...)',
+  backgroundSize: '20px 20px',
+  animation: 'barberPoleRotate 1s linear infinite'
+}} />
+
+@keyframes barberPoleRotate {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 20px; }
+}
+```
+
+**Features:**
+- Pure CSS (no images)
+- Diagonal red stripes on transparent
+- Continuous smooth rotation
+- Configurable size (default: 50px width, 75px height)
+- Minimal performance impact
+
+**Usage:**
+- Client header: Next to logo (40px size)
+- Optional: Can be added to owner/barber headers if desired
+
+---
+
+### Client Header Component
+
+**Location:** `src/components/ClientHeader.tsx`
+
+**Features:**
+- Barber pole animation on left
+- Shop name ("Lupe's Barber") as clickable logo
+- Horizontal navigation (desktop)
+- Hamburger menu (mobile, breakpoint: 768px)
+- Language toggle (EN/ES)
+
+**Navigation Items:**
+- Home → `/client/home`
+- Services → `/client/services`
+- Barbers → `/client/barbers`
+- Book Now → `/client/book`
+
+**Responsive:**
+- Desktop: Horizontal nav with hover effects
+- Mobile: Full-screen dropdown menu
+- Sticky header (stays at top)
+
+**Styling:**
+- Black background (`#000`)
+- White text
+- Hover: `rgba(255,255,255,0.1)` background
+- Clean, professional aesthetic
+
+---
+
+### Booking Source Tracking
+
+**Database Field:** `appointments.source`
+
+**Migration:** `add_appointment_source_field.sql`
+
+**Values:**
+- `'owner'` - Created by owner (default for existing records)
+- `'barber'` - Created by barber
+- `'client_web'` - Created via client website
+- `'walk_in'` - Walk-in appointment
+
+**Purpose:**
+- Analytics on booking channels
+- Track online vs in-person bookings
+- Future: Different commission rates by source
+- Marketing effectiveness measurement
+
+**Usage:**
+```typescript
+// Client web bookings
+source: 'client_web'
+
+// Owner dashboard bookings
+source: 'owner'
+
+// Barber app bookings
+source: 'barber'
+```
+
+---
+
+### Data Integration
+
+**Services:**
+- Uses existing `services` table
+- Filters by `active = true`
+- Respects `category` for grouping
+- Shows `image_url` with fallback
+- Bilingual: `name_en/es`, `description_en/es`
+
+**Barbers:**
+- Uses existing `users` table
+- Filters by `role = 'BARBER'` AND `active = true`
+- Shows `profile_image_url` with initials fallback
+- Future: Show barber specialties via `barber_services` table
+
+**Clients:**
+- Uses existing `clients` table
+- Matches by `phone` to avoid duplicates
+- Auto-creates new client if phone not found
+- Stores minimal info: name, phone, notes
+
+**Appointments:**
+- Uses existing `appointments` table
+- Sets `status = 'booked'`
+- Sets `source = 'client_web'`
+- Calculates `scheduled_end` from service duration
+- All existing owner/barber views show these appointments
+
+**Shop Config:**
+- Reads `shop_config` table for booking rules
+- Uses `days_bookable_in_advance`
+- Uses `min_book_ahead_hours`
+- Uses `client_booking_interval_minutes`
+
+---
+
+### Security & Permissions
+
+**Public Access:**
+- All client routes are public (no authentication)
+- Read-only access to services and barbers
+- Can create appointments without login
+- Cannot view other clients' appointments
+- Cannot access owner/barber dashboards
+
+**RLS Policies:**
+
+Client pages query these tables:
+1. **services:** Public read access already exists
+2. **users (barbers):** Public read for active barbers only
+3. **clients:** Can insert new clients
+4. **appointments:** Can insert new appointments
+
+**Validation:**
+- All booking rules enforced client-side and could be enforced server-side via RLS
+- Phone number required (future: SMS verification)
+- No access to financial data (commissions, payouts)
+
+---
+
+### Bilingual Support
+
+All client pages fully support EN/ES:
+
+**ClientHome:**
+- "Welcome to Lupe's Barber" / "Bienvenido a Lupe's Barber"
+- "Book Appointment" / "Reservar Cita"
+- "Quick Info" / "Información Rápida"
+- All section headings and body text
+
+**ClientServices:**
+- "Our Services" / "Nuestros Servicios"
+- Service names and descriptions (from database)
+- "Loading..." / "Cargando..."
+
+**ClientBarbers:**
+- "Our Barbers" / "Nuestros Barberos"
+- "Professional Barber" / "Barbero Profesional"
+- "Book with [Name]" / "Reservar con [Name]"
+
+**ClientBook:**
+- All step titles and labels
+- "Select Barber" / "Seleccionar Barbero"
+- "Select Service" / "Seleccionar Servicio"
+- "Select Date & Time" / "Seleccionar Fecha y Hora"
+- "Your Information" / "Tu Información"
+- "Confirm Booking" / "Confirmar Reserva"
+- All error messages (from `bookingRules.ts`)
+
+---
+
+### Performance Considerations
+
+**Barber Pole Animation:**
+- Pure CSS (no JavaScript)
+- Uses CSS transforms (GPU-accelerated)
+- Gradient background (no images to load)
+- Single `@keyframes` rule
+- Minimal CPU/battery impact
+
+**Page Load:**
+- Services: Single query, cached by browser
+- Barbers: Single query, cached by browser
+- Booking: Progressive loading (only loads next step's data)
+- Images: Fallback to gradients if missing
+- No heavy libraries or dependencies
+
+**Mobile Optimization:**
+- Responsive breakpoints at 768px
+- Touch-friendly tap targets (min 44px)
+- Native date/time pickers
+- Minimal JavaScript
+- Fast page transitions
+
+---
+
+### Future Enhancements
+
+**Planned Features:**
+
+1. **Client Portal:**
+   - View upcoming appointments
+   - Cancel/reschedule online
+   - View appointment history
+   - Save favorite barber
+
+2. **Enhanced Booking:**
+   - Calendar view of available slots
+   - Barber availability checking (conflicts)
+   - Service add-ons (beard trim + haircut)
+   - Recurring appointments
+
+3. **Communication:**
+   - SMS confirmation (using existing SMS foundation)
+   - Email confirmation
+   - Reminder notifications (24hr, 1hr)
+   - Two-way messaging with shop
+
+4. **Products Catalog:**
+   - `/client/products` page
+   - Show retail items from `products` table
+   - Online ordering for pickup
+   - Product recommendations
+
+5. **Reviews & Ratings:**
+   - Post-appointment rating request
+   - Public reviews display
+   - Barber ratings on barbers page
+   - Aggregate shop rating
+
+6. **Advanced Features:**
+   - Wait list / standby booking
+   - Group appointments (multiple people)
+   - Gift certificates
+   - Loyalty program integration
+   - Social media sharing
+
+7. **Analytics Integration:**
+   - Track booking funnel conversion
+   - A/B test booking flow
+   - Heat maps on service popularity
+   - Source attribution (Google, Instagram, etc.)
+
+---
+
+### Testing Checklist
+
+**Client Home:**
+- [ ] Page loads without authentication
+- [ ] All sections render correctly
+- [ ] "Book Appointment" buttons navigate to `/client/book`
+- [ ] Language toggle works
+- [ ] Mobile menu opens/closes
+- [ ] Barber pole animation smooth
+
+**Client Services:**
+- [ ] Services load from database
+- [ ] Grouped by category correctly
+- [ ] Images display or show fallback
+- [ ] Prices and durations show
+- [ ] Bilingual names/descriptions work
+- [ ] Mobile grid responsive
+
+**Client Barbers:**
+- [ ] Only active barbers show
+- [ ] Profile images or initials display
+- [ ] "Book with" button navigates with query param
+- [ ] Cards responsive on mobile
+- [ ] Hover effects work
+
+**Client Book:**
+- [ ] 5-step flow progresses correctly
+- [ ] Pre-selected barber from query param works
+- [ ] Date picker limits enforce rules
+- [ ] Time slots generated correctly
+- [ ] Validation shows errors in correct language
+- [ ] Cannot book too far in advance
+- [ ] Cannot book too soon
+- [ ] Times must align with interval
+- [ ] Client creation works
+- [ ] Existing client lookup by phone works
+- [ ] Appointment creates with `source = 'client_web'`
+- [ ] Success redirects to home
+- [ ] All steps support EN/ES
+
+**Integration:**
+- [ ] Client bookings appear in owner Today view
+- [ ] Client bookings appear in barber Today view
+- [ ] `source` field shows "client_web"
+- [ ] Client record created correctly
+- [ ] Booking rules respected
+- [ ] No TypeScript errors
+- [ ] Build passes
+
+---
+
 **End of Architecture Document**

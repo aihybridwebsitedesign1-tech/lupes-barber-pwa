@@ -22,6 +22,10 @@ import AppointmentDetail from './pages/AppointmentDetail';
 import BarberToday from './pages/BarberToday';
 import BarberStats from './pages/BarberStats';
 import Book from './pages/Book';
+import ClientHome from './pages/ClientHome';
+import ClientServices from './pages/ClientServices';
+import ClientBarbers from './pages/ClientBarbers';
+import ClientBook from './pages/ClientBook';
 
 function ProtectedRoute({ children, allowedRole }: { children: JSX.Element; allowedRole?: 'OWNER' | 'BARBER' }) {
   const { user, userData, loading, error } = useAuth();
@@ -64,6 +68,12 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={user ? <Navigate to={userData?.role === 'OWNER' ? '/owner/today' : '/barber/today'} /> : <Login />} />
       <Route path="/book" element={<Book />} />
+
+      <Route path="/client" element={<Navigate to="/client/home" />} />
+      <Route path="/client/home" element={<ClientHome />} />
+      <Route path="/client/services" element={<ClientServices />} />
+      <Route path="/client/barbers" element={<ClientBarbers />} />
+      <Route path="/client/book" element={<ClientBook />} />
 
       <Route path="/owner/today" element={<ProtectedRoute allowedRole="OWNER"><OwnerToday /></ProtectedRoute>} />
       <Route path="/owner/appointments" element={<ProtectedRoute allowedRole="OWNER"><OwnerAppointments /></ProtectedRoute>} />

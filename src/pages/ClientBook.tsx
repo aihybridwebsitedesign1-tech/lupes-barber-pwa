@@ -1,0 +1,577 @@
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
+import { useLanguage } from '../contexts/LanguageContext';
+import { validateBookingRules, formatBookingRuleError, getShopConfig } from '../lib/bookingRules';
+import ClientHeader from '../components/ClientHeader';
+
+type Barber = {
+  id: string;
+  first_name: string;
+  last_name: string;
+};
+
+type Service = {
+  id: string;
+  name_en: string;
+  name_es: string;
+  price: number;
+  duration_minutes: number;
+};
+
+export default function ClientBook() {
+  const { language } = useLanguage();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  const [step, setStep] = useState(1);
+  const [barbers, setBarbers] = useState<Barber[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const [selectedBarber, setSelectedBarber] = useState<string>('');
+  const [selectedService, setSelectedService] = useState<string>('');
+  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [selectedTime, setSelectedTime] = useState<string>('');
+  const [clientName, setClientName] = useState('');
+  const [clientPhone, setClientPhone] = useState('');
+  const [clientNotes, setClientNotes] = useState('');
+
+  const [timeSlots, setTimeSlots] = useState<string[]>([]);
+  const [config, setConfig] = useState<{ days_bookable_in_advance: number; min_book_ahead_hours: number; client_booking_interval_minutes: number } | null>(null);
+
+  useEffect(() => {
+    loadInitialData();
+  }, []);
+
+  useEffect(() => {
+    const preselectedBarber = searchParams.get('barber');
+    if (preselectedBarber && barbers.length > 0) {
+      const barber = barbers.find(b => b.id === preselectedBarber);
+      if (barber) {
+        setSelectedBarber(preselectedBarber);
+      }
+    }
+  }, [searchParams, barbers]);
+
+  useEffect(() => {
+    if (selectedDate && config) {
+      generateTimeSlots();
+    }
+  }, [selectedDate, config]);
+
+  const loadInitialData = async () => {
+    setLoading(true);
+    try {
+      const [barbersRes, servicesRes, shopConfig] = await Promise.all([
+        supabase.from('users').select('id, first_name, last_name').eq('role', 'BARBER').eq('active', true).order('first_name'),
+        supabase.from('services').select('id, name_en, name_es, price, duration_minutes').eq('active', true).order('name_en'),
+        getShopConfig()
+      ]);
+
+      if (barbersRes.error) throw barbersRes.error;
+      if (servicesRes.error) throw servicesRes.error;
+
+      setBarbers(barbersRes.data || []);
+      setServices(servicesRes.data || []);
+      setConfig(shopConfig);
+    } catch (error) {
+      console.error('Error loading data:', error);
+      setError(language === 'en' ? 'Failed to load booking data' : 'Error al cargar datos de reserva');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const generateTimeSlots = () => {
+    if (!config) return;
+
+    const slots: string[] = [];
+    const intervalMinutes = config.client_booking_interval_minutes || 15;
+
+    for (let hour = 9; hour < 19; hour++) {
+      for (let minute = 0; minute < 60; minute += intervalMinutes) {
+        const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+        slots.push(timeStr);
+      }
+    }
+
+    setTimeSlots(slots);
+  };
+
+  const getMinDate = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toISOString().split('T')[0];
+  };
+
+  const getMaxDate = () => {
+    if (!config) return '';
+    const maxDate = new Date();
+    maxDate.setDate(maxDate.getDate() + config.days_bookable_in_advance);
+    return maxDate.toISOString().split('T')[0];
+  };
+
+  const validateStep = async (currentStep: number): Promise<boolean> => {
+    setError('');
+
+    if (currentStep === 1 && !selectedBarber) {
+      setError(language === 'en' ? 'Please select a barber' : 'Por favor selecciona un barbero');
+      return false;
+    }
+
+    if (currentStep === 2 && !selectedService) {
+      setError(language === 'en' ? 'Please select a service' : 'Por favor selecciona un servicio');
+      return false;
+    }
+
+    if (currentStep === 3) {
+      if (!selectedDate || !selectedTime) {
+        setError(language === 'en' ? 'Please select date and time' : 'Por favor selecciona fecha y hora');
+        return false;
+      }
+
+      const appointmentDateTime = new Date(`${selectedDate}T${selectedTime}:00`);
+      const validationError = await validateBookingRules(appointmentDateTime, 'create');
+
+      if (validationError) {
+        setError(formatBookingRuleError(validationError, language));
+        return false;
+      }
+    }
+
+    if (currentStep === 4) {
+      if (!clientName.trim()) {
+        setError(language === 'en' ? 'Please enter your name' : 'Por favor ingresa tu nombre');
+        return false;
+      }
+      if (!clientPhone.trim()) {
+        setError(language === 'en' ? 'Please enter your phone number' : 'Por favor ingresa tu número de teléfono');
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  const handleNext = async () => {
+    const isValid = await validateStep(step);
+    if (isValid) {
+      setStep(step + 1);
+    }
+  };
+
+  const handleBack = () => {
+    setError('');
+    setStep(step - 1);
+  };
+
+  const handleSubmit = async () => {
+    const isValid = await validateStep(4);
+    if (!isValid) return;
+
+    setSubmitting(true);
+    setError('');
+
+    try {
+      let clientId = null;
+
+      const { data: existingClients } = await supabase
+        .from('clients')
+        .select('id')
+        .eq('phone', clientPhone)
+        .maybeSingle();
+
+      if (existingClients) {
+        clientId = existingClients.id;
+      } else {
+        const nameParts = clientName.trim().split(' ');
+        const firstName = nameParts[0];
+        const lastName = nameParts.slice(1).join(' ') || firstName;
+
+        const { data: newClient, error: clientError } = await supabase
+          .from('clients')
+          .insert({
+            first_name: firstName,
+            last_name: lastName,
+            phone: clientPhone,
+            notes: clientNotes || null,
+          })
+          .select('id')
+          .single();
+
+        if (clientError) throw clientError;
+        clientId = newClient.id;
+      }
+
+      const appointmentDateTime = new Date(`${selectedDate}T${selectedTime}:00`);
+      const selectedServiceData = services.find(s => s.id === selectedService);
+
+      const { error: appointmentError } = await supabase
+        .from('appointments')
+        .insert({
+          barber_id: selectedBarber,
+          client_id: clientId,
+          service_id: selectedService,
+          scheduled_start: appointmentDateTime.toISOString(),
+          scheduled_end: new Date(appointmentDateTime.getTime() + (selectedServiceData?.duration_minutes || 30) * 60000).toISOString(),
+          status: 'booked',
+          notes: clientNotes || null,
+          source: 'client_web',
+        });
+
+      if (appointmentError) throw appointmentError;
+
+      alert(language === 'en'
+        ? 'Booking confirmed! We look forward to seeing you.'
+        : '¡Reserva confirmada! Esperamos verte pronto.');
+
+      navigate('/client/home');
+    } catch (error) {
+      console.error('Error creating booking:', error);
+      setError(language === 'en' ? 'Failed to create booking. Please try again.' : 'Error al crear la reserva. Por favor intenta de nuevo.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const selectedBarberObj = barbers.find(b => b.id === selectedBarber);
+  const selectedServiceObj = services.find(s => s.id === selectedService);
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
+        <ClientHeader />
+        <div style={{ textAlign: 'center', padding: '4rem', fontSize: '18px', color: '#666' }}>
+          {language === 'en' ? 'Loading...' : 'Cargando...'}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
+      <ClientHeader />
+
+      <main style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem 1rem' }}>
+        <h1 style={{ fontSize: '42px', fontWeight: 'bold', marginBottom: '1rem', textAlign: 'center' }}>
+          {language === 'en' ? 'Book Appointment' : 'Reservar Cita'}
+        </h1>
+
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '2rem', gap: '0.5rem' }}>
+          {[1, 2, 3, 4, 5].map((s) => (
+            <div
+              key={s}
+              style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                backgroundColor: step >= s ? '#e74c3c' : '#ddd',
+                color: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 'bold',
+              }}
+            >
+              {s}
+            </div>
+          ))}
+        </div>
+
+        {error && (
+          <div style={{ backgroundColor: '#f8d7da', color: '#721c24', padding: '1rem', borderRadius: '6px', marginBottom: '1.5rem', border: '1px solid #f5c6cb' }}>
+            {error}
+          </div>
+        )}
+
+        <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '12px', boxShadow: '0 4px 8px rgba(0,0,0,0.1)' }}>
+          {step === 1 && (
+            <div>
+              <h2 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '1.5rem' }}>
+                {language === 'en' ? 'Select Barber' : 'Seleccionar Barbero'}
+              </h2>
+              <div style={{ display: 'grid', gap: '1rem' }}>
+                {barbers.map((barber) => (
+                  <div
+                    key={barber.id}
+                    onClick={() => setSelectedBarber(barber.id)}
+                    style={{
+                      padding: '1rem',
+                      border: `2px solid ${selectedBarber === barber.id ? '#e74c3c' : '#ddd'}`,
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      backgroundColor: selectedBarber === barber.id ? '#fee' : 'white',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    <div style={{ fontSize: '18px', fontWeight: '600' }}>
+                      {barber.first_name} {barber.last_name}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {step === 2 && (
+            <div>
+              <h2 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '1.5rem' }}>
+                {language === 'en' ? 'Select Service' : 'Seleccionar Servicio'}
+              </h2>
+              <div style={{ display: 'grid', gap: '1rem' }}>
+                {services.map((service) => (
+                  <div
+                    key={service.id}
+                    onClick={() => setSelectedService(service.id)}
+                    style={{
+                      padding: '1rem',
+                      border: `2px solid ${selectedService === service.id ? '#e74c3c' : '#ddd'}`,
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      backgroundColor: selectedService === service.id ? '#fee' : 'white',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontSize: '18px', fontWeight: '600' }}>
+                          {language === 'es' ? service.name_es : service.name_en}
+                        </div>
+                        <div style={{ fontSize: '14px', color: '#666', marginTop: '0.25rem' }}>
+                          {service.duration_minutes} {language === 'en' ? 'min' : 'min'}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#e74c3c' }}>
+                        ${service.price.toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {step === 3 && (
+            <div>
+              <h2 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '1.5rem' }}>
+                {language === 'en' ? 'Select Date & Time' : 'Seleccionar Fecha y Hora'}
+              </h2>
+
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '16px', fontWeight: '500' }}>
+                  {language === 'en' ? 'Date' : 'Fecha'}
+                </label>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => {
+                    setSelectedDate(e.target.value);
+                    setSelectedTime('');
+                  }}
+                  min={getMinDate()}
+                  max={getMaxDate()}
+                  style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '16px' }}
+                />
+              </div>
+
+              {selectedDate && (
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '16px', fontWeight: '500' }}>
+                    {language === 'en' ? 'Time' : 'Hora'}
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: '0.5rem', maxHeight: '300px', overflowY: 'auto', padding: '0.5rem' }}>
+                    {timeSlots.map((time) => (
+                      <button
+                        key={time}
+                        onClick={() => setSelectedTime(time)}
+                        style={{
+                          padding: '0.75rem',
+                          border: `2px solid ${selectedTime === time ? '#e74c3c' : '#ddd'}`,
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          backgroundColor: selectedTime === time ? '#e74c3c' : 'white',
+                          color: selectedTime === time ? 'white' : '#000',
+                          fontSize: '14px',
+                          fontWeight: '500',
+                          transition: 'all 0.2s',
+                        }}
+                      >
+                        {time}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {step === 4 && (
+            <div>
+              <h2 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '1.5rem' }}>
+                {language === 'en' ? 'Your Information' : 'Tu Información'}
+              </h2>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '16px', fontWeight: '500' }}>
+                  {language === 'en' ? 'Full Name' : 'Nombre Completo'}
+                </label>
+                <input
+                  type="text"
+                  value={clientName}
+                  onChange={(e) => setClientName(e.target.value)}
+                  placeholder={language === 'en' ? 'John Doe' : 'Juan Pérez'}
+                  style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '16px' }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '16px', fontWeight: '500' }}>
+                  {language === 'en' ? 'Phone Number' : 'Número de Teléfono'}
+                </label>
+                <input
+                  type="tel"
+                  value={clientPhone}
+                  onChange={(e) => setClientPhone(e.target.value)}
+                  placeholder="(555) 123-4567"
+                  style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '16px' }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '16px', fontWeight: '500' }}>
+                  {language === 'en' ? 'Notes (Optional)' : 'Notas (Opcional)'}
+                </label>
+                <textarea
+                  value={clientNotes}
+                  onChange={(e) => setClientNotes(e.target.value)}
+                  placeholder={language === 'en' ? 'Any special requests?' : '¿Alguna solicitud especial?'}
+                  rows={3}
+                  style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '16px', resize: 'vertical' }}
+                />
+              </div>
+            </div>
+          )}
+
+          {step === 5 && (
+            <div>
+              <h2 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '1.5rem' }}>
+                {language === 'en' ? 'Confirm Booking' : 'Confirmar Reserva'}
+              </h2>
+
+              <div style={{ backgroundColor: '#f9f9f9', padding: '1.5rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
+                <div style={{ marginBottom: '1rem' }}>
+                  <div style={{ fontSize: '14px', color: '#666', marginBottom: '0.25rem' }}>
+                    {language === 'en' ? 'Barber' : 'Barbero'}
+                  </div>
+                  <div style={{ fontSize: '18px', fontWeight: '600' }}>
+                    {selectedBarberObj?.first_name} {selectedBarberObj?.last_name}
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <div style={{ fontSize: '14px', color: '#666', marginBottom: '0.25rem' }}>
+                    {language === 'en' ? 'Service' : 'Servicio'}
+                  </div>
+                  <div style={{ fontSize: '18px', fontWeight: '600' }}>
+                    {language === 'es' ? selectedServiceObj?.name_es : selectedServiceObj?.name_en}
+                  </div>
+                  <div style={{ fontSize: '16px', color: '#e74c3c', fontWeight: 'bold', marginTop: '0.25rem' }}>
+                    ${selectedServiceObj?.price.toFixed(2)}
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <div style={{ fontSize: '14px', color: '#666', marginBottom: '0.25rem' }}>
+                    {language === 'en' ? 'Date & Time' : 'Fecha y Hora'}
+                  </div>
+                  <div style={{ fontSize: '18px', fontWeight: '600' }}>
+                    {new Date(selectedDate).toLocaleDateString(language === 'en' ? 'en-US' : 'es-ES', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </div>
+                  <div style={{ fontSize: '18px', fontWeight: '600' }}>
+                    {selectedTime}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: '14px', color: '#666', marginBottom: '0.25rem' }}>
+                    {language === 'en' ? 'Contact' : 'Contacto'}
+                  </div>
+                  <div style={{ fontSize: '16px' }}>{clientName}</div>
+                  <div style={{ fontSize: '16px' }}>{clientPhone}</div>
+                </div>
+              </div>
+
+              <button
+                onClick={handleSubmit}
+                disabled={submitting}
+                style={{
+                  width: '100%',
+                  padding: '1rem',
+                  backgroundColor: submitting ? '#999' : '#e74c3c',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: submitting ? 'not-allowed' : 'pointer',
+                  fontSize: '18px',
+                  fontWeight: 'bold',
+                }}
+              >
+                {submitting
+                  ? (language === 'en' ? 'Booking...' : 'Reservando...')
+                  : (language === 'en' ? 'Confirm Booking' : 'Confirmar Reserva')}
+              </button>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
+            {step > 1 && (
+              <button
+                onClick={handleBack}
+                style={{
+                  flex: 1,
+                  padding: '0.75rem',
+                  backgroundColor: 'white',
+                  color: '#000',
+                  border: '2px solid #ddd',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                }}
+              >
+                {language === 'en' ? 'Back' : 'Atrás'}
+              </button>
+            )}
+
+            {step < 5 && (
+              <button
+                onClick={handleNext}
+                style={{
+                  flex: 1,
+                  padding: '0.75rem',
+                  backgroundColor: '#e74c3c',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                }}
+              >
+                {language === 'en' ? 'Next' : 'Siguiente'}
+              </button>
+            )}
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
