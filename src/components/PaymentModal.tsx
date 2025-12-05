@@ -94,42 +94,64 @@ export default function PaymentModal({
     setError('');
 
     try {
-      if (paymentMethod === 'cash') {
-        const cashBase = parseFloat(cashBaseAmount);
-        const cashTotal = cashBase + tip;
-        const { error: updateError } = await supabase
-          .from('appointments')
-          .update({
-            services_total: servicesTotal,
-            products_total: productsTotal,
-            tax_amount: totals.taxAmount,
-            tip_amount: tip,
-            processing_fee_amount: 0,
-            total_charged: cashTotal,
-            net_revenue: cashTotal,
-            payment_method: 'cash',
-            paid_at: new Date().toISOString(),
-          })
-          .eq('id', appointmentId);
+      const commissionPercent = 50;
+      const serviceCommissionAmount = servicesTotal * (commissionPercent / 100);
+      const serviceDueToBarber = serviceCommissionAmount;
+      const serviceDueToShop = servicesTotal - serviceCommissionAmount;
 
-        if (updateError) throw updateError;
-      } else {
-        const { error: updateError } = await supabase
-          .from('appointments')
-          .update({
-            services_total: servicesTotal,
-            products_total: productsTotal,
-            tax_amount: totals.taxAmount,
-            tip_amount: totals.tip,
-            processing_fee_amount: totals.processingFeeAmount,
-            total_charged: totals.totalCharged,
-            net_revenue: totals.netRevenue,
-            payment_method: paymentMethod,
-            paid_at: new Date().toISOString(),
-          })
-          .eq('id', appointmentId);
+      const now = new Date().toISOString();
+      const updateData = {
+        services_total: servicesTotal,
+        products_total: productsTotal,
+        tax_amount: totals.taxAmount,
+        tip_amount: paymentMethod === 'cash' ? tip : totals.tip,
+        processing_fee_amount: paymentMethod === 'cash' ? 0 : totals.processingFeeAmount,
+        total_charged: paymentMethod === 'cash' ? (parseFloat(cashBaseAmount) + tip) : totals.totalCharged,
+        net_revenue: paymentMethod === 'cash' ? (parseFloat(cashBaseAmount) + tip) : totals.netRevenue,
+        payment_method: paymentMethod,
+        paid_at: now,
+        status: 'completed',
+        completed_at: now,
+        service_commission_percent: commissionPercent,
+        service_commission_amount: serviceCommissionAmount,
+        service_due_to_barber: serviceDueToBarber,
+        service_due_to_shop: serviceDueToShop,
+      };
 
-        if (updateError) throw updateError;
+      const { data: aptData, error: updateError } = await supabase
+        .from('appointments')
+        .update(updateData)
+        .eq('id', appointmentId)
+        .select('client_id, channel')
+        .single();
+
+      if (updateError) throw updateError;
+
+      if (aptData) {
+        const { data: client } = await supabase
+          .from('clients')
+          .select('visits_count, first_visit_at')
+          .eq('id', aptData.client_id)
+          .single();
+
+        const isFirstVisit = !client || client.visits_count === 0;
+        const clientUpdate: any = {
+          last_visit_at: now,
+          visits_count: (client?.visits_count || 0) + 1,
+        };
+
+        if (isFirstVisit) {
+          clientUpdate.first_visit_at = now;
+          if (aptData.channel) {
+            clientUpdate.acquisition_channel = aptData.channel === 'online_pwa' ? 'GOOGLE_ONLINE' :
+              aptData.channel === 'internal_manual' ? 'WALK_IN' : 'OTHER';
+          }
+        }
+
+        await supabase
+          .from('clients')
+          .update(clientUpdate)
+          .eq('id', aptData.client_id);
       }
 
       onSave();

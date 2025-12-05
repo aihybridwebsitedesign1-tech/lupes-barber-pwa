@@ -50,6 +50,16 @@ export default function Header() {
                         {language === 'en' ? 'Reports' : 'Reportes'}
                       </Link>
                     )}
+                    {userData.role === 'OWNER' && (
+                      <Link to="/owner/payouts" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 0.75rem', whiteSpace: 'nowrap', fontSize: '14px' }}>
+                        {language === 'en' ? 'Payouts' : 'Pagos'}
+                      </Link>
+                    )}
+                    {userData.role === 'OWNER' && (
+                      <Link to="/owner/clients-report" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 0.75rem', whiteSpace: 'nowrap', fontSize: '14px' }}>
+                        {language === 'en' ? 'Clients Stats' : 'Estadísticas'}
+                      </Link>
+                    )}
                     <Link to="/owner/clients" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 0.75rem', whiteSpace: 'nowrap', fontSize: '14px' }}>
                       {t.clients}
                     </Link>
@@ -228,6 +238,38 @@ export default function Header() {
                     }}
                   >
                     {language === 'en' ? 'Reports' : 'Reportes'}
+                  </Link>
+                )}
+                {userData.role === 'OWNER' && (
+                  <Link
+                    to="/owner/payouts"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    style={{
+                      color: 'white',
+                      textDecoration: 'none',
+                      padding: '1rem',
+                      borderBottom: '1px solid rgba(255,255,255,0.1)',
+                      fontSize: '16px',
+                      display: 'block'
+                    }}
+                  >
+                    {language === 'en' ? 'Payouts' : 'Pagos'}
+                  </Link>
+                )}
+                {userData.role === 'OWNER' && (
+                  <Link
+                    to="/owner/clients-report"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    style={{
+                      color: 'white',
+                      textDecoration: 'none',
+                      padding: '1rem',
+                      borderBottom: '1px solid rgba(255,255,255,0.1)',
+                      fontSize: '16px',
+                      display: 'block'
+                    }}
+                  >
+                    {language === 'en' ? 'Clients Stats' : 'Estadísticas'}
                   </Link>
                 )}
                 <Link

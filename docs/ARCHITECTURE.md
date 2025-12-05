@@ -719,4 +719,100 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
 
 ---
 
+## Sprint Implementation Status (December 5, 2025)
+
+### Implemented Features (MVP)
+
+#### 1. Commissions & Payouts Logic
+**Status:** ✅ Implemented (Flat 50% rate)
+
+**Implementation:**
+- Commission calculation in `PaymentModal.tsx` when payment is recorded
+- Flat 50% commission rate applied to services revenue
+- Fields populated: `service_commission_percent`, `service_commission_amount`, `service_due_to_barber`, `service_due_to_shop`
+- **Page:** `/owner/payouts` - Shows barber-level commission breakdown by date range
+- **TODO:** Tiered commission rates (Phase 7), product commissions, configurable rates in Settings
+
+**Current Logic:**
+```typescript
+const commissionPercent = 50;  // Temporary flat rate
+const serviceCommissionAmount = servicesTotal * (commissionPercent / 100);
+const serviceDueToBarber = serviceCommissionAmount;
+const serviceDueToShop = servicesTotal - serviceCommissionAmount;
+```
+
+#### 2. Client Acquisition & Retention Tracking
+**Status:** ✅ Implemented (Auto-tracking on completion)
+
+**Implementation:**
+- When appointment is marked completed (via `PaymentModal`):
+  - First visit: Sets `first_visit_at`, sets `acquisition_channel` based on booking channel
+  - All visits: Updates `last_visit_at`, increments `visits_count`
+- Acquisition channels mapped: `online_pwa` → `GOOGLE_ONLINE`, `internal_manual` → `WALK_IN`
+- **Page:** `/owner/clients-report` - Shows acquisition stats and retention metrics
+- Classification rules:
+  - **Regular:** ≥2 visits (hardcoded threshold)
+  - **Lapsed:** >90 days since last visit (hardcoded threshold)
+  - **Prospective:** 0 visits
+- **TODO:** Make thresholds configurable in Settings, refine classification logic
+
+#### 3. SMS Engage (Manual Send - Console Logger)
+**Status:** ✅ Implemented (Test/Console mode)
+
+**Implementation:**
+- **Page:** `/owner/engage` - Manual SMS composer for owners
+- Select client, type message (160 char limit), send test SMS
+- Currently logs to console instead of sending real SMS
+- **TODO:** Wire to Twilio or SMS provider at go-live
+- **TODO:** Check `can_send_sms` permission when TypeScript types are regenerated
+
+#### 4. Barber SMS Permissions
+**Status:** ✅ Implemented (UI complete)
+
+**Implementation:**
+- `BarberPermissionsModal` includes "Can send SMS messages (Engage)" checkbox
+- Saves `can_send_sms` to database
+- Will control access to Engage module when permission check is enabled
+
+#### 5. Inventory Management
+**Status:** ⏳ Pending (Database ready, UI TODO)
+
+**Database:**
+- `products` table extended with inventory fields
+- `inventory_transactions` table created
+- **TODO:** Build manual adjustment UI, create SALE transactions on product sale, low-stock alerts
+
+#### 6. Booking Rules Enforcement
+**Status:** ⏳ Pending (Configuration stored, validation TODO)
+
+**Database:**
+- `shop_config` table has all booking rule fields
+- **TODO:** Enforce rules in `Book.tsx` and `NewAppointmentModal.tsx`:
+  - Validate `min_book_ahead_hours` and `days_bookable_in_advance`
+  - Validate `min_cancel_ahead_hours` on cancellation
+  - Check `allow_booking_without_payment` flag
+  - Build Settings UI to configure all rules
+
+### New Pages Added
+
+1. **`/owner/payouts`** - Commission breakdown by barber (date range filter)
+2. **`/owner/clients-report`** - Acquisition channels + retention metrics
+3. **`/owner/engage`** - Manual SMS composer (console logger for now)
+
+### Assumptions & Temporary Constants
+
+1. **Commission Rate:** Flat 50% for all barbers (should be configurable per barber, tiered based on monthly sales)
+2. **Retention Thresholds:** Regular = 2+ visits, Lapsed = 90+ days (should be in `shop_config`)
+3. **SMS Provider:** Console logging only (needs Twilio integration)
+4. **Acquisition Channels:** Limited mapping (`online_pwa`, `internal_manual`) - expand as needed
+5. **Product Commissions:** Not calculated yet (Phase 7)
+6. **Inventory Transactions:** Not created automatically yet (Phase 7)
+
+### Database Schema Changes Applied
+
+- **Migration:** `add_commissions_inventory_acquisition_retention.sql`
+- See "Tonight's Sprint - Implementation Complete" document for full schema details
+
+---
+
 **End of Architecture Document**

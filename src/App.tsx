@@ -10,6 +10,9 @@ import OwnerServices from './pages/OwnerServices';
 import OwnerSettings from './pages/OwnerSettings';
 import OwnerProducts from './pages/OwnerProducts';
 import OwnerReports from './pages/OwnerReports';
+import OwnerPayouts from './pages/OwnerPayouts';
+import OwnerClientsReport from './pages/OwnerClientsReport';
+import OwnerEngage from './pages/OwnerEngage';
 import ClientDetail from './pages/ClientDetail';
 import AppointmentDetail from './pages/AppointmentDetail';
 import BarberToday from './pages/BarberToday';
@@ -66,6 +69,9 @@ function AppRoutes() {
       <Route path="/owner/products" element={<ProtectedRoute allowedRole="OWNER"><OwnerProducts /></ProtectedRoute>} />
       <Route path="/owner/settings" element={<ProtectedRoute allowedRole="OWNER"><OwnerSettings /></ProtectedRoute>} />
       <Route path="/owner/reports" element={<ProtectedRoute allowedRole="OWNER"><OwnerReports /></ProtectedRoute>} />
+      <Route path="/owner/payouts" element={<ProtectedRoute allowedRole="OWNER"><OwnerPayouts /></ProtectedRoute>} />
+      <Route path="/owner/clients-report" element={<ProtectedRoute allowedRole="OWNER"><OwnerClientsReport /></ProtectedRoute>} />
+      <Route path="/owner/engage" element={<ProtectedRoute allowedRole="OWNER"><OwnerEngage /></ProtectedRoute>} />
       <Route path="/owner/clients/:clientId" element={<ProtectedRoute allowedRole="OWNER"><ClientDetail /></ProtectedRoute>} />
       <Route path="/owner/appointments/:appointmentId" element={<ProtectedRoute allowedRole="OWNER"><AppointmentDetail /></ProtectedRoute>} />
 
