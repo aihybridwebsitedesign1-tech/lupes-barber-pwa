@@ -21,3 +21,21 @@ html, body {
   max-width: 100%;
   overflow-x: hidden;
 }
+
+@keyframes barberPoleStripesHorizontal {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 80px 0;
+  }
+}
+
+@keyframes barberPoleStripesVertical {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 0 48px;
+  }
+}

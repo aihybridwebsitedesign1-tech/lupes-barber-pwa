@@ -3,173 +3,162 @@ type BarberPoleProps = {
   height?: number;
 };
 
-export default function BarberPole({ variant = 'icon', height = 50 }: BarberPoleProps) {
+export default function BarberPole({ variant = 'banner', height = 50 }: BarberPoleProps) {
   const isIcon = variant === 'icon';
+  const poleHeight = height;
+  const capThickness = isIcon ? poleHeight * 0.25 : poleHeight * 1.25;
+  const capWidth = isIcon ? poleHeight * 0.36 : poleHeight * 0.96;
 
-  const containerStyle: React.CSSProperties = {
-    position: 'relative',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...(isIcon ? {
-      width: `${height * 0.36}px`,
-      height: `${height}px`,
-      flexDirection: 'column',
-    } : {
-      width: '100%',
-      height: `${height}px`,
-      flexDirection: 'row',
-    }),
+  const containerStyle: React.CSSProperties = isIcon
+    ? {
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: poleHeight,
+        width: capWidth,
+      }
+    : {
+        display: 'flex',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: poleHeight,
+        width: '100%',
+      };
+
+  const glassStyle: React.CSSProperties = isIcon
+    ? {
+        position: 'relative',
+        flex: 1,
+        width: '100%',
+        overflow: 'hidden',
+        borderRadius: poleHeight,
+        boxShadow:
+          'inset 0 0 10px rgba(0,0,0,0.4), inset 0 4px 12px rgba(0,0,0,0.35), 0 4px 10px rgba(0,0,0,0.5)',
+        background:
+          'linear-gradient(90deg, rgba(0,0,0,0.25) 0%, rgba(255,255,255,0.25) 50%, rgba(0,0,0,0.25) 100%)',
+      }
+    : {
+        position: 'relative',
+        flex: 1,
+        height: poleHeight * 0.7,
+        overflow: 'hidden',
+        borderRadius: poleHeight,
+        boxShadow:
+          'inset 0 0 12px rgba(0,0,0,0.4), inset 0 5px 14px rgba(0,0,0,0.35), 0 8px 18px rgba(0,0,0,0.35)',
+        background:
+          'linear-gradient(180deg, rgba(0,0,0,0.25) 0%, rgba(255,255,255,0.2) 30%, rgba(255,255,255,0.35) 50%, rgba(255,255,255,0.2) 70%, rgba(0,0,0,0.25) 100%)',
+      };
+
+  const stripesStyle: React.CSSProperties = isIcon
+    ? {
+        position: 'absolute',
+        inset: '-30%',
+        backgroundImage:
+          'repeating-linear-gradient(45deg, #d0002a 0px, #d0002a 12px, white 12px, white 24px, #004080 24px, #004080 36px, white 36px, white 48px)',
+        backgroundSize: 'auto',
+        animation: 'barberPoleStripesVertical 2.5s linear infinite',
+        filter: 'saturate(1.1)',
+      }
+    : {
+        position: 'absolute',
+        inset: '-30%',
+        backgroundImage:
+          'repeating-linear-gradient(135deg, #d0002a 0px, #d0002a 20px, white 20px, white 40px, #004080 40px, #004080 60px, white 60px, white 80px)',
+        backgroundSize: 'auto',
+        animation: 'barberPoleStripesHorizontal 2.5s linear infinite',
+        filter: 'saturate(1.1)',
+      };
+
+  const highlightStyle: React.CSSProperties = isIcon
+    ? {
+        position: 'absolute',
+        top: 0,
+        bottom: 0,
+        left: '20%',
+        width: '15%',
+        background:
+          'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.9) 50%, rgba(255,255,255,0) 100%)',
+        opacity: 0.7,
+        pointerEvents: 'none',
+      }
+    : {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: '18%',
+        height: '25%',
+        background:
+          'linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0) 100%)',
+        opacity: 0.8,
+        pointerEvents: 'none',
+      };
+
+  const innerShadowStyle: React.CSSProperties = {
+    position: 'absolute',
+    inset: 0,
+    boxShadow: 'inset 0 0 10px rgba(0,0,0,0.35)',
+    pointerEvents: 'none',
   };
 
-  const capBaseStyle: React.CSSProperties = {
-    position: 'relative',
-    background: 'radial-gradient(ellipse at 30% 30%, #fef9e7 0%, #f9e7a5 15%, #e0b64a 35%, #b07b17 60%, #8b6914 85%, #6d5410 100%)',
+  const capBaseStyle: React.CSSProperties = isIcon
+    ? {
+        position: 'relative',
+        width: capWidth,
+        height: capThickness,
+        borderRadius: capThickness,
+        background:
+          'radial-gradient(ellipse at 30% 25%, #fef9e7 0%, #f9e7a5 15%, #e0b64a 35%, #b07b17 65%, #8b6914 85%, #5b3c0f 100%)',
+        boxShadow:
+          'inset 0 2px 5px rgba(255,255,255,0.6), inset 0 -3px 6px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(139,105,20,0.55), inset 0 0 0 3px rgba(224,182,74,0.45), 0 3px 8px rgba(0,0,0,0.55)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }
+    : {
+        position: 'relative',
+        width: capWidth,
+        height: capThickness,
+        borderRadius: capThickness,
+        background:
+          'radial-gradient(ellipse at 30% 25%, #fef9e7 0%, #f9e7a5 12%, #e0b64a 32%, #b07b17 60%, #8b6914 84%, #4b320b 100%)',
+        boxShadow:
+          'inset 0 4px 8px rgba(255,255,255,0.7), inset 0 -5px 10px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(139,105,20,0.7), inset 0 0 0 3px rgba(224,182,74,0.5), inset 0 0 0 5px rgba(184,134,11,0.4), 0 6px 16px rgba(0,0,0,0.55)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginLeft: isIcon ? 0 : '-6px',
+        marginRight: isIcon ? 0 : '-6px',
+        zIndex: 2,
+      };
+
+  const capInnerRing: React.CSSProperties = {
+    width: '70%',
+    height: '55%',
+    borderRadius: 9999,
+    border: '1px solid rgba(254,249,231,0.7)',
     boxShadow:
-      'inset 0 3px 8px rgba(255,255,255,0.6), ' +
-      'inset 0 -3px 8px rgba(0,0,0,0.5), ' +
-      'inset 0 0 0 1px rgba(139,105,20,0.4), ' +
-      'inset 0 0 0 2px rgba(224,182,74,0.3), ' +
-      '0 4px 12px rgba(0,0,0,0.4)',
-    ...(isIcon ? {
-      width: '100%',
-      height: '10px',
-      borderRadius: '9999px',
-    } : {
-      width: '48px',
-      height: '130%',
-      minWidth: '48px',
-      borderRadius: '9999px',
-      marginLeft: '-4px',
-      marginRight: '-4px',
-      zIndex: 2,
-    }),
-  };
-
-  const capInnerRingStyle: React.CSSProperties = {
-    position: 'absolute',
-    top: isIcon ? '2px' : '10%',
-    left: isIcon ? '2px' : '8px',
-    right: isIcon ? '2px' : '8px',
-    bottom: isIcon ? '2px' : '10%',
-    borderRadius: '9999px',
-    border: '1px solid rgba(254,249,231,0.4)',
-    boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.5), inset 0 -1px 2px rgba(0,0,0,0.3)',
-    pointerEvents: 'none',
-  };
-
-  const glassContainerStyle: React.CSSProperties = {
-    position: 'relative',
-    overflow: 'hidden',
-    borderRadius: '9999px',
-    background: isIcon
-      ? 'linear-gradient(90deg, rgba(20,20,20,0.2) 0%, rgba(255,255,255,0.15) 25%, rgba(255,255,255,0.35) 50%, rgba(255,255,255,0.15) 75%, rgba(20,20,20,0.2) 100%)'
-      : 'linear-gradient(180deg, rgba(20,20,20,0.2) 0%, rgba(255,255,255,0.15) 25%, rgba(255,255,255,0.35) 50%, rgba(255,255,255,0.15) 75%, rgba(20,20,20,0.2) 100%)',
-    boxShadow:
-      'inset 0 4px 12px rgba(0,0,0,0.3), ' +
-      'inset 0 -4px 12px rgba(0,0,0,0.3), ' +
-      '0 6px 20px rgba(0,0,0,0.35)',
-    ...(isIcon ? {
-      flex: 1,
-      width: '100%',
-    } : {
-      flex: 1,
-      height: '100%',
-      zIndex: 1,
-    }),
-  };
-
-  const stripesBackgroundStyle: React.CSSProperties = {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background: isIcon
-      ? 'repeating-linear-gradient(45deg, #d0002a 0px, #d0002a 12px, white 12px, white 24px, #004080 24px, #004080 36px, white 36px, white 48px)'
-      : 'repeating-linear-gradient(135deg, #d0002a 0px, #d0002a 20px, white 20px, white 40px, #004080 40px, #004080 60px, white 60px, white 80px)',
-    animation: isIcon ? 'barberPoleRotateVertical 2.5s linear infinite' : 'barberPoleRotateHorizontal 2.5s linear infinite',
-    borderRadius: '9999px',
-  };
-
-  const glassHighlightStyle: React.CSSProperties = {
-    position: 'absolute',
-    top: 0,
-    left: isIcon ? '28%' : '0',
-    width: isIcon ? '18%' : '100%',
-    height: isIcon ? '100%' : '28%',
-    background: isIcon
-      ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.85) 50%, transparent 100%)'
-      : 'linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.85) 50%, transparent 100%)',
-    pointerEvents: 'none',
-    borderRadius: '9999px',
-  };
-
-  const glassInnerShadowStyle: React.CSSProperties = {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: '9999px',
-    boxShadow: 'inset 0 0 8px rgba(0,0,0,0.2)',
-    pointerEvents: 'none',
+      'inset 0 1px 2px rgba(255,255,255,0.8), inset 0 -2px 4px rgba(115,81,15,0.9)',
+    background:
+      'radial-gradient(circle at 30% 25%, rgba(255,255,255,0.9) 0%, rgba(240,212,120,0.4) 40%, rgba(133,96,24,0.9) 100%)',
   };
 
   return (
-    <>
-      <style>
-        {`
-          @keyframes barberPoleRotateVertical {
-            0% {
-              background-position: 0 0;
-            }
-            100% {
-              background-position: 0 48px;
-            }
-          }
-
-          @keyframes barberPoleRotateHorizontal {
-            0% {
-              background-position: 0 0;
-            }
-            100% {
-              background-position: 80px 0;
-            }
-          }
-        `}
-      </style>
-      <div style={containerStyle}>
-        {isIcon ? (
-          <>
-            <div style={capBaseStyle}>
-              <div style={capInnerRingStyle} />
-            </div>
-            <div style={glassContainerStyle}>
-              <div style={stripesBackgroundStyle} />
-              <div style={glassInnerShadowStyle} />
-              <div style={glassHighlightStyle} />
-            </div>
-            <div style={capBaseStyle}>
-              <div style={capInnerRingStyle} />
-            </div>
-          </>
-        ) : (
-          <>
-            <div style={capBaseStyle}>
-              <div style={capInnerRingStyle} />
-            </div>
-            <div style={glassContainerStyle}>
-              <div style={stripesBackgroundStyle} />
-              <div style={glassInnerShadowStyle} />
-              <div style={glassHighlightStyle} />
-            </div>
-            <div style={capBaseStyle}>
-              <div style={capInnerRingStyle} />
-            </div>
-          </>
-        )}
+    <div style={containerStyle} aria-hidden="true">
+      <div style={capBaseStyle}>
+        <div style={capInnerRing} />
       </div>
-    </>
+
+      <div style={glassStyle}>
+        <div style={stripesStyle} />
+        <div style={innerShadowStyle} />
+        <div style={highlightStyle} />
+      </div>
+
+      <div style={capBaseStyle}>
+        <div style={capInnerRing} />
+      </div>
+    </div>
   );
 }
