@@ -70,6 +70,7 @@ export default function Header() {
       { label: language === 'en' ? 'Services' : 'Servicios', path: '/owner/services', condition: userData?.role === 'OWNER' || userData?.can_manage_services },
       { label: language === 'en' ? 'Products' : 'Productos', path: '/owner/products', condition: userData?.role === 'OWNER' || userData?.can_manage_products },
       { label: language === 'en' ? 'Inventory Management' : 'Gestión de Inventario', path: '/owner/inventory', condition: userData?.role === 'OWNER' },
+      { label: language === 'en' ? 'Inventory Reports (Beta)' : 'Reportes de Inventario (Beta)', path: '/owner/inventory-reports', condition: userData?.role === 'OWNER' },
     ].filter(item => item.condition !== false),
   };
 

@@ -15,6 +15,7 @@ import OwnerClientsReport from './pages/OwnerClientsReport';
 import OwnerEngage from './pages/OwnerEngage';
 import OwnerBarbersTimeTracking from './pages/OwnerBarbersTimeTracking';
 import OwnerInventory from './pages/OwnerInventory';
+import OwnerInventoryReports from './pages/OwnerInventoryReports';
 import OwnerSmsSettings from './pages/OwnerSmsSettings';
 import ClientDetail from './pages/ClientDetail';
 import AppointmentDetail from './pages/AppointmentDetail';
@@ -76,6 +77,7 @@ function AppRoutes() {
       <Route path="/owner/clients-report" element={<ProtectedRoute allowedRole="OWNER"><OwnerClientsReport /></ProtectedRoute>} />
       <Route path="/owner/barbers-time-tracking" element={<ProtectedRoute allowedRole="OWNER"><OwnerBarbersTimeTracking /></ProtectedRoute>} />
       <Route path="/owner/inventory" element={<ProtectedRoute allowedRole="OWNER"><OwnerInventory /></ProtectedRoute>} />
+      <Route path="/owner/inventory-reports" element={<ProtectedRoute allowedRole="OWNER"><OwnerInventoryReports /></ProtectedRoute>} />
       <Route path="/owner/engage" element={<ProtectedRoute allowedRole="OWNER"><OwnerEngage /></ProtectedRoute>} />
       <Route path="/owner/sms-settings" element={<ProtectedRoute allowedRole="OWNER"><OwnerSmsSettings /></ProtectedRoute>} />
       <Route path="/owner/clients/:clientId" element={<ProtectedRoute allowedRole="OWNER"><ClientDetail /></ProtectedRoute>} />

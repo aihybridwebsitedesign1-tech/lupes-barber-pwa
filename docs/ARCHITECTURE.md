@@ -815,4 +815,385 @@ const serviceDueToShop = servicesTotal - serviceCommissionAmount;
 
 ---
 
+## Sprint: Inventory Management, Booking Rules & Settings (December 5, 2025)
+
+This sprint focused on three major areas: wiring up inventory management with automatic SALE transactions, enforcing booking rules via shop configuration, and building a Settings hub for shop owners to configure these rules.
+
+### Part 1: Inventory Management (MVP UI + Logic)
+
+#### 1.1 Inventory Management Page (`/owner/inventory`)
+
+**Location:** `src/pages/OwnerInventory.tsx`
+
+Displays all products with comprehensive stock information:
+- Product name, SKU, category, brand
+- Retail price, supply cost
+- Current stock, low/high thresholds
+- Status badge (OUT, LOW, OK)
+
+**Status Determination:**
+```typescript
+- current_stock <= 0 → OUT (red background)
+- 0 < current_stock <= low_stock_threshold → LOW (yellow background)
+- otherwise → OK (blue background)
+```
+
+**Visual Highlighting:**
+- Rows with OUT status: `#fff5f5` background
+- Rows with LOW status: `#fffef0` background
+- Normal rows: white background
+
+#### 1.2 Adjust Inventory Modal
+
+**Trigger:** "Adjust" button on each product row
+
+**Modal Fields:**
+- Product name (read-only)
+- Current quantity (read-only)
+- New quantity (number input, required)
+- Reason (textarea, optional)
+
+**Backend Logic:**
+1. Calculate delta = new_quantity - old_quantity
+2. Create `inventory_transactions` record:
+   - `type`: 'ADJUSTMENT'
+   - `quantity_change`: delta
+   - `stock_after`: new_quantity
+   - `reason`: user input or "Manual adjustment"
+   - `created_by_user_id`: current user
+3. Update `products.current_stock` to new_quantity
+4. Show success toast and refresh table
+
+#### 1.3 SALE Transactions on Product Sale
+
+**Location:** `src/components/PaymentModal.tsx` (lines 102-172)
+
+**Trigger:** When appointment is marked as completed/paid
+
+**Logic:**
+1. Check if `appointments.inventory_processed` is false (idempotency check)
+2. Fetch all `appointment_products` for the appointment
+3. For each product:
+   - Fetch current `current_stock`
+   - Calculate `newStock = current_stock - quantity`
+   - Create `inventory_transactions` record:
+     - `type`: 'SALE'
+     - `quantity_change`: -quantity (negative)
+     - `stock_after`: newStock
+     - `appointment_id`: appointment ID
+     - `created_by_user_id`: current user
+   - Update `products.current_stock` to newStock
+4. Set `appointments.inventory_processed = true`
+
+**Idempotency:**
+- New field `inventory_processed` (boolean, default false) added to `appointments` table
+- SALE transactions only created if `inventory_processed` is false
+- Prevents double-decrement if payment is processed twice
+
+**Migration:** `add_inventory_processed_flag.sql`
+
+#### 1.4 Inventory Reports (Beta) Page (`/owner/inventory-reports`)
+
+**Location:** `src/pages/OwnerInventoryReports.tsx`
+
+**Section 1: Valuation Summary**
+
+Three cards showing:
+1. **Total Retail Value:** Σ(current_stock × retail_price)
+2. **Total Cost Value:** Σ(current_stock × supply_cost)
+3. **Potential Gross Margin:** retail_value - cost_value
+
+**Section 2: Current Stock Snapshot**
+
+Read-only table showing:
+- Product name, SKU
+- Current stock
+- Status badge
+- Retail value (stock × price)
+- Cost value (stock × cost)
+
+**Future Enhancements (TODOs):**
+- CSV export for stock data
+- Shrinkage tracking report
+- Product performance analytics
+
+### Part 2: Booking Rules Enforcement
+
+#### 2.1 Booking Validation Helper
+
+**Location:** `src/lib/bookingRules.ts`
+
+**Functions:**
+
+1. **`getShopConfig()`**
+   - Fetches booking rule configuration from `shop_config` table
+   - Returns: `days_bookable_in_advance`, `min_book_ahead_hours`, `min_cancel_ahead_hours`, `client_booking_interval_minutes`
+
+2. **`validateBookingRules(startTime: Date, action: 'create' | 'cancel' | 'reschedule')`**
+   - Validates appointment time against configured rules
+   - Returns `BookingValidationError` or `null`
+
+**Validation Rules:**
+
+**For Create/Reschedule:**
+1. **Book-ahead window:** `startTime <= now + days_bookable_in_advance`
+2. **Minimum advance time:** `startTime >= now + min_book_ahead_hours`
+3. **Time slot intervals:** Minutes must be divisible by `client_booking_interval_minutes`
+
+**For Cancel/Reschedule:**
+1. **Cancellation deadline:** `(startTime - now) >= min_cancel_ahead_hours`
+
+**Error Messages:**
+- Bilingual (English/Spanish)
+- User-friendly explanations
+- Clear action items
+
+**Example:**
+```typescript
+const error = await validateBookingRules(new Date('2025-12-10T14:00:00'), 'create');
+// Returns: "Appointments must be booked at least 2 hour(s) in advance"
+```
+
+#### 2.2 Shop Config Fields Used
+
+**Table:** `shop_config`
+
+**Fields:**
+- `days_bookable_in_advance` (int, default 30): Max days to book ahead
+- `min_book_ahead_hours` (int, default 2): Min hours before appointment
+- `min_cancel_ahead_hours` (int, default 24): Min hours to allow cancellation
+- `client_booking_interval_minutes` (int, default 15): Time slot intervals (10/15/20/30/60)
+
+**Future Integration:**
+- Call `validateBookingRules()` from:
+  - Client-facing booking flow (when implemented)
+  - Owner/barber create appointment modals
+  - Cancellation/reschedule endpoints
+
+### Part 3: Settings Hub (Shop Configuration UI)
+
+#### 3.1 Settings Page Structure
+
+**Location:** `src/pages/OwnerSettings.tsx`
+
+**Layout:** Tabbed interface with three tabs
+
+**Tabs:**
+1. Shop Info
+2. Booking Rules
+3. Clients & Retention
+
+#### 3.2 Shop Info Tab
+
+**Fields:**
+- **Tax Rate (%)**: Sales tax applied to services/products
+- **Card Processing Fee (%)**: Fee for card transactions
+
+**Persistence:**
+- Updates `shop_config.tax_rate` (stored as decimal: input/100)
+- Updates `shop_config.card_processing_fee_rate`
+
+#### 3.3 Booking Rules Tab
+
+**Fields:**
+1. **Days Bookable in Advance** (1-365)
+   - Controls max booking window
+2. **Minimum Hours Before Booking** (0-72)
+   - Prevents last-minute bookings
+3. **Minimum Hours Before Cancellation** (0-72)
+   - Enforces cancellation policy
+4. **Booking Interval** (dropdown: 10, 15, 20, 30, 60 minutes)
+   - Controls available time slots
+
+**Persistence:**
+- Updates corresponding `shop_config` fields
+- Changes take effect immediately (no restart needed)
+- Used by `validateBookingRules()` function
+
+#### 3.4 Clients & Retention Tab
+
+**Fields:**
+1. **Visits to Become Regular Client** (1-20, default 3)
+   - Threshold for "regular" classification
+2. **Days Without Visit to Count as Lapsed** (1-365, default 90)
+   - Threshold for "lapsed" classification
+
+**Persistence:**
+- Updates `shop_config.regular_client_min_visits`
+- Updates `shop_config.lapsed_client_days`
+
+**Impact:**
+- Clients Report page (Retention & Acquisition)
+- Client segmentation logic
+- Marketing automation triggers (future)
+
+**UI Note:**
+- Blue info box explains which pages are affected
+- Encourages configuration before analyzing reports
+
+#### 3.5 Settings Navigation
+
+**Access:** Dropdown menu in main nav → Settings → Shop Settings
+
+**All settings persist to `shop_config` table (single row, ID = 1)**
+
+### Database Schema Changes
+
+#### New/Modified Tables
+
+**1. `appointments` (modified)**
+- Added: `inventory_processed` (boolean, default false)
+- Index: `idx_appointments_inventory_processed`
+
+**2. `inventory_transactions` (existing, now fully utilized)**
+- Used for SALE and ADJUSTMENT transactions
+- Fields: `product_id`, `type`, `quantity_change`, `stock_after`, `reason`, `appointment_id`, `created_by_user_id`
+
+**3. `shop_config` (existing, fields now configurable via UI)**
+- `days_bookable_in_advance`: Max booking window
+- `min_book_ahead_hours`: Minimum advance booking time
+- `min_cancel_ahead_hours`: Minimum cancellation notice
+- `client_booking_interval_minutes`: Time slot intervals
+- `regular_client_min_visits`: Regular client threshold
+- `lapsed_client_days`: Lapsed client threshold
+
+### Files Modified/Created
+
+**New Pages:**
+1. `src/pages/OwnerInventory.tsx` - Full inventory management (replaced stub)
+2. `src/pages/OwnerInventoryReports.tsx` - Valuation and stock snapshot
+3. `src/pages/OwnerSettings.tsx` - Tabbed settings hub (complete rewrite)
+
+**New Utilities:**
+1. `src/lib/bookingRules.ts` - Booking validation helper
+
+**Modified Components:**
+1. `src/components/PaymentModal.tsx` - Added SALE transaction logic (lines 102-172)
+2. `src/components/Header.tsx` - Added "Inventory Reports (Beta)" to dropdown
+
+**Modified Routes:**
+1. `src/App.tsx` - Added `/owner/inventory-reports` route
+
+**Migrations:**
+1. `add_inventory_processed_flag` - Added idempotency field to appointments
+
+### Removed Hard-Coded Values
+
+**Before Sprint:**
+- Commission rate: Hard-coded 50%
+- Regular client threshold: Hard-coded 2 visits
+- Lapsed client threshold: Hard-coded 90 days
+- Booking rules: Not enforced
+
+**After Sprint:**
+- Commission rate: Still hard-coded (TODO: per-barber configuration in Phase 8)
+- Regular/lapsed thresholds: Configurable via Settings → Clients & Retention
+- Booking rules: Configurable via Settings → Booking Rules
+- Inventory: Automatically tracked on product sales
+
+### Business Logic Summary
+
+#### Inventory Flow
+```
+1. Owner adjusts stock manually → ADJUSTMENT transaction created
+2. Appointment marked as paid → Check inventory_processed flag
+3. If not processed → For each product in appointment
+4. Create SALE transaction (quantity_change = -quantity)
+5. Decrement product.current_stock
+6. Set inventory_processed = true
+7. Display updated stock levels on Inventory page
+```
+
+#### Booking Rules Flow (Future)
+```
+1. User selects appointment time
+2. Call validateBookingRules(time, 'create')
+3. Check against shop_config rules
+4. If validation fails → Show friendly error message
+5. If validation passes → Allow booking
+```
+
+#### Settings Flow
+```
+1. Owner navigates to Settings
+2. Selects tab (Shop Info / Booking Rules / Retention)
+3. Updates field values
+4. Clicks "Save Changes"
+5. Updates shop_config table
+6. Shows success toast
+7. Changes take effect immediately
+```
+
+### TODOs & Future Work
+
+#### Inventory (Phase 7+)
+- [ ] Add low-stock email/SMS alerts
+- [ ] Implement CSV export for inventory reports
+- [ ] Build shrinkage tracking report
+- [ ] Add product performance analytics
+- [ ] Create PURCHASE transaction type for restocking
+- [ ] Implement barcode scanning for faster adjustments
+
+#### Booking Rules (Phase 6)
+- [ ] Integrate `validateBookingRules()` into client booking flow
+- [ ] Add validation to NewAppointmentModal
+- [ ] Add validation to EditAppointmentModal
+- [ ] Show friendly errors in UI (not just console)
+- [ ] Add override capability for OWNER role
+- [ ] Add "blackout dates" feature (holidays, closures)
+
+#### Settings (Phase 8+)
+- [ ] Add "Shop Details" sub-tab (name, address, phone, hours)
+- [ ] Add "Hours & Booking Rules" sub-tab (combine with existing)
+- [ ] Add "Payments & Fees" sub-tab (expand Shop Info)
+- [ ] Add "Notifications" sub-tab (SMS/email preferences)
+- [ ] Add "Languages" sub-tab (default language, enable/disable)
+- [ ] Add "Integrations" sub-tab (Google Calendar, Twilio, etc.)
+- [ ] Per-barber commission configuration
+- [ ] Commission tiers based on monthly sales
+
+#### Clients Report (Phase 6)
+- [ ] Update OwnerClientsReport to fetch thresholds from shop_config
+- [ ] Remove hard-coded REGULAR_MIN_VISITS = 2
+- [ ] Remove hard-coded LAPSED_DAYS = 90
+- [ ] Display current thresholds at top of page
+- [ ] Add "Configure" link to Settings → Clients & Retention tab
+
+### Known Limitations
+
+1. **Inventory Idempotency:** Relies on `inventory_processed` flag. If flag is manually reset, inventory will be decremented again. Consider using unique constraint or transaction logs.
+
+2. **Booking Rules Not Enforced Yet:** Validation function exists but not integrated into booking flows. Appointments can still be created outside configured windows.
+
+3. **Commission Still Hard-Coded:** 50% service commission is still hard-coded in PaymentModal. Needs per-barber configuration.
+
+4. **Settings Single Row Assumption:** Code assumes `shop_config` has exactly one row with ID = 1. Should add error handling for missing config.
+
+5. **No Negative Stock Prevention:** Products can go negative if more items are sold than in stock. Add validation to prevent this.
+
+6. **SALE Transactions on Edit:** If appointment products are edited after payment, inventory is not adjusted. Need logic to handle product changes post-payment.
+
+### Testing Recommendations
+
+**Inventory:**
+- [ ] Test manual adjustment (increase and decrease)
+- [ ] Test SALE transaction on appointment payment
+- [ ] Verify idempotency (pay same appointment twice)
+- [ ] Check valuation calculations
+- [ ] Verify status badges (OUT, LOW, OK)
+
+**Booking Rules:**
+- [ ] Call `validateBookingRules()` from browser console
+- [ ] Test all validation scenarios (too far, too soon, wrong interval)
+- [ ] Verify error messages in both languages
+- [ ] Confirm Settings changes affect validation immediately
+
+**Settings:**
+- [ ] Save each tab independently
+- [ ] Verify persistence (reload page, check values)
+- [ ] Test edge cases (negative values, max values)
+- [ ] Confirm bilingual labels
+
+---
+
 **End of Architecture Document**

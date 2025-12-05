@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 
 type PaymentModalProps = {
@@ -18,6 +19,7 @@ export default function PaymentModal({
   onSave,
 }: PaymentModalProps) {
   const { language, t } = useLanguage();
+  const { userData } = useAuth();
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card_in_shop' | 'card_online'>('cash');
   const [tipAmount, setTipAmount] = useState('0.00');
   const [cashBaseAmount, setCashBaseAmount] = useState('');
@@ -99,6 +101,14 @@ export default function PaymentModal({
       const serviceDueToBarber = serviceCommissionAmount;
       const serviceDueToShop = servicesTotal - serviceCommissionAmount;
 
+      const { data: existingApt } = await supabase
+        .from('appointments')
+        .select('inventory_processed')
+        .eq('id', appointmentId)
+        .single();
+
+      const alreadyProcessed = existingApt?.inventory_processed || false;
+
       const now = new Date().toISOString();
       const updateData = {
         services_total: servicesTotal,
@@ -116,6 +126,7 @@ export default function PaymentModal({
         service_commission_amount: serviceCommissionAmount,
         service_due_to_barber: serviceDueToBarber,
         service_due_to_shop: serviceDueToShop,
+        inventory_processed: true,
       };
 
       const { data: aptData, error: updateError } = await supabase
@@ -126,6 +137,41 @@ export default function PaymentModal({
         .single();
 
       if (updateError) throw updateError;
+
+      if (!alreadyProcessed) {
+        const { data: appointmentProducts } = await supabase
+          .from('appointment_products')
+          .select('product_id, quantity')
+          .eq('appointment_id', appointmentId);
+
+        if (appointmentProducts && appointmentProducts.length > 0) {
+          for (const ap of appointmentProducts) {
+            const { data: product } = await supabase
+              .from('products')
+              .select('current_stock')
+              .eq('id', ap.product_id)
+              .single();
+
+            if (product) {
+              const newStock = product.current_stock - ap.quantity;
+
+              await supabase.from('inventory_transactions').insert({
+                product_id: ap.product_id,
+                type: 'SALE',
+                quantity_change: -ap.quantity,
+                stock_after: newStock,
+                appointment_id: appointmentId,
+                created_by_user_id: userData?.id,
+              });
+
+              await supabase
+                .from('products')
+                .update({ current_stock: newStock })
+                .eq('id', ap.product_id);
+            }
+          }
+        }
+      }
 
       if (aptData) {
         const { data: client } = await supabase
