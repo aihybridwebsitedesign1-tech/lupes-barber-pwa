@@ -58,7 +58,9 @@ export default function ClientHome() {
         </section>
 
         <div style={{ maxWidth: '1200px', margin: '0 auto 2rem', padding: '0 2rem' }}>
-          <BarberPole variant="banner" height={50} />
+          <div style={{ marginLeft: '-2rem', marginRight: '-2rem' }}>
+            <BarberPole variant="banner" height={50} />
+          </div>
         </div>
 
         <section style={{ maxWidth: '1200px', margin: '0 auto', padding: '4rem 2rem' }}>
