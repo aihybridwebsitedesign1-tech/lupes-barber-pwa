@@ -12,7 +12,7 @@ export default function BarberPole({ variant = 'icon', height = 50 }: BarberPole
     alignItems: 'center',
     justifyContent: 'center',
     ...(isIcon ? {
-      width: `${height * 0.6}px`,
+      width: `${height * 0.36}px`,
       height: `${height}px`,
       flexDirection: 'column',
     } : {
@@ -24,28 +24,31 @@ export default function BarberPole({ variant = 'icon', height = 50 }: BarberPole
 
   const capStyle: React.CSSProperties = {
     position: 'relative',
-    background: 'linear-gradient(135deg, #f6c453 0%, #d4a017 50%, #b8860b 100%)',
-    boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.4), inset 0 -2px 4px rgba(0,0,0,0.4), 0 2px 4px rgba(0,0,0,0.3)',
+    background: 'radial-gradient(ellipse at center, #f9e7a5 0%, #e0b64a 40%, #b07b17 70%, #8b6914 100%)',
+    boxShadow: 'inset 0 2px 6px rgba(255,255,255,0.5), inset 0 -2px 6px rgba(0,0,0,0.4), 0 3px 8px rgba(0,0,0,0.35)',
     ...(isIcon ? {
       width: '100%',
-      height: '8px',
-      borderRadius: '4px',
+      height: '10px',
+      borderRadius: '9999px',
     } : {
-      width: '30px',
-      height: '100%',
-      minWidth: '30px',
+      width: '40px',
+      height: '120%',
+      minWidth: '40px',
+      borderRadius: '9999px',
     }),
   };
 
-  const tubeContainerStyle: React.CSSProperties = {
+  const glassContainerStyle: React.CSSProperties = {
     position: 'relative',
-    background: 'linear-gradient(90deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0.1) 100%)',
-    boxShadow: 'inset 0 0 8px rgba(0,0,0,0.2), 0 4px 8px rgba(0,0,0,0.2)',
+    background: isIcon
+      ? 'linear-gradient(90deg, rgba(0,0,0,0.15) 0%, rgba(255,255,255,0.1) 30%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0.1) 70%, rgba(0,0,0,0.15) 100%)'
+      : 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(255,255,255,0.1) 30%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0.1) 70%, rgba(0,0,0,0.15) 100%)',
+    boxShadow: 'inset 0 4px 12px rgba(0,0,0,0.25), inset 0 -4px 12px rgba(0,0,0,0.25), 0 6px 16px rgba(0,0,0,0.3)',
     overflow: 'hidden',
+    borderRadius: '9999px',
     ...(isIcon ? {
       flex: 1,
       width: '100%',
-      borderRadius: '4px',
     } : {
       flex: 1,
       height: '100%',
@@ -56,25 +59,23 @@ export default function BarberPole({ variant = 'icon', height = 50 }: BarberPole
     position: 'absolute',
     top: 0,
     left: 0,
-    width: '100%',
-    height: '100%',
+    width: isIcon ? '100%' : '200%',
+    height: isIcon ? '200%' : '100%',
     background: isIcon
-      ? 'repeating-linear-gradient(45deg, #dc143c 0px, #dc143c 10px, white 10px, white 20px, #003d7a 20px, #003d7a 30px, white 30px, white 40px)'
-      : 'repeating-linear-gradient(135deg, #dc143c 0px, #dc143c 15px, white 15px, white 30px, #003d7a 30px, #003d7a 45px, white 45px, white 60px)',
-    backgroundSize: isIcon ? '40px 40px' : '60px 60px',
+      ? 'repeating-linear-gradient(45deg, #d0002a 0px, #d0002a 12px, white 12px, white 24px, #004080 24px, #004080 36px, white 36px, white 48px)'
+      : 'repeating-linear-gradient(135deg, #d0002a 0px, #d0002a 20px, white 20px, white 40px, #004080 40px, #004080 60px, white 60px, white 80px)',
     animation: isIcon ? 'barberPoleRotateVertical 3s linear infinite' : 'barberPoleRotateHorizontal 3s linear infinite',
-    opacity: 0.9,
   };
 
   const glassHighlightStyle: React.CSSProperties = {
     position: 'absolute',
     top: 0,
-    left: isIcon ? '20%' : '0',
-    width: isIcon ? '30%' : '100%',
-    height: isIcon ? '100%' : '30%',
+    left: isIcon ? '25%' : '0',
+    width: isIcon ? '15%' : '100%',
+    height: isIcon ? '100%' : '25%',
     background: isIcon
-      ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.6) 50%, transparent 100%)'
-      : 'linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.6) 50%, transparent 100%)',
+      ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.8) 50%, transparent 100%)'
+      : 'linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.8) 50%, transparent 100%)',
     pointerEvents: 'none',
   };
 
@@ -84,19 +85,19 @@ export default function BarberPole({ variant = 'icon', height = 50 }: BarberPole
         {`
           @keyframes barberPoleRotateVertical {
             0% {
-              background-position: 0 0;
+              transform: translateY(0);
             }
             100% {
-              background-position: 0 40px;
+              transform: translateY(48px);
             }
           }
 
           @keyframes barberPoleRotateHorizontal {
             0% {
-              background-position: 0 0;
+              transform: translateX(0);
             }
             100% {
-              background-position: 60px 0;
+              transform: translateX(80px);
             }
           }
         `}
@@ -104,21 +105,21 @@ export default function BarberPole({ variant = 'icon', height = 50 }: BarberPole
       <div style={containerStyle}>
         {isIcon ? (
           <>
-            <div style={{ ...capStyle, borderRadius: '4px 4px 0 0' }} />
-            <div style={tubeContainerStyle}>
+            <div style={{ ...capStyle }} />
+            <div style={glassContainerStyle}>
               <div style={stripesStyle} />
               <div style={glassHighlightStyle} />
             </div>
-            <div style={{ ...capStyle, borderRadius: '0 0 4px 4px' }} />
+            <div style={{ ...capStyle }} />
           </>
         ) : (
           <>
-            <div style={{ ...capStyle, borderRadius: '8px 0 0 8px' }} />
-            <div style={tubeContainerStyle}>
+            <div style={{ ...capStyle }} />
+            <div style={glassContainerStyle}>
               <div style={stripesStyle} />
               <div style={glassHighlightStyle} />
             </div>
-            <div style={{ ...capStyle, borderRadius: '0 8px 8px 0' }} />
+            <div style={{ ...capStyle }} />
           </>
         )}
       </div>

@@ -57,7 +57,7 @@ export default function ClientHome() {
           </div>
         </section>
 
-        <div style={{ maxWidth: '1200px', margin: '2rem auto', padding: '0 2rem' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto 2rem', padding: '0 2rem' }}>
           <BarberPole variant="banner" height={50} />
         </div>
 
