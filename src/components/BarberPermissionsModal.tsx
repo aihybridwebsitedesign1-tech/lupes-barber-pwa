@@ -51,6 +51,7 @@ export default function BarberPermissionsModal({
   }, [barberId]);
 
   const loadBarberData = async () => {
+    setLoading(true);
     try {
       const { data, error } = await supabase
         .from('users')
@@ -180,6 +181,8 @@ export default function BarberPermissionsModal({
       }
 
       console.log('Update successful, data returned:', updateData);
+
+      await loadBarberData();
 
       alert(
         language === 'en'
