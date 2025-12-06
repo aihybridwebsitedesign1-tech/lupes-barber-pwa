@@ -119,10 +119,10 @@ export default function OwnerClientsReport() {
               ? 'Acquisition channels and retention metrics for all active clients.'
               : 'Canales de adquisición y métricas de retención para todos los clientes activos.'}
           </p>
-          <p style={{ fontSize: '13px', color: '#999', fontStyle: 'italic' }}>
+          <p style={{ fontSize: '13px', color: '#666' }}>
             {language === 'en'
-              ? `TODO: Retention thresholds (${REGULAR_MIN_VISITS} visits, ${LAPSED_DAYS} days) will be configurable in Settings later.`
-              : `TODO: Los umbrales de retención (${REGULAR_MIN_VISITS} visitas, ${LAPSED_DAYS} días) serán configurables en Configuración más tarde.`}
+              ? `Retention thresholds: ${REGULAR_MIN_VISITS} visits for regular status, ${LAPSED_DAYS} days to mark as lapsed.`
+              : `Umbrales de retención: ${REGULAR_MIN_VISITS} visitas para estado regular, ${LAPSED_DAYS} días para marcar como inactivo.`}
           </p>
         </div>
 

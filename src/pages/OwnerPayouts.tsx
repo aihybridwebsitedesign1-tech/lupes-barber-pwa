@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import Header from '../components/Header';
+import RecordPayoutModal from '../components/RecordPayoutModal';
+import { exportToCSV } from '../lib/csvExport';
 
 type BarberPayout = {
   barberId: string;
@@ -13,13 +15,28 @@ type BarberPayout = {
   totalTips: number;
   commissionDueToBarber: number;
   dueToShop: number;
+  payoutsRecorded: number;
+  balanceDue: number;
+};
+
+type PayoutRecord = {
+  id: string;
+  barber_id: string;
+  barber_name: string;
+  amount: number;
+  method: string;
+  date_paid: string;
+  notes: string | null;
 };
 
 export default function OwnerPayouts() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [payouts, setPayouts] = useState<BarberPayout[]>([]);
+  const [payoutRecords, setPayoutRecords] = useState<PayoutRecord[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showRecordModal, setShowRecordModal] = useState(false);
+  const [selectedBarber, setSelectedBarber] = useState<{ id: string; name: string } | null>(null);
   const { language } = useLanguage();
   const { userData } = useAuth();
   const navigate = useNavigate();
@@ -59,6 +76,29 @@ export default function OwnerPayouts() {
         .gte('completed_at', startDateTime)
         .lte('completed_at', endDateTime);
 
+      const { data: payoutData } = await supabase
+        .from('payouts')
+        .select('*, users!payouts_barber_id_fkey(name)')
+        .gte('date_paid', startDate)
+        .lte('date_paid', endDate)
+        .order('date_paid', { ascending: false });
+
+      const records: PayoutRecord[] = (payoutData || []).map((p) => ({
+        id: p.id,
+        barber_id: p.barber_id,
+        barber_name: p.users?.name || 'Unknown',
+        amount: p.amount,
+        method: p.method,
+        date_paid: p.date_paid,
+        notes: p.notes,
+      }));
+      setPayoutRecords(records);
+
+      const payoutsByBarber = new Map<string, number>();
+      records.forEach((p) => {
+        payoutsByBarber.set(p.barber_id, (payoutsByBarber.get(p.barber_id) || 0) + p.amount);
+      });
+
       const barberMap = new Map<string, BarberPayout>();
 
       (appointments || []).forEach((apt) => {
@@ -74,6 +114,8 @@ export default function OwnerPayouts() {
             totalTips: 0,
             commissionDueToBarber: 0,
             dueToShop: 0,
+            payoutsRecorded: 0,
+            balanceDue: 0,
           });
         }
 
@@ -85,6 +127,11 @@ export default function OwnerPayouts() {
         entry.dueToShop += Number(apt.service_due_to_shop || 0);
       });
 
+      barberMap.forEach((entry, barberId) => {
+        entry.payoutsRecorded = payoutsByBarber.get(barberId) || 0;
+        entry.balanceDue = entry.commissionDueToBarber - entry.payoutsRecorded;
+      });
+
       setPayouts(Array.from(barberMap.values()).sort((a, b) =>
         b.commissionDueToBarber - a.commissionDueToBarber
       ));
@@ -93,6 +140,35 @@ export default function OwnerPayouts() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRecordPayout = (barberId: string, barberName: string) => {
+    setSelectedBarber({ id: barberId, name: barberName });
+    setShowRecordModal(true);
+  };
+
+  const handlePayoutSuccess = () => {
+    setShowRecordModal(false);
+    setSelectedBarber(null);
+    loadPayouts();
+  };
+
+  const handleExportPayouts = () => {
+    const exportData = payoutRecords.map((p) => ({
+      barber: p.barber_name,
+      date_paid: new Date(p.date_paid).toLocaleDateString(),
+      amount: p.amount,
+      method: p.method,
+      notes: p.notes || '',
+    }));
+
+    exportToCSV(exportData, 'payout-history', {
+      barber: 'Barber',
+      date_paid: 'Date Paid',
+      amount: 'Amount',
+      method: 'Method',
+      notes: 'Notes',
+    });
   };
 
   if (!userData || userData.role !== 'OWNER') {
@@ -106,27 +182,24 @@ export default function OwnerPayouts() {
       totalTips: acc.totalTips + p.totalTips,
       commissionDueToBarber: acc.commissionDueToBarber + p.commissionDueToBarber,
       dueToShop: acc.dueToShop + p.dueToShop,
+      payoutsRecorded: acc.payoutsRecorded + p.payoutsRecorded,
+      balanceDue: acc.balanceDue + p.balanceDue,
     }),
-    { servicesRevenue: 0, productsRevenue: 0, totalTips: 0, commissionDueToBarber: 0, dueToShop: 0 }
+    { servicesRevenue: 0, productsRevenue: 0, totalTips: 0, commissionDueToBarber: 0, dueToShop: 0, payoutsRecorded: 0, balanceDue: 0 }
   );
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
       <Header />
-      <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '1rem' }}>
+      <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '1rem' }}>
         <div style={{ marginBottom: '1.5rem' }}>
           <h2 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '0.5rem' }}>
-            {language === 'en' ? 'Payouts (Beta)' : 'Pagos (Beta)'}
+            {language === 'en' ? 'Payouts' : 'Pagos'}
           </h2>
-          <p style={{ fontSize: '14px', color: '#666', marginBottom: '1rem' }}>
+          <p style={{ fontSize: '14px', color: '#666' }}>
             {language === 'en'
-              ? 'Commission breakdown by barber for completed, paid appointments.'
-              : 'Desglose de comisiones por barbero para citas completadas y pagadas.'}
-          </p>
-          <p style={{ fontSize: '13px', color: '#999', fontStyle: 'italic' }}>
-            {language === 'en'
-              ? 'TODO: Add CSV export and more detailed breakdown later.'
-              : 'TODO: Agregar exportación CSV y desglose más detallado después.'}
+              ? 'Track commission earnings, record payouts, and manage balances for your barbers.'
+              : 'Rastrea ganancias por comisión, registra pagos y administra saldos para tus barberos.'}
           </p>
         </div>
 
@@ -208,7 +281,7 @@ export default function OwnerPayouts() {
         ) : (
           <div style={{ backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '800px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1000px' }}>
                 <thead style={{ backgroundColor: '#f9f9f9' }}>
                   <tr>
                     <th style={{ padding: '1rem', textAlign: 'left', fontSize: '14px', fontWeight: '500' }}>
@@ -224,10 +297,16 @@ export default function OwnerPayouts() {
                       {language === 'en' ? 'Tips' : 'Propinas'}
                     </th>
                     <th style={{ padding: '1rem', textAlign: 'right', fontSize: '14px', fontWeight: '500', backgroundColor: '#e8f5e9' }}>
-                      {language === 'en' ? 'Due to Barber' : 'Debido al Barbero'}
+                      {language === 'en' ? 'Commission Due' : 'Comisión Debida'}
                     </th>
-                    <th style={{ padding: '1rem', textAlign: 'right', fontSize: '14px', fontWeight: '500', backgroundColor: '#fff3e0' }}>
-                      {language === 'en' ? 'Due to Shop' : 'Debido a la Tienda'}
+                    <th style={{ padding: '1rem', textAlign: 'right', fontSize: '14px', fontWeight: '500', backgroundColor: '#e3f2fd' }}>
+                      {language === 'en' ? 'Payouts Recorded' : 'Pagos Registrados'}
+                    </th>
+                    <th style={{ padding: '1rem', textAlign: 'right', fontSize: '14px', fontWeight: '500', backgroundColor: '#fff9c4' }}>
+                      {language === 'en' ? 'Balance Due' : 'Saldo Debido'}
+                    </th>
+                    <th style={{ padding: '1rem', textAlign: 'center', fontSize: '14px', fontWeight: '500' }}>
+                      {language === 'en' ? 'Actions' : 'Acciones'}
                     </th>
                   </tr>
                 </thead>
@@ -249,8 +328,28 @@ export default function OwnerPayouts() {
                       <td style={{ padding: '1rem', textAlign: 'right', fontSize: '14px', fontWeight: '500', backgroundColor: '#f1f8f4' }}>
                         ${payout.commissionDueToBarber.toFixed(2)}
                       </td>
-                      <td style={{ padding: '1rem', textAlign: 'right', fontSize: '14px', fontWeight: '500', backgroundColor: '#fff9f0' }}>
-                        ${payout.dueToShop.toFixed(2)}
+                      <td style={{ padding: '1rem', textAlign: 'right', fontSize: '14px', fontWeight: '500', backgroundColor: '#e3f2fd' }}>
+                        ${payout.payoutsRecorded.toFixed(2)}
+                      </td>
+                      <td style={{ padding: '1rem', textAlign: 'right', fontSize: '14px', fontWeight: '500', backgroundColor: '#fffbec' }}>
+                        ${payout.balanceDue.toFixed(2)}
+                      </td>
+                      <td style={{ padding: '1rem', textAlign: 'center' }}>
+                        <button
+                          onClick={() => handleRecordPayout(payout.barberId, payout.barberName)}
+                          style={{
+                            padding: '0.5rem 1rem',
+                            backgroundColor: '#16a34a',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            fontSize: '13px',
+                            fontWeight: '500',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {language === 'en' ? 'Record Payout' : 'Registrar Pago'}
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -271,25 +370,98 @@ export default function OwnerPayouts() {
                       <td style={{ padding: '1rem', textAlign: 'right', fontSize: '14px', fontWeight: 'bold', backgroundColor: '#e8f5e9' }}>
                         ${totals.commissionDueToBarber.toFixed(2)}
                       </td>
-                      <td style={{ padding: '1rem', textAlign: 'right', fontSize: '14px', fontWeight: 'bold', backgroundColor: '#fff3e0' }}>
-                        ${totals.dueToShop.toFixed(2)}
+                      <td style={{ padding: '1rem', textAlign: 'right', fontSize: '14px', fontWeight: 'bold', backgroundColor: '#e3f2fd' }}>
+                        ${totals.payoutsRecorded.toFixed(2)}
                       </td>
+                      <td style={{ padding: '1rem', textAlign: 'right', fontSize: '14px', fontWeight: 'bold', backgroundColor: '#fff9c4' }}>
+                        ${totals.balanceDue.toFixed(2)}
+                      </td>
+                      <td style={{ padding: '1rem' }}></td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
 
-            {payouts.length > 0 && (
-              <div style={{ padding: '1rem', backgroundColor: '#f9f9f9', fontSize: '12px', color: '#666' }}>
-                <p style={{ margin: 0 }}>
-                  {language === 'en'
-                    ? 'Current commission rate: 50% of services revenue. Product commissions and tiered rates coming in Phase 7.'
-                    : 'Tasa de comisión actual: 50% de ingresos por servicios. Comisiones de productos y tasas escalonadas próximamente en Fase 7.'}
-                </p>
-              </div>
-            )}
           </div>
+        )}
+
+        {payoutRecords.length > 0 && (
+          <div style={{ backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', overflow: 'hidden', marginTop: '1.5rem' }}>
+            <div style={{ padding: '1.5rem', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '20px', fontWeight: '600', margin: 0 }}>
+                {language === 'en' ? 'Payout History' : 'Historial de Pagos'}
+              </h3>
+              <button
+                onClick={handleExportPayouts}
+                style={{
+                  padding: '0.5rem 1rem',
+                  backgroundColor: '#fff',
+                  color: '#000',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                }}
+              >
+                {language === 'en' ? 'Export CSV' : 'Exportar CSV'}
+              </button>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead style={{ backgroundColor: '#f9f9f9' }}>
+                  <tr>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '13px', fontWeight: '500' }}>
+                      {language === 'en' ? 'Date' : 'Fecha'}
+                    </th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '13px', fontWeight: '500' }}>
+                      {language === 'en' ? 'Barber' : 'Barbero'}
+                    </th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'right', fontSize: '13px', fontWeight: '500' }}>
+                      {language === 'en' ? 'Amount' : 'Cantidad'}
+                    </th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '13px', fontWeight: '500' }}>
+                      {language === 'en' ? 'Method' : 'Método'}
+                    </th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '13px', fontWeight: '500' }}>
+                      {language === 'en' ? 'Notes' : 'Notas'}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {payoutRecords.map((record) => (
+                    <tr key={record.id} style={{ borderBottom: '1px solid #eee' }}>
+                      <td style={{ padding: '0.75rem 1rem', fontSize: '13px' }}>
+                        {new Date(record.date_paid).toLocaleDateString()}
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem', fontSize: '13px', fontWeight: '500' }}>
+                        {record.barber_name}
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontSize: '13px', fontWeight: '500' }}>
+                        ${record.amount.toFixed(2)}
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem', fontSize: '13px' }}>
+                        {record.method}
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem', fontSize: '13px', color: '#666' }}>
+                        {record.notes || '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {showRecordModal && selectedBarber && (
+          <RecordPayoutModal
+            barberId={selectedBarber.id}
+            barberName={selectedBarber.name}
+            onClose={() => setShowRecordModal(false)}
+            onSuccess={handlePayoutSuccess}
+          />
         )}
       </main>
     </div>

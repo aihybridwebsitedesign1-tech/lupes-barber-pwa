@@ -5,6 +5,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import Header from '../components/Header';
 import PaymentStatusBadge from '../components/PaymentStatusBadge';
+import BarberTimeClockCard from '../components/BarberTimeClockCard';
 
 type AppointmentWithDetails = {
   id: string;
@@ -204,11 +205,14 @@ export default function BarberToday() {
           <p style={{ color: '#666', fontSize: '16px' }}>{formatDate()}</p>
         </div>
 
+        <BarberTimeClockCard barberId={userData!.id} />
+
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
           gap: '1rem',
           marginBottom: '2rem',
+          marginTop: '2rem',
         }}>
           <div style={{
             backgroundColor: 'white',
