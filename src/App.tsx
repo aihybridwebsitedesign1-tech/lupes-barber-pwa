@@ -36,7 +36,28 @@ function ProtectedRoute({ children, allowedRole }: { children: JSX.Element; allo
   const { user, userData, loading, error } = useAuth();
 
   if (loading) {
-    return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading...</div>;
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#f5f5f5'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: '48px',
+            height: '48px',
+            border: '4px solid #e5e7eb',
+            borderTopColor: '#000',
+            borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite',
+            margin: '0 auto 1rem'
+          }} />
+          <p style={{ color: '#666', fontSize: '16px' }}>Loading...</p>
+        </div>
+      </div>
+    );
   }
 
   if (error) {
@@ -66,7 +87,28 @@ function AppRoutes() {
   const { user, userData, loading } = useAuth();
 
   if (loading) {
-    return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading...</div>;
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#f5f5f5'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: '48px',
+            height: '48px',
+            border: '4px solid #e5e7eb',
+            borderTopColor: '#000',
+            borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite',
+            margin: '0 auto 1rem'
+          }} />
+          <p style={{ color: '#666', fontSize: '16px' }}>Loading...</p>
+        </div>
+      </div>
+    );
   }
 
   return (

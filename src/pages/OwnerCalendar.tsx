@@ -134,6 +134,13 @@ export default function OwnerCalendar() {
     return slots;
   };
 
+  const formatTimeSlot = (slot: string) => {
+    const hour = parseInt(slot.split(':')[0]);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const hour12 = hour % 12 || 12;
+    return `${hour12}:00 ${ampm}`;
+  };
+
   const getAppointmentsForDayAndHour = (date: Date, hour: number) => {
     return appointments.filter(apt => {
       const start = new Date(apt.scheduled_start);
@@ -314,7 +321,7 @@ export default function OwnerCalendar() {
                       zIndex: 10,
                     }}
                   >
-                    {slot}
+                    {formatTimeSlot(slot)}
                   </div>
                   {weekDays.map((day, dayIdx) => {
                     const hour = parseInt(slot.split(':')[0]);

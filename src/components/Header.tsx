@@ -1,216 +1,103 @@
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 
-type DropdownItem = {
+type MenuItem = {
   label: string;
   path: string;
   condition?: boolean;
 };
 
-type DropdownMenu = {
+type MenuSection = {
   label: string;
-  items: DropdownItem[];
+  items: MenuItem[];
 };
 
 export default function Header() {
   const { userData, signOut } = useAuth();
   const { language, setLanguage, t } = useLanguage();
   const navigate = useNavigate();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-  const [activeDesktopDropdown, setActiveDesktopDropdown] = useState<string | null>(null);
-  const [activeMobileDropdown, setActiveMobileDropdown] = useState<string | null>(null);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState<string | null>(null);
 
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 1100);
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isMenuOpen) {
+        setIsMenuOpen(false);
+      }
     };
 
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+    if (isMenuOpen) {
+      document.addEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'hidden';
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'unset';
+    };
+  }, [isMenuOpen]);
 
   const handleSignOut = async () => {
+    setIsMenuOpen(false);
     await signOut();
     navigate('/login');
   };
 
+  const handleNavigate = (path: string) => {
+    setIsMenuOpen(false);
+    setActiveSection(null);
+    navigate(path);
+  };
+
   const isOwner = userData?.role === 'OWNER';
 
-  const clientsMenu: DropdownMenu = {
-    label: language === 'en' ? 'Clients' : 'Clientes',
-    items: [
-      { label: language === 'en' ? 'Clients List' : 'Lista de Clientes', path: '/owner/clients' },
-      { label: language === 'en' ? 'Retention & Acquisition' : 'Retención y Adquisición', path: '/owner/clients-report' },
-    ],
-  };
-
-  const barbersMenu: DropdownMenu = {
-    label: language === 'en' ? 'Barbers' : 'Barberos',
-    items: [
-      { label: language === 'en' ? 'Barbers List' : 'Lista de Barberos', path: '/owner/barbers' },
-      { label: language === 'en' ? 'Time Tracking' : 'Seguimiento de Tiempo', path: '/owner/barbers-time-tracking' },
-    ],
-  };
-
-  const analyticsMenu: DropdownMenu = {
-    label: language === 'en' ? 'Analytics' : 'Análisis',
-    items: [
-      { label: language === 'en' ? 'Overview Reports' : 'Reportes Generales', path: '/owner/reports', condition: userData?.role === 'OWNER' || userData?.can_view_shop_reports },
-      { label: language === 'en' ? 'Payouts (Commissions)' : 'Pagos (Comisiones)', path: '/owner/payouts', condition: userData?.role === 'OWNER' },
-    ].filter(item => item.condition !== false),
-  };
-
-  const inventoryMenu: DropdownMenu = {
-    label: language === 'en' ? 'Inventory & Sales' : 'Inventario y Ventas',
-    items: [
-      { label: language === 'en' ? 'Services' : 'Servicios', path: '/owner/services', condition: userData?.role === 'OWNER' || userData?.can_manage_services },
-      { label: language === 'en' ? 'Products' : 'Productos', path: '/owner/products', condition: userData?.role === 'OWNER' || userData?.can_manage_products },
-      { label: language === 'en' ? 'Inventory Management' : 'Gestión de Inventario', path: '/owner/inventory', condition: userData?.role === 'OWNER' },
-      { label: language === 'en' ? 'Inventory Reports (Beta)' : 'Reportes de Inventario (Beta)', path: '/owner/inventory-reports', condition: userData?.role === 'OWNER' },
-    ].filter(item => item.condition !== false),
-  };
-
-  const messagesMenu: DropdownMenu = {
-    label: language === 'en' ? 'Messages' : 'Mensajes',
-    items: [
-      { label: language === 'en' ? 'SMS Campaigns (Engage)' : 'Campañas SMS (Engage)', path: '/owner/engage' },
-      { label: language === 'en' ? 'Templates & Automations' : 'Plantillas y Automatizaciones', path: '/owner/sms-settings' },
-    ],
-  };
-
-  const settingsMenu: DropdownMenu = {
-    label: language === 'en' ? 'Settings' : 'Configuración',
-    items: [
-      { label: language === 'en' ? 'Shop Settings' : 'Configuración de Tienda', path: '/owner/settings' },
-    ],
-  };
-
-  const renderDropdown = (menu: DropdownMenu, isDesktop: boolean) => {
-    const isActive = isDesktop
-      ? activeDesktopDropdown === menu.label
-      : activeMobileDropdown === menu.label;
-
-    if (isDesktop) {
-      return (
-        <div
-          key={menu.label}
-          style={{ position: 'relative' }}
-          onMouseEnter={() => setActiveDesktopDropdown(menu.label)}
-          onMouseLeave={() => setActiveDesktopDropdown(null)}
-        >
-          <button
-            style={{
-              color: 'white',
-              textDecoration: 'none',
-              padding: '0.5rem 0.75rem',
-              whiteSpace: 'nowrap',
-              fontSize: '14px',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.25rem',
-            }}
-          >
-            {menu.label}
-            <span style={{ fontSize: '10px' }}>▾</span>
-          </button>
-          {isActive && (
-            <div
-              style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                backgroundColor: '#1a1a1a',
-                boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
-                borderRadius: '4px',
-                minWidth: '200px',
-                zIndex: 1000,
-                marginTop: '0.25rem',
-              }}
-            >
-              {menu.items.map((item) => (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  style={{
-                    display: 'block',
-                    color: 'white',
-                    textDecoration: 'none',
-                    padding: '0.75rem 1rem',
-                    fontSize: '14px',
-                    borderBottom: '1px solid rgba(255,255,255,0.1)',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-      );
-    } else {
-      return (
-        <div key={menu.label}>
-          <button
-            onClick={() => setActiveMobileDropdown(isActive ? null : menu.label)}
-            style={{
-              width: '100%',
-              textAlign: 'left',
-              color: 'white',
-              background: 'none',
-              border: 'none',
-              padding: '1rem',
-              borderBottom: '1px solid rgba(255,255,255,0.1)',
-              fontSize: '16px',
-              cursor: 'pointer',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            {menu.label}
-            <span style={{ fontSize: '12px', transform: isActive ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>▾</span>
-          </button>
-          {isActive && (
-            <div style={{ backgroundColor: '#0a0a0a' }}>
-              {menu.items.map((item) => (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  onClick={() => {
-                    setIsMobileMenuOpen(false);
-                    setActiveMobileDropdown(null);
-                  }}
-                  style={{
-                    display: 'block',
-                    color: 'rgba(255,255,255,0.8)',
-                    textDecoration: 'none',
-                    padding: '0.75rem 1rem 0.75rem 2rem',
-                    fontSize: '14px',
-                    borderBottom: '1px solid rgba(255,255,255,0.05)',
-                  }}
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-      );
-    }
-  };
+  const ownerMenuSections: MenuSection[] = [
+    {
+      label: language === 'en' ? 'Clients' : 'Clientes',
+      items: [
+        { label: language === 'en' ? 'Clients List' : 'Lista de Clientes', path: '/owner/clients' },
+        { label: language === 'en' ? 'Retention & Acquisition' : 'Retención y Adquisición', path: '/owner/clients-report' },
+      ],
+    },
+    {
+      label: language === 'en' ? 'Barbers' : 'Barberos',
+      items: [
+        { label: language === 'en' ? 'Barbers List' : 'Lista de Barberos', path: '/owner/barbers' },
+        { label: language === 'en' ? 'Time Tracking' : 'Seguimiento de Tiempo', path: '/owner/barbers-time-tracking' },
+      ],
+    },
+    {
+      label: language === 'en' ? 'Analytics' : 'Análisis',
+      items: [
+        { label: language === 'en' ? 'Overview Reports' : 'Reportes Generales', path: '/owner/reports', condition: userData?.role === 'OWNER' || userData?.can_view_shop_reports },
+        { label: language === 'en' ? 'Payouts (Commissions)' : 'Pagos (Comisiones)', path: '/owner/payouts', condition: userData?.role === 'OWNER' },
+      ].filter(item => item.condition !== false),
+    },
+    {
+      label: language === 'en' ? 'Inventory & Sales' : 'Inventario y Ventas',
+      items: [
+        { label: language === 'en' ? 'Services' : 'Servicios', path: '/owner/services', condition: userData?.role === 'OWNER' || userData?.can_manage_services },
+        { label: language === 'en' ? 'Products' : 'Productos', path: '/owner/products', condition: userData?.role === 'OWNER' || userData?.can_manage_products },
+        { label: language === 'en' ? 'Inventory Management' : 'Gestión de Inventario', path: '/owner/inventory', condition: userData?.role === 'OWNER' },
+        { label: language === 'en' ? 'Inventory Reports' : 'Reportes de Inventario', path: '/owner/inventory-reports', condition: userData?.role === 'OWNER' },
+      ].filter(item => item.condition !== false),
+    },
+    {
+      label: language === 'en' ? 'Messages' : 'Mensajes',
+      items: [
+        { label: language === 'en' ? 'SMS Campaigns' : 'Campañas SMS', path: '/owner/engage' },
+        { label: language === 'en' ? 'Templates & Automations' : 'Plantillas y Automatizaciones', path: '/owner/sms-settings' },
+      ],
+    },
+    {
+      label: language === 'en' ? 'Settings' : 'Configuración',
+      items: [
+        { label: language === 'en' ? 'Shop Settings' : 'Configuración de Tienda', path: '/owner/settings' },
+      ],
+    },
+  ];
 
   return (
     <>
@@ -218,351 +105,306 @@ export default function Header() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', maxWidth: '1400px', margin: '0 auto', gap: '1rem', width: '100%' }}>
           <h1 style={{ fontSize: '20px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>Lupe's Barber</h1>
 
-          {!isMobile && userData && (
-            <>
-              <nav style={{ display: 'flex', gap: '0.5rem', flex: '1', minWidth: 0, alignItems: 'center' }}>
-                {isOwner ? (
-                  <>
-                    <Link
-                      to="/owner/today"
-                      style={{
-                        color: 'white',
-                        textDecoration: 'none',
-                        padding: '0.5rem 0.75rem',
-                        borderRadius: '4px',
-                        backgroundColor: 'rgba(255,255,255,0.1)',
-                        whiteSpace: 'nowrap',
-                        fontSize: '14px',
-                      }}
-                    >
-                      {t.today}
-                    </Link>
-                    <Link
-                      to="/owner/calendar"
-                      style={{
-                        color: 'white',
-                        textDecoration: 'none',
-                        padding: '0.5rem 0.75rem',
-                        whiteSpace: 'nowrap',
-                        fontSize: '14px',
-                      }}
-                    >
-                      {language === 'en' ? 'Calendar' : 'Calendario'}
-                    </Link>
-                    <Link
-                      to="/owner/appointments"
-                      style={{
-                        color: 'white',
-                        textDecoration: 'none',
-                        padding: '0.5rem 0.75rem',
-                        whiteSpace: 'nowrap',
-                        fontSize: '14px',
-                      }}
-                    >
-                      {language === 'en' ? 'Appointments' : 'Citas'}
-                    </Link>
-                    {renderDropdown(clientsMenu, true)}
-                    {renderDropdown(barbersMenu, true)}
-                    {analyticsMenu.items.length > 0 && renderDropdown(analyticsMenu, true)}
-                    {inventoryMenu.items.length > 0 && renderDropdown(inventoryMenu, true)}
-                    {renderDropdown(messagesMenu, true)}
-                    <div style={{ flex: 1 }} />
-                    {renderDropdown(settingsMenu, true)}
-                  </>
-                ) : (
-                  <>
-                    <Link
-                      to="/barber/today"
-                      style={{
-                        color: 'white',
-                        textDecoration: 'none',
-                        padding: '0.5rem 0.75rem',
-                        borderRadius: '4px',
-                        backgroundColor: 'rgba(255,255,255,0.1)',
-                        whiteSpace: 'nowrap',
-                        fontSize: '14px',
-                      }}
-                    >
-                      {t.today}
-                    </Link>
-                    <Link
-                      to="/barber/calendar"
-                      style={{
-                        color: 'white',
-                        textDecoration: 'none',
-                        padding: '0.5rem 0.75rem',
-                        whiteSpace: 'nowrap',
-                        fontSize: '14px',
-                      }}
-                    >
-                      {language === 'en' ? 'Calendar' : 'Calendario'}
-                    </Link>
-                    {userData.can_view_own_stats && (
-                      <Link
-                        to="/barber/stats"
-                        style={{
-                          color: 'white',
-                          textDecoration: 'none',
-                          padding: '0.5rem 0.75rem',
-                          whiteSpace: 'nowrap',
-                          fontSize: '14px',
-                        }}
-                      >
-                        {language === 'en' ? 'My Earnings' : 'Mis Ganancias'}
-                      </Link>
-                    )}
-                  </>
-                )}
-              </nav>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
-                <div style={{ display: 'flex', gap: '0.25rem' }}>
-                  <button
-                    onClick={() => setLanguage('en')}
-                    style={{
-                      padding: '0.25rem 0.5rem',
-                      backgroundColor: language === 'en' ? 'white' : 'transparent',
-                      color: language === 'en' ? '#000' : 'white',
-                      border: '1px solid white',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '12px',
-                      minWidth: '32px',
-                    }}
-                  >
-                    EN
-                  </button>
-                  <button
-                    onClick={() => setLanguage('es')}
-                    style={{
-                      padding: '0.25rem 0.5rem',
-                      backgroundColor: language === 'es' ? 'white' : 'transparent',
-                      color: language === 'es' ? '#000' : 'white',
-                      border: '1px solid white',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '12px',
-                      minWidth: '32px',
-                    }}
-                  >
-                    ES
-                  </button>
-                </div>
-
+          {userData && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div style={{ display: 'flex', gap: '0.25rem' }}>
                 <button
-                  onClick={handleSignOut}
+                  onClick={() => setLanguage('en')}
                   style={{
-                    padding: '0.5rem 0.75rem',
-                    backgroundColor: '#fff',
-                    color: '#000',
-                    border: 'none',
+                    padding: '0.25rem 0.5rem',
+                    backgroundColor: language === 'en' ? 'white' : 'transparent',
+                    color: language === 'en' ? '#000' : 'white',
+                    border: '1px solid white',
                     borderRadius: '4px',
                     cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    whiteSpace: 'nowrap',
+                    fontSize: '12px',
+                    minWidth: '32px',
                   }}
                 >
-                  {t.logout}
+                  EN
+                </button>
+                <button
+                  onClick={() => setLanguage('es')}
+                  style={{
+                    padding: '0.25rem 0.5rem',
+                    backgroundColor: language === 'es' ? 'white' : 'transparent',
+                    color: language === 'es' ? '#000' : 'white',
+                    border: '1px solid white',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    minWidth: '32px',
+                  }}
+                >
+                  ES
                 </button>
               </div>
-            </>
-          )}
 
-          {isMobile && userData && (
-            <button
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'white',
-                fontSize: '24px',
-                cursor: 'pointer',
-                padding: '0.5rem',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '4px',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-              aria-label="Menu"
-            >
-              <div style={{ width: '24px', height: '3px', backgroundColor: 'white', borderRadius: '2px' }}></div>
-              <div style={{ width: '24px', height: '3px', backgroundColor: 'white', borderRadius: '2px' }}></div>
-              <div style={{ width: '24px', height: '3px', backgroundColor: 'white', borderRadius: '2px' }}></div>
-            </button>
+              <button
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'white',
+                  fontSize: '24px',
+                  cursor: 'pointer',
+                  padding: '0.5rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                aria-label={language === 'en' ? 'Menu' : 'Menú'}
+              >
+                <div style={{ width: '24px', height: '3px', backgroundColor: 'white', borderRadius: '2px' }}></div>
+                <div style={{ width: '24px', height: '3px', backgroundColor: 'white', borderRadius: '2px' }}></div>
+                <div style={{ width: '24px', height: '3px', backgroundColor: 'white', borderRadius: '2px' }}></div>
+              </button>
+            </div>
           )}
         </div>
       </header>
 
-      {isMobile && isMobileMenuOpen && userData && (
-        <div
-          style={{
-            position: 'fixed',
-            top: '56px',
-            left: 0,
-            right: 0,
-            backgroundColor: '#000',
-            color: 'white',
-            boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
-            zIndex: 1000,
-            maxHeight: 'calc(100vh - 56px)',
-            overflowY: 'auto',
-            width: '100%',
-            boxSizing: 'border-box',
-          }}
-        >
-          <nav style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-            {isOwner ? (
-              <>
-                <Link
-                  to="/owner/today"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  style={{
-                    color: 'white',
-                    textDecoration: 'none',
-                    padding: '1rem',
-                    borderBottom: '1px solid rgba(255,255,255,0.1)',
-                    fontSize: '16px',
-                    display: 'block',
-                  }}
-                >
-                  {t.today}
-                </Link>
-                <Link
-                  to="/owner/appointments"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  style={{
-                    color: 'white',
-                    textDecoration: 'none',
-                    padding: '1rem',
-                    borderBottom: '1px solid rgba(255,255,255,0.1)',
-                    fontSize: '16px',
-                    display: 'block',
-                  }}
-                >
-                  {language === 'en' ? 'Calendar' : 'Calendario'}
-                </Link>
-                {renderDropdown(clientsMenu, false)}
-                {renderDropdown(barbersMenu, false)}
-                {analyticsMenu.items.length > 0 && renderDropdown(analyticsMenu, false)}
-                {inventoryMenu.items.length > 0 && renderDropdown(inventoryMenu, false)}
-                {renderDropdown(messagesMenu, false)}
-                {renderDropdown(settingsMenu, false)}
-              </>
-            ) : (
-              <>
-                <Link
-                  to="/barber/today"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  style={{
-                    color: 'white',
-                    textDecoration: 'none',
-                    padding: '1rem',
-                    borderBottom: '1px solid rgba(255,255,255,0.1)',
-                    fontSize: '16px',
-                    display: 'block',
-                  }}
-                >
-                  {t.today}
-                </Link>
-                <Link
-                  to="/barber/appointments"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  style={{
-                    color: 'white',
-                    textDecoration: 'none',
-                    padding: '1rem',
-                    borderBottom: '1px solid rgba(255,255,255,0.1)',
-                    fontSize: '16px',
-                    display: 'block',
-                  }}
-                >
-                  {language === 'en' ? 'Calendar' : 'Calendario'}
-                </Link>
-                {userData.can_view_own_stats && (
-                  <Link
-                    to="/barber/stats"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    style={{
-                      color: 'white',
-                      textDecoration: 'none',
-                      padding: '1rem',
-                      borderBottom: '1px solid rgba(255,255,255,0.1)',
-                      fontSize: '16px',
-                      display: 'block',
-                    }}
-                  >
-                    {language === 'en' ? 'My Earnings' : 'Mis Ganancias'}
-                  </Link>
-                )}
-              </>
-            )}
-
-            <div
-              style={{
-                padding: '1rem',
-                borderBottom: '1px solid rgba(255,255,255,0.1)',
-                display: 'flex',
-                gap: '0.5rem',
-                alignItems: 'center',
-              }}
-            >
-              <span style={{ fontSize: '14px', marginRight: '0.5rem' }}>
-                {language === 'en' ? 'Language:' : 'Idioma:'}
-              </span>
+      {isMenuOpen && userData && (
+        <>
+          <div
+            onClick={() => setIsMenuOpen(false)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0,0,0,0.5)',
+              zIndex: 999,
+            }}
+          />
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              right: 0,
+              bottom: 0,
+              width: '320px',
+              maxWidth: '85vw',
+              backgroundColor: '#000',
+              color: 'white',
+              boxShadow: '-2px 0 8px rgba(0,0,0,0.3)',
+              zIndex: 1000,
+              overflowY: 'auto',
+              animation: 'slideInRight 0.2s ease-out',
+            }}
+          >
+            <div style={{ padding: '1.5rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 'bold', margin: 0 }}>
+                {language === 'en' ? 'Menu' : 'Menú'}
+              </h2>
               <button
-                onClick={() => setLanguage('en')}
+                onClick={() => setIsMenuOpen(false)}
                 style={{
-                  padding: '0.5rem 1rem',
-                  backgroundColor: language === 'en' ? 'white' : 'transparent',
-                  color: language === 'en' ? '#000' : 'white',
-                  border: '1px solid white',
-                  borderRadius: '4px',
+                  background: 'none',
+                  border: 'none',
+                  color: 'white',
+                  fontSize: '24px',
                   cursor: 'pointer',
-                  fontSize: '14px',
+                  padding: '0.5rem',
                 }}
+                aria-label={language === 'en' ? 'Close' : 'Cerrar'}
               >
-                EN
-              </button>
-              <button
-                onClick={() => setLanguage('es')}
-                style={{
-                  padding: '0.5rem 1rem',
-                  backgroundColor: language === 'es' ? 'white' : 'transparent',
-                  color: language === 'es' ? '#000' : 'white',
-                  border: '1px solid white',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                }}
-              >
-                ES
+                ✕
               </button>
             </div>
 
-            <button
-              onClick={() => {
-                setIsMobileMenuOpen(false);
-                handleSignOut();
-              }}
-              style={{
-                padding: '1rem',
-                backgroundColor: '#fff',
-                color: '#000',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '16px',
-                fontWeight: '500',
-                textAlign: 'left',
-                width: '100%',
-              }}
-            >
-              {t.logout}
-            </button>
-          </nav>
-        </div>
+            <nav style={{ display: 'flex', flexDirection: 'column' }}>
+              {isOwner ? (
+                <>
+                  <button
+                    onClick={() => handleNavigate('/owner/today')}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      color: 'white',
+                      padding: '1rem',
+                      fontSize: '16px',
+                      background: 'none',
+                      border: 'none',
+                      borderBottom: '1px solid rgba(255,255,255,0.1)',
+                      cursor: 'pointer',
+                      fontWeight: '500',
+                    }}
+                  >
+                    {t.today}
+                  </button>
+                  <button
+                    onClick={() => handleNavigate('/owner/calendar')}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      color: 'white',
+                      padding: '1rem',
+                      fontSize: '16px',
+                      background: 'none',
+                      border: 'none',
+                      borderBottom: '1px solid rgba(255,255,255,0.1)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {language === 'en' ? 'Calendar' : 'Calendario'}
+                  </button>
+                  <button
+                    onClick={() => handleNavigate('/owner/appointments')}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      color: 'white',
+                      padding: '1rem',
+                      fontSize: '16px',
+                      background: 'none',
+                      border: 'none',
+                      borderBottom: '1px solid rgba(255,255,255,0.1)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {language === 'en' ? 'Appointments' : 'Citas'}
+                  </button>
+
+                  {ownerMenuSections.map((section) => section.items.length > 0 && (
+                    <div key={section.label}>
+                      <button
+                        onClick={() => setActiveSection(activeSection === section.label ? null : section.label)}
+                        style={{
+                          width: '100%',
+                          textAlign: 'left',
+                          color: 'white',
+                          background: 'none',
+                          border: 'none',
+                          padding: '1rem',
+                          borderBottom: '1px solid rgba(255,255,255,0.1)',
+                          fontSize: '16px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}
+                      >
+                        {section.label}
+                        <span style={{ fontSize: '12px', transform: activeSection === section.label ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>▾</span>
+                      </button>
+                      {activeSection === section.label && (
+                        <div style={{ backgroundColor: '#1a1a1a' }}>
+                          {section.items.map((item) => (
+                            <button
+                              key={item.path}
+                              onClick={() => handleNavigate(item.path)}
+                              style={{
+                                width: '100%',
+                                textAlign: 'left',
+                                color: 'rgba(255,255,255,0.9)',
+                                padding: '0.75rem 1rem 0.75rem 2rem',
+                                fontSize: '14px',
+                                background: 'none',
+                                border: 'none',
+                                borderBottom: '1px solid rgba(255,255,255,0.05)',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              {item.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => handleNavigate('/barber/today')}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      color: 'white',
+                      padding: '1rem',
+                      fontSize: '16px',
+                      background: 'none',
+                      border: 'none',
+                      borderBottom: '1px solid rgba(255,255,255,0.1)',
+                      cursor: 'pointer',
+                      fontWeight: '500',
+                    }}
+                  >
+                    {t.today}
+                  </button>
+                  <button
+                    onClick={() => handleNavigate('/barber/calendar')}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      color: 'white',
+                      padding: '1rem',
+                      fontSize: '16px',
+                      background: 'none',
+                      border: 'none',
+                      borderBottom: '1px solid rgba(255,255,255,0.1)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {language === 'en' ? 'My Calendar' : 'Mi Calendario'}
+                  </button>
+                  {userData.can_view_own_stats && (
+                    <button
+                      onClick={() => handleNavigate('/barber/stats')}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        color: 'white',
+                        padding: '1rem',
+                        fontSize: '16px',
+                        background: 'none',
+                        border: 'none',
+                        borderBottom: '1px solid rgba(255,255,255,0.1)',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {language === 'en' ? 'My Earnings' : 'Mis Ganancias'}
+                    </button>
+                  )}
+                </>
+              )}
+
+              <button
+                onClick={handleSignOut}
+                style={{
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '1rem',
+                  backgroundColor: '#fff',
+                  color: '#000',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                  fontWeight: '500',
+                  marginTop: 'auto',
+                }}
+              >
+                {t.logout}
+              </button>
+            </nav>
+          </div>
+        </>
       )}
+
+      <style>{`
+        @keyframes slideInRight {
+          from {
+            transform: translateX(100%);
+          }
+          to {
+            transform: translateX(0);
+          }
+        }
+      `}</style>
     </>
   );
 }
