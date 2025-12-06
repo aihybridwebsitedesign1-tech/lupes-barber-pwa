@@ -6,11 +6,13 @@ import { useAuth } from '../contexts/AuthContext';
 import Header from '../components/Header';
 import EditAppointmentModal from '../components/EditAppointmentModal';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
+import PaymentStatusBadge from '../components/PaymentStatusBadge';
 
 type Appointment = {
   id: string;
   scheduled_start: string;
   status: string;
+  payment_status: 'paid' | 'unpaid' | 'refunded' | 'partial' | null;
   payment_method: string | null;
   paid_at: string | null;
   client_name: string;
@@ -45,6 +47,7 @@ export default function OwnerAppointments() {
           id,
           scheduled_start,
           status,
+          payment_status,
           payment_method,
           paid_at,
           clients!inner(first_name, last_name),
@@ -86,6 +89,7 @@ export default function OwnerAppointments() {
             id: apt.id,
             scheduled_start: apt.scheduled_start,
             status: apt.status,
+            payment_status: apt.payment_status as 'paid' | 'unpaid' | 'refunded' | 'partial' | null,
             payment_method: apt.payment_method,
             paid_at: apt.paid_at,
             client_name: `${apt.clients.first_name} ${apt.clients.last_name}`,
@@ -356,23 +360,7 @@ export default function OwnerAppointments() {
                         </span>
                       </td>
                       <td style={{ padding: '1rem', fontSize: '14px' }}>
-                        <span
-                          style={{
-                            padding: '4px 12px',
-                            borderRadius: '12px',
-                            fontSize: '12px',
-                            backgroundColor: apt.paid_at ? '#d4edda' : '#f8d7da',
-                            color: apt.paid_at ? '#155724' : '#721c24',
-                          }}
-                        >
-                          {apt.paid_at
-                            ? language === 'en'
-                              ? 'Paid'
-                              : 'Pagado'
-                            : language === 'en'
-                            ? 'Unpaid'
-                            : 'Sin pagar'}
-                        </span>
+                        <PaymentStatusBadge status={apt.payment_status} size="small" />
                       </td>
                       <td style={{ padding: '1rem', fontSize: '14px' }}>
                         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>

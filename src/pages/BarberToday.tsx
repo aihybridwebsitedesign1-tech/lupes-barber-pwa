@@ -4,11 +4,13 @@ import { supabase } from '../lib/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import Header from '../components/Header';
+import PaymentStatusBadge from '../components/PaymentStatusBadge';
 
 type AppointmentWithDetails = {
   id: string;
   scheduled_start: string;
   status: string;
+  payment_status: 'paid' | 'unpaid' | 'refunded' | 'partial' | null;
   services_total: number;
   tip_amount: number;
   service_due_to_barber: number;
@@ -52,6 +54,7 @@ export default function BarberToday() {
           id,
           scheduled_start,
           status,
+          payment_status,
           services_total,
           tip_amount,
           service_due_to_barber,
@@ -69,6 +72,7 @@ export default function BarberToday() {
         id: apt.id,
         scheduled_start: apt.scheduled_start,
         status: apt.status,
+        payment_status: apt.payment_status as 'paid' | 'unpaid' | 'refunded' | 'partial' | null,
         services_total: Number(apt.services_total || 0),
         tip_amount: Number(apt.tip_amount || 0),
         service_due_to_barber: Number(apt.service_due_to_barber || 0),
@@ -261,13 +265,16 @@ export default function BarberToday() {
                 <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '14px' }}>{t.client}</th>
                 <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '14px' }}>{t.service}</th>
                 <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '14px' }}>{t.status}</th>
+                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '14px' }}>
+                  {language === 'en' ? 'Payment' : 'Pago'}
+                </th>
                 <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '14px' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {appointments.length === 0 ? (
                 <tr>
-                  <td colSpan={5} style={{ padding: '2rem', textAlign: 'center', color: '#999' }}>
+                  <td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: '#999' }}>
                     No appointments today
                   </td>
                 </tr>
@@ -302,6 +309,9 @@ export default function BarberToday() {
                       }}>
                         {t[apt.status as keyof typeof t] || apt.status}
                       </span>
+                    </td>
+                    <td style={{ padding: '1rem', fontSize: '14px' }}>
+                      <PaymentStatusBadge status={apt.payment_status} size="small" />
                     </td>
                     <td style={{ padding: '1rem', fontSize: '14px' }}>
                       {apt.status === 'booked' && (

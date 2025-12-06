@@ -5,12 +5,14 @@ import { useLanguage } from '../contexts/LanguageContext';
 import Header from '../components/Header';
 import NewAppointmentModal from '../components/NewAppointmentModal';
 import SetupChecklist from '../components/SetupChecklist';
+import PaymentStatusBadge from '../components/PaymentStatusBadge';
 
 type AppointmentWithDetails = {
   id: string;
   scheduled_start: string;
   status: string;
   source: string | null;
+  payment_status: 'paid' | 'unpaid' | 'refunded' | 'partial' | null;
   barber: { name: string } | null;
   client: { first_name: string; last_name: string };
   service: { name_en: string; name_es: string };
@@ -46,6 +48,7 @@ export default function OwnerToday() {
           status,
           source,
           services_total,
+          payment_status,
           barber:barber_id (name),
           client:client_id (first_name, last_name),
           service:service_id (name_en, name_es)
@@ -66,6 +69,7 @@ export default function OwnerToday() {
         scheduled_start: apt.scheduled_start,
         status: apt.status,
         source: apt.source || null,
+        payment_status: apt.payment_status as 'paid' | 'unpaid' | 'refunded' | 'partial' | null,
         barber: Array.isArray(apt.barber) ? apt.barber[0] : apt.barber,
         client: Array.isArray(apt.client) ? apt.client[0] : apt.client,
         service: Array.isArray(apt.service) ? apt.service[0] : apt.service,
@@ -225,12 +229,15 @@ export default function OwnerToday() {
                   {language === 'en' ? 'Source' : 'Origen'}
                 </th>
                 <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '14px' }}>{t.status}</th>
+                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '14px' }}>
+                  {language === 'en' ? 'Payment' : 'Pago'}
+                </th>
               </tr>
             </thead>
             <tbody>
               {appointments.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: '#999' }}>
+                  <td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: '#999' }}>
                     No appointments today
                   </td>
                 </tr>
@@ -269,6 +276,9 @@ export default function OwnerToday() {
                       }}>
                         {t[apt.status as keyof typeof t] || apt.status}
                       </span>
+                    </td>
+                    <td style={{ padding: '1rem', fontSize: '14px' }}>
+                      <PaymentStatusBadge status={apt.payment_status} size="small" />
                     </td>
                   </tr>
                 ))

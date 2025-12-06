@@ -10,6 +10,7 @@ import EditAppointmentModal from '../components/EditAppointmentModal';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 import CancelAppointmentModal from '../components/CancelAppointmentModal';
 import RescheduleAppointmentModal from '../components/RescheduleAppointmentModal';
+import PaymentStatusBadge from '../components/PaymentStatusBadge';
 
 type Appointment = {
   id: string;
@@ -26,6 +27,11 @@ type Appointment = {
   processing_fee_amount: number;
   total_charged: number;
   net_revenue: number;
+  payment_status: 'paid' | 'unpaid' | 'refunded' | 'partial' | null;
+  amount_due: number;
+  amount_paid: number;
+  stripe_session_id: string | null;
+  notes: string | null;
   payment_method: string | null;
   paid_at: string | null;
   completed_at: string | null;
@@ -129,6 +135,11 @@ export default function AppointmentDetail() {
           processing_fee_amount: Number(aptData.processing_fee_amount),
           total_charged: Number(aptData.total_charged),
           net_revenue: Number(aptData.net_revenue),
+          payment_status: aptData.payment_status as 'paid' | 'unpaid' | 'refunded' | 'partial' | null,
+          amount_due: Number(aptData.amount_due || 0),
+          amount_paid: Number(aptData.amount_paid || 0),
+          stripe_session_id: aptData.stripe_session_id || null,
+          notes: aptData.notes || null,
           payment_method: aptData.payment_method,
           paid_at: aptData.paid_at,
           completed_at: aptData.completed_at,
@@ -304,6 +315,50 @@ export default function AppointmentDetail() {
     setShowRescheduleModal(false);
     alert(language === 'en' ? 'Appointment rescheduled!' : '¡Cita reprogramada!');
     loadAppointmentData();
+  };
+
+  const handleMarkAsPaid = async (method: 'cash' | 'card') => {
+    if (!appointment) return;
+
+    if (appointment.payment_status === 'paid') {
+      alert(language === 'en' ? 'This appointment is already marked as paid.' : 'Esta cita ya está marcada como pagada.');
+      return;
+    }
+
+    const confirmMsg = language === 'en'
+      ? `Mark this appointment as paid with ${method}?`
+      : `¿Marcar esta cita como pagada con ${method === 'cash' ? 'efectivo' : 'tarjeta'}?`;
+
+    if (!confirm(confirmMsg)) return;
+
+    setSaving(true);
+    try {
+      const amountToPay = appointment.amount_due || 0;
+      const timestamp = new Date().toISOString();
+      const noteAddition = `\n[Marked as paid offline (${method}) by owner on ${new Date().toLocaleString()}]`;
+
+      const { error } = await supabase
+        .from('appointments')
+        .update({
+          payment_status: 'paid',
+          amount_paid: amountToPay,
+          payment_method: method,
+          paid_at: timestamp,
+          stripe_session_id: null,
+          notes: (appointment.notes || '') + noteAddition
+        })
+        .eq('id', appointmentId);
+
+      if (error) throw error;
+
+      alert(language === 'en' ? 'Appointment marked as paid!' : '¡Cita marcada como pagada!');
+      loadAppointmentData();
+    } catch (error) {
+      console.error('Error marking as paid:', error);
+      alert(language === 'en' ? 'Error marking as paid' : 'Error al marcar como pagada');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const canDelete = userData?.role === 'OWNER' || userData?.can_manage_appointments;
@@ -619,6 +674,90 @@ export default function AppointmentDetail() {
                 </p>
               )}
             </div>
+          </div>
+
+          <div style={{ paddingTop: '1.5rem', borderTop: '1px solid #eee', marginBottom: '1.5rem' }}>
+            <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '1rem' }}>
+              {language === 'en' ? 'Payment Information' : 'Información de Pago'}
+            </h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '14px', color: '#666' }}>
+                  {language === 'en' ? 'Status:' : 'Estado:'}
+                </span>
+                <PaymentStatusBadge status={appointment.payment_status} size="medium" />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '14px', color: '#666' }}>
+                  {language === 'en' ? 'Amount Due:' : 'Monto a Pagar:'}
+                </span>
+                <span style={{ fontSize: '16px', fontWeight: '600' }}>
+                  ${appointment.amount_due.toFixed(2)}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '14px', color: '#666' }}>
+                  {language === 'en' ? 'Amount Paid:' : 'Monto Pagado:'}
+                </span>
+                <span style={{ fontSize: '16px', fontWeight: '600', color: appointment.payment_status === 'paid' ? '#10b981' : '#666' }}>
+                  ${appointment.amount_paid.toFixed(2)}
+                </span>
+              </div>
+              {appointment.payment_method && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '14px', color: '#666' }}>
+                    {language === 'en' ? 'Payment Method:' : 'Método de Pago:'}
+                  </span>
+                  <span style={{ fontSize: '14px', fontWeight: '500', textTransform: 'capitalize' }}>
+                    {appointment.payment_method}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {userData?.role === 'OWNER' && appointment.payment_status !== 'paid' && appointment.payment_status !== 'refunded' && (
+              <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #eee' }}>
+                <p style={{ fontSize: '13px', color: '#666', marginBottom: '0.75rem' }}>
+                  {language === 'en' ? 'Mark as paid offline:' : 'Marcar como pagado offline:'}
+                </p>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    onClick={() => handleMarkAsPaid('cash')}
+                    disabled={saving}
+                    style={{
+                      flex: 1,
+                      padding: '8px 16px',
+                      backgroundColor: saving ? '#ccc' : '#10b981',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: saving ? 'not-allowed' : 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                    }}
+                  >
+                    {language === 'en' ? 'Cash' : 'Efectivo'}
+                  </button>
+                  <button
+                    onClick={() => handleMarkAsPaid('card')}
+                    disabled={saving}
+                    style={{
+                      flex: 1,
+                      padding: '8px 16px',
+                      backgroundColor: saving ? '#ccc' : '#10b981',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: saving ? 'not-allowed' : 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                    }}
+                  >
+                    {language === 'en' ? 'Card' : 'Tarjeta'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {canEdit && appointment.status === 'booked' && (
