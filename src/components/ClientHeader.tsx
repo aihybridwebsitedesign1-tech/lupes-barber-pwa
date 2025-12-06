@@ -2,6 +2,8 @@ import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import BarberPole from './BarberPole';
+import PWAInstallBanner from './PWAInstallBanner';
+import IOSSafariInstallGuide from './IOSSafariInstallGuide';
 
 export default function ClientHeader() {
   const { language, setLanguage } = useLanguage();
@@ -209,6 +211,9 @@ export default function ClientHeader() {
           </nav>
         </div>
       )}
+
+      <PWAInstallBanner />
+      <IOSSafariInstallGuide />
     </>
   );
 }
