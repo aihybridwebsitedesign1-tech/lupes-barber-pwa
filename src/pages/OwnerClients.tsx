@@ -7,6 +7,7 @@ import Header from '../components/Header';
 import NewClientModal from '../components/NewClientModal';
 import EditClientModal from '../components/EditClientModal';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
+import ClientCSVImportModal from '../components/ClientCSVImportModal';
 import { exportToCSV } from '../lib/csvExport';
 
 type Client = {
@@ -25,6 +26,7 @@ export default function OwnerClients() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showNewClientModal, setShowNewClientModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [editingClientId, setEditingClientId] = useState<string | null>(null);
   const [deletingClientId, setDeletingClientId] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -191,6 +193,23 @@ export default function OwnerClients() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
           <h2 style={{ fontSize: '28px', fontWeight: 'bold' }}>{t.clients}</h2>
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+            {canManageClients && (
+              <button
+                onClick={() => setShowImportModal(true)}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: '#fff',
+                  color: '#000',
+                  border: '1px solid #ddd',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                }}
+              >
+                {language === 'en' ? 'Import CSV' : 'Importar CSV'}
+              </button>
+            )}
             <button
               onClick={handleExportCSV}
               style={{
@@ -385,6 +404,16 @@ export default function OwnerClients() {
             onClose={() => setShowNewClientModal(false)}
             onSave={() => {
               setShowNewClientModal(false);
+              loadClients();
+            }}
+          />
+        )}
+
+        {showImportModal && (
+          <ClientCSVImportModal
+            onClose={() => setShowImportModal(false)}
+            onSuccess={() => {
+              setShowImportModal(false);
               loadClients();
             }}
           />

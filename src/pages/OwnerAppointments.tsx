@@ -7,6 +7,7 @@ import Header from '../components/Header';
 import EditAppointmentModal from '../components/EditAppointmentModal';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 import PaymentStatusBadge from '../components/PaymentStatusBadge';
+import { exportToCSV } from '../lib/csvExport';
 
 type Appointment = {
   id: string;
@@ -188,6 +189,30 @@ export default function OwnerAppointments() {
     });
   };
 
+  const handleExportCSV = () => {
+    const exportData = filteredAppointments.map((apt) => ({
+      date_time: formatDateTime(apt.scheduled_start),
+      barber: apt.barber_name,
+      client: apt.client_name,
+      service: apt.service_name,
+      status: apt.status,
+      payment_status: apt.payment_status || 'unpaid',
+      payment_method: apt.payment_method || '',
+      paid_at: apt.paid_at ? new Date(apt.paid_at).toLocaleDateString() : '',
+    }));
+
+    exportToCSV(exportData, 'appointments', {
+      date_time: 'Date & Time',
+      barber: 'Barber',
+      client: 'Client',
+      service: 'Service',
+      status: 'Status',
+      payment_status: 'Payment Status',
+      payment_method: 'Payment Method',
+      paid_at: 'Paid At',
+    });
+  };
+
   const getStatusBadgeStyle = (status: string) => {
     const styles: { [key: string]: { bg: string; color: string } } = {
       completed: { bg: '#d4edda', color: '#155724' },
@@ -224,7 +249,24 @@ export default function OwnerAppointments() {
     <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
       <Header />
       <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '1rem' }}>
-        <h2 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '1.5rem' }}>{t.appointments}</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+          <h2 style={{ fontSize: '28px', fontWeight: 'bold' }}>{t.appointments}</h2>
+          <button
+            onClick={handleExportCSV}
+            style={{
+              padding: '12px 24px',
+              backgroundColor: '#fff',
+              color: '#000',
+              border: '1px solid #ddd',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '500',
+            }}
+          >
+            {language === 'en' ? 'Export CSV' : 'Exportar CSV'}
+          </button>
+        </div>
 
         <div style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
           <div style={{ marginBottom: '1rem' }}>

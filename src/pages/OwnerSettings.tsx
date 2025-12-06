@@ -50,6 +50,7 @@ export default function OwnerSettings() {
 
   const [defaultCommissionRate, setDefaultCommissionRate] = useState('50');
   const [reminderHoursBefore, setReminderHoursBefore] = useState('24');
+  const [reminderHoursBeforeSecondary, setReminderHoursBeforeSecondary] = useState('');
   const [barbers, setBarbers] = useState<any[]>([]);
 
   useEffect(() => {
@@ -86,6 +87,7 @@ export default function OwnerSettings() {
         setLapsedClientDays(String(data.lapsed_client_days || 90));
         setDefaultCommissionRate(((data.default_commission_rate || 0.5) * 100).toFixed(0));
         setReminderHoursBefore(String(data.reminder_hours_before || 24));
+        setReminderHoursBeforeSecondary(data.reminder_hours_before_secondary ? String(data.reminder_hours_before_secondary) : '');
       }
 
       const { data: barbersData, error: barbersError } = await supabase
@@ -219,10 +221,13 @@ export default function OwnerSettings() {
     setSuccess('');
 
     try {
+      const secondaryValue = reminderHoursBeforeSecondary.trim() ? parseInt(reminderHoursBeforeSecondary) : null;
+
       const { error: updateError } = await supabase
         .from('shop_config')
         .update({
           reminder_hours_before: parseInt(reminderHoursBefore),
+          reminder_hours_before_secondary: secondaryValue,
         })
         .eq('id', config?.id || 1);
 
@@ -881,7 +886,7 @@ export default function OwnerSettings() {
 
                     <div style={{ marginBottom: '1.5rem' }}>
                       <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '0.5rem' }}>
-                        {language === 'en' ? 'Hours Before Appointment to Send SMS Reminder' : 'Horas Antes de Cita para Enviar Recordatorio SMS'}
+                        {language === 'en' ? 'Primary Reminder (hours before)' : 'Recordatorio Primario (horas antes)'}
                       </label>
                       <input
                         type="number"
@@ -900,8 +905,35 @@ export default function OwnerSettings() {
                       />
                       <p style={{ fontSize: '13px', color: '#666', marginTop: '0.25rem' }}>
                         {language === 'en'
-                          ? 'SMS reminders are sent automatically this many hours before the scheduled appointment time.'
-                          : 'Los recordatorios SMS se envían automáticamente esta cantidad de horas antes de la hora programada.'}
+                          ? 'First reminder sent this many hours before the appointment (e.g., 24 for one day before).'
+                          : 'Primer recordatorio enviado esta cantidad de horas antes de la cita (ej., 24 para un día antes).'}
+                      </p>
+                    </div>
+
+                    <div style={{ marginBottom: '1.5rem' }}>
+                      <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '0.5rem' }}>
+                        {language === 'en' ? 'Secondary Reminder (hours before, optional)' : 'Recordatorio Secundario (horas antes, opcional)'}
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="72"
+                        placeholder={language === 'en' ? 'Leave blank to disable' : 'Dejar vacío para desactivar'}
+                        value={reminderHoursBeforeSecondary}
+                        onChange={(e) => setReminderHoursBeforeSecondary(e.target.value)}
+                        style={{
+                          width: '100%',
+                          maxWidth: '300px',
+                          padding: '0.5rem',
+                          border: '1px solid #ddd',
+                          borderRadius: '4px',
+                          fontSize: '14px',
+                        }}
+                      />
+                      <p style={{ fontSize: '13px', color: '#666', marginTop: '0.25rem' }}>
+                        {language === 'en'
+                          ? 'Optional second reminder (e.g., 1 for one hour before). Leave blank to send only the primary reminder.'
+                          : 'Recordatorio secundario opcional (ej., 1 para una hora antes). Dejar vacío para enviar solo el recordatorio primario.'}
                       </p>
                     </div>
 
@@ -925,8 +957,8 @@ export default function OwnerSettings() {
                         </li>
                         <li>
                           {language === 'en'
-                            ? 'Reminders are sent automatically before appointments'
-                            : 'Los recordatorios se envían automáticamente antes de las citas'}
+                            ? 'Up to two reminders can be sent automatically before appointments (primary + optional secondary)'
+                            : 'Se pueden enviar hasta dos recordatorios automáticamente antes de las citas (primario + secundario opcional)'}
                         </li>
                         <li>
                           {language === 'en'

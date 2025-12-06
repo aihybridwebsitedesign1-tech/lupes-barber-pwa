@@ -33,6 +33,130 @@ function formatTime(dateStr: string): string {
   return `${hours}:${minutesStr} ${ampm}`;
 }
 
+async function sendRemindersForOffset(
+  supabase: any,
+  reminderHours: number,
+  config: any
+): Promise<{ sent: number; skipped: number; errors: string[] }> {
+  const shopName = config.shop_name || "Lupe's Barber";
+  const shopPhone = config.phone;
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+  const now = new Date();
+  const targetTime = new Date(now.getTime() + reminderHours * 60 * 60 * 1000);
+  const windowStart = new Date(targetTime.getTime() - 30 * 60 * 1000);
+  const windowEnd = new Date(targetTime.getTime() + 30 * 60 * 1000);
+
+  const { data: appointments, error: apptError } = await supabase
+    .from("appointments")
+    .select(`
+      id,
+      scheduled_start,
+      status,
+      notes,
+      clients!inner (
+        id,
+        first_name,
+        last_name,
+        phone,
+        language
+      ),
+      users!appointments_barber_id_fkey (
+        name
+      ),
+      services!inner (
+        name_en,
+        name_es
+      )
+    `)
+    .eq("status", "booked")
+    .gte("scheduled_start", windowStart.toISOString())
+    .lte("scheduled_start", windowEnd.toISOString());
+
+  if (apptError) {
+    console.error(`[Reminders ${reminderHours}h] Query error:`, apptError);
+    return { sent: 0, skipped: 0, errors: ["Failed to fetch appointments"] };
+  }
+
+  if (!appointments || appointments.length === 0) {
+    console.log(`[Reminders ${reminderHours}h] No appointments found in window`);
+    return { sent: 0, skipped: 0, errors: [] };
+  }
+
+  let sentCount = 0;
+  let skippedCount = 0;
+  const errors: string[] = [];
+
+  for (const apt of appointments) {
+    const { data: reminderSent } = await supabase
+      .from("appointment_reminders_sent")
+      .select("id")
+      .eq("appointment_id", apt.id)
+      .eq("reminder_offset_hours", reminderHours)
+      .maybeSingle();
+
+    if (reminderSent) {
+      console.log(`[Reminders ${reminderHours}h] Already sent for appointment ${apt.id}`);
+      skippedCount++;
+      continue;
+    }
+
+    const client = apt.clients;
+    if (!client || !client.phone) {
+      console.warn(`[Reminders ${reminderHours}h] No phone for appointment ${apt.id}`);
+      skippedCount++;
+      continue;
+    }
+
+    const language = client.language || 'en';
+    const barberName = apt.users?.name || 'our barber';
+    const serviceName = language === 'es' ? apt.services.name_es : apt.services.name_en;
+    const date = formatDate(apt.scheduled_start, language);
+    const time = formatTime(apt.scheduled_start);
+
+    const notificationUrl = `${supabaseUrl}/functions/v1/send-notification`;
+    const notificationResponse = await fetch(notificationUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${supabaseServiceKey}`,
+      },
+      body: JSON.stringify({
+        appointmentId: apt.id,
+        clientId: client.id,
+        phoneNumber: client.phone,
+        notificationType: "reminder",
+        appointmentDetails: {
+          shopName,
+          date,
+          time,
+          barberName,
+          serviceName,
+          shopPhone,
+        },
+        language,
+      }),
+    });
+
+    const result = await notificationResponse.json();
+
+    if (result.status === "sent" || result.status === "disabled") {
+      await supabase.from("appointment_reminders_sent").insert({
+        appointment_id: apt.id,
+        reminder_type: "reminder",
+        reminder_offset_hours: reminderHours,
+      });
+      sentCount++;
+      console.log(`[Reminders ${reminderHours}h] Sent for appointment ${apt.id}`);
+    } else {
+      errors.push(`Appointment ${apt.id}: ${result.message}`);
+    }
+  }
+
+  return { sent: sentCount, skipped: skippedCount, errors };
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -42,15 +166,13 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    // Create Supabase client with service role
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Check if reminders are enabled
     const { data: config } = await supabase
       .from("shop_config")
-      .select("enable_reminders, reminder_hours_before, shop_name, phone")
+      .select("enable_reminders, reminder_hours_before, reminder_hours_before_secondary, shop_name, phone")
       .single();
 
     if (!config || !config.enable_reminders) {
@@ -61,138 +183,31 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const reminderHours = config.reminder_hours_before || 24;
-    const shopName = config.shop_name || "Lupe's Barber";
-    const shopPhone = config.phone;
+    const primaryHours = config.reminder_hours_before || 24;
+    const secondaryHours = config.reminder_hours_before_secondary;
 
-    // Calculate the time window for reminders
-    const now = new Date();
-    const targetTime = new Date(now.getTime() + reminderHours * 60 * 60 * 1000);
-    const windowStart = new Date(targetTime.getTime() - 30 * 60 * 1000); // 30 min before
-    const windowEnd = new Date(targetTime.getTime() + 30 * 60 * 1000); // 30 min after
+    let totalSent = 0;
+    let totalSkipped = 0;
+    const allErrors: string[] = [];
 
-    // Find appointments that need reminders
-    const { data: appointments, error: apptError } = await supabase
-      .from("appointments")
-      .select(`
-        id,
-        scheduled_start,
-        status,
-        notes,
-        clients!inner (
-          id,
-          first_name,
-          last_name,
-          phone,
-          language
-        ),
-        users!appointments_barber_id_fkey (
-          name
-        ),
-        services!inner (
-          name_en,
-          name_es
-        )
-      `)
-      .eq("status", "booked")
-      .gte("scheduled_start", windowStart.toISOString())
-      .lte("scheduled_start", windowEnd.toISOString());
+    const primaryResult = await sendRemindersForOffset(supabase, primaryHours, config);
+    totalSent += primaryResult.sent;
+    totalSkipped += primaryResult.skipped;
+    allErrors.push(...primaryResult.errors);
 
-    if (apptError) {
-      console.error("[Reminders] Query error:", apptError);
-      return new Response(
-        JSON.stringify({ status: "error", message: "Failed to fetch appointments" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    if (!appointments || appointments.length === 0) {
-      console.log("[Reminders] No appointments found in window");
-      return new Response(
-        JSON.stringify({ status: "success", sent: 0, message: "No appointments to remind" }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    let sentCount = 0;
-    let skippedCount = 0;
-    const errors: string[] = [];
-
-    // Process each appointment
-    for (const apt of appointments) {
-      // Check if reminder already sent
-      const { data: reminderSent } = await supabase
-        .from("appointment_reminders_sent")
-        .select("id")
-        .eq("appointment_id", apt.id)
-        .eq("reminder_type", "24h")
-        .single();
-
-      if (reminderSent) {
-        console.log(`[Reminders] Already sent for appointment ${apt.id}`);
-        skippedCount++;
-        continue;
-      }
-
-      const client = apt.clients;
-      if (!client || !client.phone) {
-        console.warn(`[Reminders] No phone for appointment ${apt.id}`);
-        skippedCount++;
-        continue;
-      }
-
-      const language = client.language || 'en';
-      const barberName = apt.users?.name || 'our barber';
-      const serviceName = language === 'es' ? apt.services.name_es : apt.services.name_en;
-      const date = formatDate(apt.scheduled_start, language);
-      const time = formatTime(apt.scheduled_start);
-
-      // Call send-notification edge function
-      const notificationUrl = `${supabaseUrl}/functions/v1/send-notification`;
-      const notificationResponse = await fetch(notificationUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${supabaseServiceKey}`,
-        },
-        body: JSON.stringify({
-          appointmentId: apt.id,
-          clientId: client.id,
-          phoneNumber: client.phone,
-          notificationType: "reminder",
-          appointmentDetails: {
-            shopName,
-            date,
-            time,
-            barberName,
-            serviceName,
-            shopPhone,
-          },
-          language,
-        }),
-      });
-
-      const result = await notificationResponse.json();
-
-      if (result.status === "sent" || result.status === "disabled") {
-        // Mark reminder as sent
-        await supabase.from("appointment_reminders_sent").insert({
-          appointment_id: apt.id,
-          reminder_type: "24h",
-        });
-        sentCount++;
-        console.log(`[Reminders] Sent for appointment ${apt.id}`);
-      } else {
-        errors.push(`Appointment ${apt.id}: ${result.message}`);
-      }
+    if (secondaryHours !== null && secondaryHours !== undefined) {
+      const secondaryResult = await sendRemindersForOffset(supabase, secondaryHours, config);
+      totalSent += secondaryResult.sent;
+      totalSkipped += secondaryResult.skipped;
+      allErrors.push(...secondaryResult.errors);
     }
 
     return new Response(
       JSON.stringify({
         status: "success",
-        sent: sentCount,
-        skipped: skippedCount,
-        errors: errors.length > 0 ? errors : undefined,
+        sent: totalSent,
+        skipped: totalSkipped,
+        errors: allErrors.length > 0 ? allErrors : undefined,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
