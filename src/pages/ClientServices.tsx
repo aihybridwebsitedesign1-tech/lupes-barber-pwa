@@ -11,7 +11,7 @@ type Service = {
   description_en: string;
   description_es: string;
   category: string;
-  price: number;
+  base_price: number;
   duration_minutes: number;
   image_url: string | null;
   active: boolean;
@@ -177,7 +177,7 @@ export default function ClientServices() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
                           <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#e74c3c' }}>
-                            ${service.price.toFixed(2)}
+                            ${(service.base_price || 0).toFixed(2)}
                           </div>
                           {service.duration_minutes && (
                             <div style={{ fontSize: '14px', color: '#999', marginTop: '0.25rem' }}>

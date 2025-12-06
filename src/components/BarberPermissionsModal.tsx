@@ -33,6 +33,11 @@ export default function BarberPermissionsModal({
   const [minHoursBeforeBooking, setMinHoursBeforeBooking] = useState<string>('');
   const [minHoursBeforeCancellation, setMinHoursBeforeCancellation] = useState<string>('');
   const [bookingIntervalMinutes, setBookingIntervalMinutes] = useState<string>('15');
+  const [showOnClientSite, setShowOnClientSite] = useState(false);
+  const [publicDisplayName, setPublicDisplayName] = useState('');
+  const [bio, setBio] = useState('');
+  const [specialties, setSpecialties] = useState('');
+  const [photoUrl, setPhotoUrl] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -75,6 +80,12 @@ export default function BarberPermissionsModal({
       setMinHoursBeforeBooking(data.min_hours_before_booking_override?.toString() || '');
       setMinHoursBeforeCancellation(data.min_hours_before_cancellation_override?.toString() || '');
       setBookingIntervalMinutes(data.booking_interval_minutes_override?.toString() || '15');
+
+      setShowOnClientSite(data.show_on_client_site ?? false);
+      setPublicDisplayName(data.public_display_name || '');
+      setBio(data.bio || '');
+      setSpecialties(data.specialties || '');
+      setPhotoUrl(data.photo_url || '');
     } catch (err: any) {
       console.error('Error loading barber data:', err);
       setError(err.message);
@@ -142,6 +153,11 @@ export default function BarberPermissionsModal({
           min_hours_before_booking_override: minBookAhead,
           min_hours_before_cancellation_override: minCancelAhead,
           booking_interval_minutes_override: intervalMins,
+          show_on_client_site: showOnClientSite,
+          public_display_name: publicDisplayName.trim() || null,
+          bio: bio.trim() || null,
+          specialties: specialties.trim() || null,
+          photo_url: photoUrl.trim() || null,
         })
         .eq('id', barberId)
         .select();
@@ -564,6 +580,137 @@ export default function BarberPermissionsModal({
                   ? 'Custom rules override shop defaults for this barber only.'
                   : 'Las reglas personalizadas reemplazan los valores predeterminados solo para este barbero.'}
               </div>
+            </div>
+
+            <div style={{ marginBottom: '1.5rem', paddingTop: '1rem', borderTop: '2px solid #eee' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '0.75rem' }}>
+                {language === 'en' ? 'Public Profile' : 'Perfil Público'}
+              </h3>
+
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  cursor: 'pointer',
+                  padding: '0.75rem',
+                  backgroundColor: showOnClientSite ? '#e3f2fd' : '#f5f5f5',
+                  borderRadius: '6px',
+                  border: `2px solid ${showOnClientSite ? '#2196f3' : '#ddd'}`,
+                  marginBottom: '1rem',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={showOnClientSite}
+                  onChange={(e) => setShowOnClientSite(e.target.checked)}
+                  style={{ marginRight: '0.75rem', width: '18px', height: '18px', cursor: 'pointer' }}
+                />
+                <span style={{ fontWeight: '500', fontSize: '16px' }}>
+                  {language === 'en' ? 'Show on client website' : 'Mostrar en sitio web de clientes'}
+                </span>
+              </label>
+              <div style={{ marginBottom: '1rem', fontSize: '12px', color: '#666', paddingLeft: '0.75rem' }}>
+                {language === 'en'
+                  ? 'When enabled, this barber will appear on the public "Our Barbers" page with their profile information.'
+                  : 'Cuando está habilitado, este barbero aparecerá en la página pública "Nuestros Barberos" con su información de perfil.'}
+              </div>
+
+              {showOnClientSite && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', paddingLeft: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
+                      {language === 'en' ? 'Public display name (optional)' : 'Nombre público (opcional)'}
+                    </label>
+                    <input
+                      type="text"
+                      value={publicDisplayName}
+                      onChange={(e) => setPublicDisplayName(e.target.value)}
+                      placeholder={language === 'en' ? 'Leave empty to use real name' : 'Dejar vacío para usar nombre real'}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        border: '2px solid #ddd',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                      }}
+                    />
+                    <div style={{ fontSize: '12px', color: '#666', marginTop: '0.25rem' }}>
+                      {language === 'en'
+                        ? 'Custom name to display publicly. If empty, uses their real name.'
+                        : 'Nombre personalizado para mostrar públicamente. Si está vacío, usa su nombre real.'}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
+                      {language === 'en' ? 'Specialties' : 'Especialidades'}
+                    </label>
+                    <input
+                      type="text"
+                      value={specialties}
+                      onChange={(e) => setSpecialties(e.target.value)}
+                      placeholder={language === 'en' ? 'e.g., Fades, beard trims, kids cuts' : 'ej., Degradados, recorte de barba, cortes para niños'}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        border: '2px solid #ddd',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                      }}
+                    />
+                    <div style={{ fontSize: '12px', color: '#666', marginTop: '0.25rem' }}>
+                      {language === 'en'
+                        ? 'List of services or styles this barber specializes in.'
+                        : 'Lista de servicios o estilos en los que este barbero se especializa.'}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
+                      {language === 'en' ? 'Bio (optional)' : 'Biografía (opcional)'}
+                    </label>
+                    <textarea
+                      value={bio}
+                      onChange={(e) => setBio(e.target.value)}
+                      placeholder={language === 'en' ? 'Brief description or bio' : 'Breve descripción o biografía'}
+                      rows={3}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        border: '2px solid #ddd',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        fontFamily: 'inherit',
+                        resize: 'vertical',
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px', fontWeight: '500' }}>
+                      {language === 'en' ? 'Photo URL (optional)' : 'URL de Foto (opcional)'}
+                    </label>
+                    <input
+                      type="text"
+                      value={photoUrl}
+                      onChange={(e) => setPhotoUrl(e.target.value)}
+                      placeholder={language === 'en' ? 'https://...' : 'https://...'}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        border: '2px solid #ddd',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                      }}
+                    />
+                    <div style={{ fontSize: '12px', color: '#666', marginTop: '0.25rem' }}>
+                      {language === 'en'
+                        ? 'URL to profile photo. If empty, shows initials.'
+                        : 'URL a foto de perfil. Si está vacío, muestra iniciales.'}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {error && (
