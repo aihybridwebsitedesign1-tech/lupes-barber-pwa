@@ -21,7 +21,7 @@ type ShopConfig = {
   lapsed_client_days: number;
 };
 
-type Tab = 'shop_info' | 'booking_rules' | 'retention';
+type Tab = 'shop_info' | 'booking_rules' | 'retention' | 'commissions' | 'notifications';
 
 export default function OwnerSettings() {
   const { language } = useLanguage();

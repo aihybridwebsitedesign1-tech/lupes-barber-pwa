@@ -7,6 +7,12 @@ type ShopConfig = {
   client_booking_interval_minutes: number;
 };
 
+type BarberOverrides = {
+  min_hours_before_booking_override: number | null;
+  min_hours_before_cancellation_override: number | null;
+  booking_interval_minutes_override: number | null;
+};
+
 type BookingValidationError = {
   field: string;
   message: string;
@@ -27,9 +33,27 @@ export async function getShopConfig(): Promise<ShopConfig | null> {
   return data;
 }
 
+async function getBarberOverrides(barberId: string | null): Promise<BarberOverrides | null> {
+  if (!barberId) return null;
+
+  const { data, error } = await supabase
+    .from('users')
+    .select('min_hours_before_booking_override, min_hours_before_cancellation_override, booking_interval_minutes_override')
+    .eq('id', barberId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error fetching barber overrides:', error);
+    return null;
+  }
+
+  return data;
+}
+
 export async function validateBookingRules(
   startTime: Date,
-  action: 'create' | 'cancel' | 'reschedule'
+  action: 'create' | 'cancel' | 'reschedule',
+  barberId?: string | null
 ): Promise<BookingValidationError | null> {
   const config = await getShopConfig();
   if (!config) {
@@ -39,6 +63,12 @@ export async function validateBookingRules(
       messageEs: 'No se pudieron cargar las reglas de reserva',
     };
   }
+
+  const barberOverrides = await getBarberOverrides(barberId || null);
+
+  const minBookAheadHours = barberOverrides?.min_hours_before_booking_override ?? config.min_book_ahead_hours;
+  const minCancelAheadHours = barberOverrides?.min_hours_before_cancellation_override ?? config.min_cancel_ahead_hours;
+  const intervalMinutes = barberOverrides?.booking_interval_minutes_override ?? config.client_booking_interval_minutes;
 
   const now = new Date();
   const msUntilAppointment = startTime.getTime() - now.getTime();
@@ -54,16 +84,15 @@ export async function validateBookingRules(
       };
     }
 
-    if (hoursUntilAppointment < config.min_book_ahead_hours) {
+    if (hoursUntilAppointment < minBookAheadHours) {
       return {
         field: 'start_time',
-        message: `Appointments must be booked at least ${config.min_book_ahead_hours} hour(s) in advance`,
-        messageEs: `Las citas deben reservarse con al menos ${config.min_book_ahead_hours} hora(s) de anticipación`,
+        message: `Appointments must be booked at least ${minBookAheadHours} hour(s) in advance`,
+        messageEs: `Las citas deben reservarse con al menos ${minBookAheadHours} hora(s) de anticipación`,
       };
     }
 
     const minutes = startTime.getMinutes();
-    const intervalMinutes = config.client_booking_interval_minutes;
     if (minutes % intervalMinutes !== 0) {
       return {
         field: 'start_time',
@@ -74,11 +103,11 @@ export async function validateBookingRules(
   }
 
   if (action === 'cancel' || action === 'reschedule') {
-    if (hoursUntilAppointment < config.min_cancel_ahead_hours) {
+    if (hoursUntilAppointment < minCancelAheadHours) {
       return {
         field: 'start_time',
-        message: `This appointment can no longer be cancelled online. It must be cancelled at least ${config.min_cancel_ahead_hours} hour(s) in advance. Please call the shop.`,
-        messageEs: `Esta cita ya no se puede cancelar en línea. Debe cancelarse con al menos ${config.min_cancel_ahead_hours} hora(s) de anticipación. Por favor llame a la tienda.`,
+        message: `This appointment can no longer be cancelled online. It must be cancelled at least ${minCancelAheadHours} hour(s) in advance. Please call the shop.`,
+        messageEs: `Esta cita ya no se puede cancelar en línea. Debe cancelarse con al menos ${minCancelAheadHours} hora(s) de anticipación. Por favor llame a la tienda.`,
       };
     }
   }

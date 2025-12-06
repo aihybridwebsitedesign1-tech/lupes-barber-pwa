@@ -28,6 +28,11 @@ export default function BarberPermissionsModal({
   const [canManageAppointments, setCanManageAppointments] = useState(false);
   const [canManageClients, setCanManageClients] = useState(false);
   const [canSendSms, setCanSendSms] = useState(false);
+  const [commissionRateOverride, setCommissionRateOverride] = useState<string>('');
+  const [useDefaultBookingRules, setUseDefaultBookingRules] = useState(true);
+  const [minHoursBeforeBooking, setMinHoursBeforeBooking] = useState<string>('');
+  const [minHoursBeforeCancellation, setMinHoursBeforeCancellation] = useState<string>('');
+  const [bookingIntervalMinutes, setBookingIntervalMinutes] = useState<string>('15');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -58,6 +63,18 @@ export default function BarberPermissionsModal({
       setCanManageAppointments(data.can_manage_appointments ?? false);
       setCanManageClients(data.can_manage_clients ?? false);
       setCanSendSms(data.can_send_sms ?? false);
+
+      setCommissionRateOverride(data.commission_rate_override ? (data.commission_rate_override * 100).toString() : '');
+
+      const hasBookingOverrides =
+        data.min_hours_before_booking_override !== null ||
+        data.min_hours_before_cancellation_override !== null ||
+        data.booking_interval_minutes_override !== null;
+
+      setUseDefaultBookingRules(!hasBookingOverrides);
+      setMinHoursBeforeBooking(data.min_hours_before_booking_override?.toString() || '');
+      setMinHoursBeforeCancellation(data.min_hours_before_cancellation_override?.toString() || '');
+      setBookingIntervalMinutes(data.booking_interval_minutes_override?.toString() || '15');
     } catch (err: any) {
       console.error('Error loading barber data:', err);
       setError(err.message);
@@ -90,6 +107,22 @@ export default function BarberPermissionsModal({
         language: preferredLanguage,
       });
 
+      const commissionRate = commissionRateOverride.trim()
+        ? parseFloat(commissionRateOverride) / 100
+        : null;
+
+      const minBookAhead = !useDefaultBookingRules && minHoursBeforeBooking.trim()
+        ? parseInt(minHoursBeforeBooking, 10)
+        : null;
+
+      const minCancelAhead = !useDefaultBookingRules && minHoursBeforeCancellation.trim()
+        ? parseInt(minHoursBeforeCancellation, 10)
+        : null;
+
+      const intervalMins = !useDefaultBookingRules && bookingIntervalMinutes.trim()
+        ? parseInt(bookingIntervalMinutes, 10)
+        : null;
+
       const { data: updateData, error: updateError } = await supabase
         .from('users')
         .update({
@@ -105,6 +138,10 @@ export default function BarberPermissionsModal({
           can_manage_appointments: canManageAppointments,
           can_manage_clients: canManageClients,
           can_send_sms: canSendSms,
+          commission_rate_override: commissionRate,
+          min_hours_before_booking_override: minBookAhead,
+          min_hours_before_cancellation_override: minCancelAhead,
+          booking_interval_minutes_override: intervalMins,
         })
         .eq('id', barberId)
         .select();
@@ -408,6 +445,124 @@ export default function BarberPermissionsModal({
                   />
                   <span>{language === 'en' ? 'Can send SMS messages (Engage)' : 'Puede enviar mensajes SMS (Engage)'}</span>
                 </label>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '0.75rem' }}>
+                {language === 'en' ? 'Commission Rate' : 'Tasa de Comisión'}
+              </h3>
+              <div style={{ marginBottom: '0.5rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px' }}>
+                  {language === 'en' ? 'Commission rate override (%)' : 'Tasa de comisión personalizada (%)'}
+                </label>
+                <input
+                  type="number"
+                  value={commissionRateOverride}
+                  onChange={(e) => setCommissionRateOverride(e.target.value)}
+                  placeholder={language === 'en' ? 'Leave empty to use shop default' : 'Dejar vacío para usar predeterminado'}
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    border: '2px solid #ddd',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                  }}
+                />
+              </div>
+              <div style={{ fontSize: '12px', color: '#666' }}>
+                {language === 'en'
+                  ? 'Leave empty to use shop default rate. For example, enter "50" for 50%.'
+                  : 'Dejar vacío para usar la tasa predeterminada. Por ejemplo, ingresa "50" para 50%.'}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '0.75rem' }}>
+                {language === 'en' ? 'Booking Rules for this Barber' : 'Reglas de Reserva para este Barbero'}
+              </h3>
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', marginBottom: '1rem' }}>
+                <input
+                  type="checkbox"
+                  checked={useDefaultBookingRules}
+                  onChange={(e) => setUseDefaultBookingRules(e.target.checked)}
+                  style={{ marginRight: '0.75rem', width: '16px', height: '16px', cursor: 'pointer' }}
+                />
+                <span>{language === 'en' ? 'Use shop default rules' : 'Usar reglas predeterminadas'}</span>
+              </label>
+
+              {!useDefaultBookingRules && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', paddingLeft: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px' }}>
+                      {language === 'en' ? 'Minimum hours before booking' : 'Horas mínimas antes de reservar'}
+                    </label>
+                    <input
+                      type="number"
+                      value={minHoursBeforeBooking}
+                      onChange={(e) => setMinHoursBeforeBooking(e.target.value)}
+                      min="0"
+                      step="1"
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        border: '2px solid #ddd',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px' }}>
+                      {language === 'en' ? 'Minimum hours before cancellation' : 'Horas mínimas antes de cancelar'}
+                    </label>
+                    <input
+                      type="number"
+                      value={minHoursBeforeCancellation}
+                      onChange={(e) => setMinHoursBeforeCancellation(e.target.value)}
+                      min="0"
+                      step="1"
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        border: '2px solid #ddd',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '14px' }}>
+                      {language === 'en' ? 'Booking interval' : 'Intervalo de reserva'}
+                    </label>
+                    <select
+                      value={bookingIntervalMinutes}
+                      onChange={(e) => setBookingIntervalMinutes(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        border: '2px solid #ddd',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                      }}
+                    >
+                      <option value="15">15 {language === 'en' ? 'minutes' : 'minutos'}</option>
+                      <option value="30">30 {language === 'en' ? 'minutes' : 'minutos'}</option>
+                      <option value="60">60 {language === 'en' ? 'minutes' : 'minutos'}</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ fontSize: '12px', color: '#666', marginTop: '0.5rem' }}>
+                {language === 'en'
+                  ? 'Custom rules override shop defaults for this barber only.'
+                  : 'Las reglas personalizadas reemplazan los valores predeterminados solo para este barbero.'}
               </div>
             </div>
 
