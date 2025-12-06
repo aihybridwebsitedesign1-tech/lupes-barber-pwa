@@ -7,6 +7,7 @@ import Header from '../components/Header';
 import NewClientModal from '../components/NewClientModal';
 import EditClientModal from '../components/EditClientModal';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
+import { exportToCSV } from '../lib/csvExport';
 
 type Client = {
   id: string;
@@ -150,6 +151,28 @@ export default function OwnerClients() {
     }
   };
 
+  const handleExportCSV = () => {
+    const exportData = filteredClients.map((client) => ({
+      first_name: client.first_name || '',
+      last_name: client.last_name || '',
+      phone: client.phone || '',
+      email: client.email || '',
+      language: client.language || 'en',
+      lastVisit: client.lastVisit || '',
+      totalVisits: client.totalVisits || 0,
+    }));
+
+    exportToCSV(exportData, 'clients', {
+      first_name: 'First Name',
+      last_name: 'Last Name',
+      phone: 'Phone',
+      email: 'Email',
+      language: 'Language',
+      lastVisit: 'Last Visit',
+      totalVisits: 'Total Visits',
+    });
+  };
+
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
@@ -167,23 +190,40 @@ export default function OwnerClients() {
       <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '1rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
           <h2 style={{ fontSize: '28px', fontWeight: 'bold' }}>{t.clients}</h2>
-          {canManageClients && (
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
             <button
-              onClick={() => setShowNewClientModal(true)}
+              onClick={handleExportCSV}
               style={{
                 padding: '12px 24px',
-                backgroundColor: '#000',
-                color: 'white',
-                border: 'none',
+                backgroundColor: '#fff',
+                color: '#000',
+                border: '1px solid #ddd',
                 borderRadius: '6px',
                 cursor: 'pointer',
                 fontSize: '14px',
                 fontWeight: '500',
               }}
             >
-              {language === 'en' ? 'New Client' : 'Nuevo Cliente'}
+              {language === 'en' ? 'Export CSV' : 'Exportar CSV'}
             </button>
-          )}
+            {canManageClients && (
+              <button
+                onClick={() => setShowNewClientModal(true)}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: '#000',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                }}
+              >
+                {language === 'en' ? 'New Client' : 'Nuevo Cliente'}
+              </button>
+            )}
+          </div>
         </div>
 
         <div style={{ marginBottom: '1.5rem' }}>

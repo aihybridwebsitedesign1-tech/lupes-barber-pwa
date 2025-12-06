@@ -48,6 +48,10 @@ export default function OwnerSettings() {
   const [regularClientMinVisits, setRegularClientMinVisits] = useState('3');
   const [lapsedClientDays, setLapsedClientDays] = useState('90');
 
+  const [defaultCommissionRate, setDefaultCommissionRate] = useState('50');
+  const [reminderHoursBefore, setReminderHoursBefore] = useState('24');
+  const [barbers, setBarbers] = useState<any[]>([]);
+
   useEffect(() => {
     if (!userData) return;
     if (userData.role !== 'OWNER') {
@@ -80,6 +84,18 @@ export default function OwnerSettings() {
         setBookingInterval(String(data.client_booking_interval_minutes || 15));
         setRegularClientMinVisits(String(data.regular_client_min_visits || 3));
         setLapsedClientDays(String(data.lapsed_client_days || 90));
+        setDefaultCommissionRate(((data.default_commission_rate || 0.5) * 100).toFixed(0));
+        setReminderHoursBefore(String(data.reminder_hours_before || 24));
+      }
+
+      const { data: barbersData, error: barbersError } = await supabase
+        .from('users')
+        .select('id, name, commission_rate_override')
+        .eq('role', 'BARBER')
+        .order('name');
+
+      if (!barbersError && barbersData) {
+        setBarbers(barbersData);
       }
     } catch (err: any) {
       console.error('Error loading shop config:', err);
@@ -172,6 +188,72 @@ export default function OwnerSettings() {
     }
   };
 
+  const handleSaveCommissions = async () => {
+    setSaving(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const { error: updateError } = await supabase
+        .from('shop_config')
+        .update({
+          default_commission_rate: parseFloat(defaultCommissionRate) / 100,
+        })
+        .eq('id', config?.id || 1);
+
+      if (updateError) throw updateError;
+
+      setSuccess(language === 'en' ? 'Commission settings saved successfully!' : '¡Configuración de comisiones guardada exitosamente!');
+      loadShopConfig();
+    } catch (err: any) {
+      console.error('Error saving commission settings:', err);
+      setError(language === 'en' ? 'Failed to save commission settings' : 'Error al guardar configuración de comisiones');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveNotifications = async () => {
+    setSaving(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const { error: updateError } = await supabase
+        .from('shop_config')
+        .update({
+          reminder_hours_before: parseInt(reminderHoursBefore),
+        })
+        .eq('id', config?.id || 1);
+
+      if (updateError) throw updateError;
+
+      setSuccess(language === 'en' ? 'Notification settings saved successfully!' : '¡Configuración de notificaciones guardada exitosamente!');
+      loadShopConfig();
+    } catch (err: any) {
+      console.error('Error saving notification settings:', err);
+      setError(language === 'en' ? 'Failed to save notification settings' : 'Error al guardar configuración de notificaciones');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleUpdateBarberCommission = async (barberId: string, commissionRate: string) => {
+    try {
+      const rate = commissionRate.trim() ? parseFloat(commissionRate) / 100 : null;
+      const { error } = await supabase
+        .from('users')
+        .update({ commission_rate_override: rate })
+        .eq('id', barberId);
+
+      if (error) throw error;
+      loadShopConfig();
+    } catch (err: any) {
+      console.error('Error updating barber commission:', err);
+      alert(language === 'en' ? 'Failed to update commission' : 'Error al actualizar comisión');
+    }
+  };
+
   if (!userData || userData.role !== 'OWNER') {
     return null;
   }
@@ -180,6 +262,8 @@ export default function OwnerSettings() {
     { id: 'shop_info', labelEn: 'Shop Info', labelEs: 'Info de Tienda' },
     { id: 'booking_rules', labelEn: 'Booking Rules', labelEs: 'Reglas de Reserva' },
     { id: 'retention', labelEn: 'Clients & Retention', labelEs: 'Clientes y Retención' },
+    { id: 'commissions', labelEn: 'Commissions', labelEs: 'Comisiones' },
+    { id: 'notifications', labelEn: 'Notifications', labelEs: 'Notificaciones' },
   ];
 
   return (
@@ -645,6 +729,215 @@ export default function OwnerSettings() {
 
                     <button
                       onClick={handleSaveRetention}
+                      disabled={saving}
+                      style={{
+                        padding: '0.75rem 1.5rem',
+                        backgroundColor: saving ? '#ccc' : '#000',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        cursor: saving ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      {saving
+                        ? language === 'en'
+                          ? 'Saving...'
+                          : 'Guardando...'
+                        : language === 'en'
+                        ? 'Save Changes'
+                        : 'Guardar Cambios'}
+                    </button>
+                  </div>
+                )}
+
+                {activeTab === 'commissions' && (
+                  <div>
+                    <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '1.5rem' }}>
+                      {language === 'en' ? 'Commission Settings' : 'Configuración de Comisiones'}
+                    </h3>
+
+                    <div style={{ marginBottom: '2rem' }}>
+                      <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '0.5rem' }}>
+                        {language === 'en' ? 'Default Commission Rate for Services (%)' : 'Tasa de Comisión Predeterminada para Servicios (%)'}
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        value={defaultCommissionRate}
+                        onChange={(e) => setDefaultCommissionRate(e.target.value)}
+                        style={{
+                          width: '100%',
+                          maxWidth: '300px',
+                          padding: '0.5rem',
+                          border: '1px solid #ddd',
+                          borderRadius: '4px',
+                          fontSize: '14px',
+                        }}
+                      />
+                      <p style={{ fontSize: '13px', color: '#666', marginTop: '0.25rem' }}>
+                        {language === 'en'
+                          ? 'Default commission rate used for all barbers unless overridden. For example, enter "50" for 50%.'
+                          : 'Tasa de comisión predeterminada para todos los barberos a menos que se reemplace. Por ejemplo, ingresa "50" para 50%.'}
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={handleSaveCommissions}
+                      disabled={saving}
+                      style={{
+                        padding: '0.75rem 1.5rem',
+                        backgroundColor: saving ? '#ccc' : '#000',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        cursor: saving ? 'not-allowed' : 'pointer',
+                        marginBottom: '2rem',
+                      }}
+                    >
+                      {saving
+                        ? language === 'en'
+                          ? 'Saving...'
+                          : 'Guardando...'
+                        : language === 'en'
+                        ? 'Save Default Rate'
+                        : 'Guardar Tasa Predeterminada'}
+                    </button>
+
+                    <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '1rem' }}>
+                      {language === 'en' ? 'Per-Barber Commission Overrides' : 'Comisiones Personalizadas por Barbero'}
+                    </h4>
+                    <p style={{ fontSize: '14px', color: '#666', marginBottom: '1rem' }}>
+                      {language === 'en'
+                        ? 'Leave blank to use shop default. Enter a percentage (e.g., "60") to override.'
+                        : 'Dejar vacío para usar predeterminado. Ingresa un porcentaje (ej., "60") para reemplazar.'}
+                    </p>
+
+                    {barbers.length === 0 ? (
+                      <p style={{ fontSize: '14px', color: '#999', fontStyle: 'italic' }}>
+                        {language === 'en' ? 'No barbers found.' : 'No se encontraron barberos.'}
+                      </p>
+                    ) : (
+                      <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', backgroundColor: 'white', borderRadius: '4px', overflow: 'hidden' }}>
+                          <thead>
+                            <tr style={{ backgroundColor: '#f9f9f9', borderBottom: '2px solid #ddd' }}>
+                              <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '14px', fontWeight: '600' }}>
+                                {language === 'en' ? 'Barber' : 'Barbero'}
+                              </th>
+                              <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '14px', fontWeight: '600' }}>
+                                {language === 'en' ? 'Commission Override (%)' : 'Comisión Personalizada (%)'}
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {barbers.map((barber) => (
+                              <tr key={barber.id} style={{ borderBottom: '1px solid #eee' }}>
+                                <td style={{ padding: '0.75rem', fontSize: '14px' }}>{barber.name}</td>
+                                <td style={{ padding: '0.75rem' }}>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    step="0.1"
+                                    placeholder={language === 'en' ? 'Use default' : 'Usar predeterminado'}
+                                    value={barber.commission_rate_override ? (barber.commission_rate_override * 100).toFixed(1) : ''}
+                                    onChange={(e) => {
+                                      const newBarbers = [...barbers];
+                                      const index = newBarbers.findIndex((b) => b.id === barber.id);
+                                      newBarbers[index] = { ...newBarbers[index], commission_rate_override: e.target.value ? parseFloat(e.target.value) / 100 : null };
+                                      setBarbers(newBarbers);
+                                    }}
+                                    onBlur={(e) => handleUpdateBarberCommission(barber.id, e.target.value)}
+                                    style={{
+                                      width: '100%',
+                                      maxWidth: '150px',
+                                      padding: '0.5rem',
+                                      border: '1px solid #ddd',
+                                      borderRadius: '4px',
+                                      fontSize: '14px',
+                                    }}
+                                  />
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {activeTab === 'notifications' && (
+                  <div>
+                    <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '1.5rem' }}>
+                      {language === 'en' ? 'Notification Settings' : 'Configuración de Notificaciones'}
+                    </h3>
+
+                    <div style={{ marginBottom: '1.5rem' }}>
+                      <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '0.5rem' }}>
+                        {language === 'en' ? 'Hours Before Appointment to Send SMS Reminder' : 'Horas Antes de Cita para Enviar Recordatorio SMS'}
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="72"
+                        value={reminderHoursBefore}
+                        onChange={(e) => setReminderHoursBefore(e.target.value)}
+                        style={{
+                          width: '100%',
+                          maxWidth: '300px',
+                          padding: '0.5rem',
+                          border: '1px solid #ddd',
+                          borderRadius: '4px',
+                          fontSize: '14px',
+                        }}
+                      />
+                      <p style={{ fontSize: '13px', color: '#666', marginTop: '0.25rem' }}>
+                        {language === 'en'
+                          ? 'SMS reminders are sent automatically this many hours before the scheduled appointment time.'
+                          : 'Los recordatorios SMS se envían automáticamente esta cantidad de horas antes de la hora programada.'}
+                      </p>
+                    </div>
+
+                    <div
+                      style={{
+                        padding: '1rem',
+                        backgroundColor: '#f0f9ff',
+                        borderLeft: '4px solid #0369a1',
+                        borderRadius: '4px',
+                        marginBottom: '1.5rem',
+                      }}
+                    >
+                      <p style={{ fontSize: '14px', color: '#0c4a6e', fontWeight: '600', marginBottom: '0.5rem' }}>
+                        {language === 'en' ? 'Automated SMS Notifications' : 'Notificaciones SMS Automatizadas'}
+                      </p>
+                      <ul style={{ fontSize: '14px', color: '#0c4a6e', marginLeft: '1.5rem' }}>
+                        <li>
+                          {language === 'en'
+                            ? 'Booking confirmations are sent immediately when appointments are booked'
+                            : 'Las confirmaciones de reserva se envían inmediatamente cuando se reservan citas'}
+                        </li>
+                        <li>
+                          {language === 'en'
+                            ? 'Reminders are sent automatically before appointments'
+                            : 'Los recordatorios se envían automáticamente antes de las citas'}
+                        </li>
+                        <li>
+                          {language === 'en'
+                            ? 'Cancellation notifications are sent when appointments are cancelled'
+                            : 'Las notificaciones de cancelación se envían cuando se cancelan citas'}
+                        </li>
+                      </ul>
+                    </div>
+
+                    <button
+                      onClick={handleSaveNotifications}
                       disabled={saving}
                       style={{
                         padding: '0.75rem 1.5rem',
