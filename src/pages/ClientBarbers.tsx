@@ -11,6 +11,10 @@ type Barber = {
   bio: string | null;
   specialties: string | null;
   photo_url: string | null;
+  instagram_url: string | null;
+  tiktok_url: string | null;
+  facebook_url: string | null;
+  website_url: string | null;
   active: boolean;
   show_on_client_site: boolean;
 };
@@ -30,7 +34,7 @@ export default function ClientBarbers() {
     try {
       const { data, error } = await supabase
         .from('users')
-        .select('id, name, public_display_name, bio, specialties, photo_url, active, show_on_client_site')
+        .select('id, name, public_display_name, bio, specialties, photo_url, instagram_url, tiktok_url, facebook_url, website_url, active, show_on_client_site')
         .eq('role', 'BARBER')
         .eq('active', true)
         .eq('show_on_client_site', true)
@@ -168,6 +172,55 @@ export default function ClientBarbers() {
                       <p style={{ fontSize: '14px', color: '#666', marginBottom: '1rem' }}>
                         {language === 'en' ? 'Professional Barber' : 'Barbero Profesional'}
                       </p>
+                    )}
+
+                    {(barber.instagram_url || barber.tiktok_url || barber.facebook_url || barber.website_url) && (
+                      <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                        {barber.instagram_url && (
+                          <a
+                            href={barber.instagram_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ fontSize: '13px', color: '#e74c3c', textDecoration: 'none', fontWeight: '500' }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            📷 IG
+                          </a>
+                        )}
+                        {barber.tiktok_url && (
+                          <a
+                            href={barber.tiktok_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ fontSize: '13px', color: '#e74c3c', textDecoration: 'none', fontWeight: '500' }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            🎵 TikTok
+                          </a>
+                        )}
+                        {barber.facebook_url && (
+                          <a
+                            href={barber.facebook_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ fontSize: '13px', color: '#e74c3c', textDecoration: 'none', fontWeight: '500' }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            👤 FB
+                          </a>
+                        )}
+                        {barber.website_url && (
+                          <a
+                            href={barber.website_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ fontSize: '13px', color: '#e74c3c', textDecoration: 'none', fontWeight: '500' }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            🌐 {language === 'en' ? 'Web' : 'Sitio'}
+                          </a>
+                        )}
+                      </div>
                     )}
 
                     <button

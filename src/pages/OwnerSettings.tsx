@@ -39,6 +39,10 @@ export default function OwnerSettings() {
   const [phone, setPhone] = useState('');
   const [taxRate, setTaxRate] = useState('0');
   const [cardFeeRate, setCardFeeRate] = useState('4');
+  const [shopInstagramUrl, setShopInstagramUrl] = useState('');
+  const [shopFacebookUrl, setShopFacebookUrl] = useState('');
+  const [shopTiktokUrl, setShopTiktokUrl] = useState('');
+  const [shopWebsiteUrl, setShopWebsiteUrl] = useState('');
 
   const [daysBookableInAdvance, setDaysBookableInAdvance] = useState('30');
   const [minBookAheadHours, setMinBookAheadHours] = useState('2');
@@ -88,6 +92,10 @@ export default function OwnerSettings() {
         setDefaultCommissionRate(((data.default_commission_rate || 0.5) * 100).toFixed(0));
         setReminderHoursBefore(String(data.reminder_hours_before || 24));
         setReminderHoursBeforeSecondary(data.reminder_hours_before_secondary ? String(data.reminder_hours_before_secondary) : '');
+        setShopInstagramUrl(data.shop_instagram_url || '');
+        setShopFacebookUrl(data.shop_facebook_url || '');
+        setShopTiktokUrl(data.shop_tiktok_url || '');
+        setShopWebsiteUrl(data.shop_website_url || '');
       }
 
       const { data: barbersData, error: barbersError } = await supabase
@@ -121,6 +129,10 @@ export default function OwnerSettings() {
           phone: phone,
           tax_rate: parseFloat(taxRate) / 100,
           card_processing_fee_rate: parseFloat(cardFeeRate) / 100,
+          shop_instagram_url: shopInstagramUrl.trim() || null,
+          shop_facebook_url: shopFacebookUrl.trim() || null,
+          shop_tiktok_url: shopTiktokUrl.trim() || null,
+          shop_website_url: shopWebsiteUrl.trim() || null,
         })
         .eq('id', config?.id || 1);
 
@@ -478,6 +490,90 @@ export default function OwnerSettings() {
                           ? 'Fee charged for card transactions'
                           : 'Tarifa aplicada a transacciones con tarjeta'}
                       </p>
+                    </div>
+
+                    <div style={{ marginTop: '2rem', paddingTop: '2rem', borderTop: '2px solid #eee' }}>
+                      <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '1rem' }}>
+                        {language === 'en' ? 'Shop Social Media' : 'Redes Sociales'}
+                      </h4>
+
+                      <div style={{ display: 'grid', gap: '1rem', maxWidth: '500px' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '0.5rem' }}>
+                            Instagram
+                          </label>
+                          <input
+                            type="text"
+                            value={shopInstagramUrl}
+                            onChange={(e) => setShopInstagramUrl(e.target.value)}
+                            placeholder="https://instagram.com/shopname"
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem',
+                              border: '1px solid #ddd',
+                              borderRadius: '4px',
+                              fontSize: '14px',
+                            }}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '0.5rem' }}>
+                            Facebook
+                          </label>
+                          <input
+                            type="text"
+                            value={shopFacebookUrl}
+                            onChange={(e) => setShopFacebookUrl(e.target.value)}
+                            placeholder="https://facebook.com/shopname"
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem',
+                              border: '1px solid #ddd',
+                              borderRadius: '4px',
+                              fontSize: '14px',
+                            }}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '0.5rem' }}>
+                            TikTok
+                          </label>
+                          <input
+                            type="text"
+                            value={shopTiktokUrl}
+                            onChange={(e) => setShopTiktokUrl(e.target.value)}
+                            placeholder="https://tiktok.com/@shopname"
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem',
+                              border: '1px solid #ddd',
+                              borderRadius: '4px',
+                              fontSize: '14px',
+                            }}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '0.5rem' }}>
+                            {language === 'en' ? 'Website' : 'Sitio Web'}
+                          </label>
+                          <input
+                            type="text"
+                            value={shopWebsiteUrl}
+                            onChange={(e) => setShopWebsiteUrl(e.target.value)}
+                            placeholder="https://yourshop.com"
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem',
+                              border: '1px solid #ddd',
+                              borderRadius: '4px',
+                              fontSize: '14px',
+                            }}
+                          />
+                        </div>
+                      </div>
                     </div>
 
                     <button

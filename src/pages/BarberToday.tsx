@@ -208,11 +208,70 @@ export default function BarberToday() {
         <BarberTimeClockCard barberId={userData!.id} />
 
         <div style={{
+          backgroundColor: 'white',
+          padding: '1.5rem',
+          borderRadius: '8px',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+          marginTop: '1rem',
+          marginBottom: '2rem',
+        }}>
+          <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '1rem' }}>
+            {language === 'en' ? 'My Booking Link' : 'Mi Enlace de Reserva'}
+          </h4>
+          <p style={{ fontSize: '13px', color: '#666', marginBottom: '0.75rem' }}>
+            {language === 'en'
+              ? 'Share this link with clients so they can book directly with you:'
+              : 'Comparte este enlace con clientes para que reserven directamente contigo:'}
+          </p>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <input
+              type="text"
+              readOnly
+              value={`${window.location.origin}/client/book?barber=${userData!.id}`}
+              style={{
+                flex: 1,
+                padding: '0.75rem',
+                border: '2px solid #ddd',
+                borderRadius: '6px',
+                fontSize: '13px',
+                backgroundColor: '#f9f9f9',
+                fontFamily: 'monospace',
+              }}
+            />
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(`${window.location.origin}/client/book?barber=${userData!.id}`);
+                const btn = document.getElementById('copy-btn-text');
+                if (btn) {
+                  const originalText = btn.textContent;
+                  btn.textContent = language === 'en' ? 'Copied!' : '¡Copiado!';
+                  setTimeout(() => {
+                    btn.textContent = originalText || '';
+                  }, 2000);
+                }
+              }}
+              style={{
+                padding: '0.75rem 1.25rem',
+                backgroundColor: '#e74c3c',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <span id="copy-btn-text">{language === 'en' ? 'Copy' : 'Copiar'}</span>
+            </button>
+          </div>
+        </div>
+
+        <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
           gap: '1rem',
           marginBottom: '2rem',
-          marginTop: '2rem',
         }}>
           <div style={{
             backgroundColor: 'white',

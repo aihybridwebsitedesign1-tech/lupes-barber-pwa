@@ -38,6 +38,10 @@ export default function BarberPermissionsModal({
   const [bio, setBio] = useState('');
   const [specialties, setSpecialties] = useState('');
   const [photoUrl, setPhotoUrl] = useState('');
+  const [instagramUrl, setInstagramUrl] = useState('');
+  const [tiktokUrl, setTiktokUrl] = useState('');
+  const [facebookUrl, setFacebookUrl] = useState('');
+  const [websiteUrl, setWebsiteUrl] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -86,6 +90,10 @@ export default function BarberPermissionsModal({
       setBio(data.bio || '');
       setSpecialties(data.specialties || '');
       setPhotoUrl(data.photo_url || '');
+      setInstagramUrl(data.instagram_url || '');
+      setTiktokUrl(data.tiktok_url || '');
+      setFacebookUrl(data.facebook_url || '');
+      setWebsiteUrl(data.website_url || '');
     } catch (err: any) {
       console.error('Error loading barber data:', err);
       setError(err.message);
@@ -158,6 +166,10 @@ export default function BarberPermissionsModal({
           bio: bio.trim() || null,
           specialties: specialties.trim() || null,
           photo_url: photoUrl.trim() || null,
+          instagram_url: instagramUrl.trim() || null,
+          tiktok_url: tiktokUrl.trim() || null,
+          facebook_url: facebookUrl.trim() || null,
+          website_url: websiteUrl.trim() || null,
         })
         .eq('id', barberId)
         .select();
@@ -707,6 +719,90 @@ export default function BarberPermissionsModal({
                       {language === 'en'
                         ? 'URL to profile photo. If empty, shows initials.'
                         : 'URL a foto de perfil. Si está vacío, muestra iniciales.'}
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid #eee' }}>
+                    <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '0.75rem' }}>
+                      {language === 'en' ? 'Social Media Links (optional)' : 'Redes Sociales (opcional)'}
+                    </h4>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '13px', fontWeight: '500' }}>
+                          Instagram
+                        </label>
+                        <input
+                          type="text"
+                          value={instagramUrl}
+                          onChange={(e) => setInstagramUrl(e.target.value)}
+                          placeholder="https://instagram.com/username"
+                          style={{
+                            width: '100%',
+                            padding: '8px',
+                            border: '1px solid #ddd',
+                            borderRadius: '6px',
+                            fontSize: '13px',
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '13px', fontWeight: '500' }}>
+                          TikTok
+                        </label>
+                        <input
+                          type="text"
+                          value={tiktokUrl}
+                          onChange={(e) => setTiktokUrl(e.target.value)}
+                          placeholder="https://tiktok.com/@username"
+                          style={{
+                            width: '100%',
+                            padding: '8px',
+                            border: '1px solid #ddd',
+                            borderRadius: '6px',
+                            fontSize: '13px',
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '13px', fontWeight: '500' }}>
+                          Facebook
+                        </label>
+                        <input
+                          type="text"
+                          value={facebookUrl}
+                          onChange={(e) => setFacebookUrl(e.target.value)}
+                          placeholder="https://facebook.com/username"
+                          style={{
+                            width: '100%',
+                            padding: '8px',
+                            border: '1px solid #ddd',
+                            borderRadius: '6px',
+                            fontSize: '13px',
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '13px', fontWeight: '500' }}>
+                          {language === 'en' ? 'Website' : 'Sitio Web'}
+                        </label>
+                        <input
+                          type="text"
+                          value={websiteUrl}
+                          onChange={(e) => setWebsiteUrl(e.target.value)}
+                          placeholder="https://..."
+                          style={{
+                            width: '100%',
+                            padding: '8px',
+                            border: '1px solid #ddd',
+                            borderRadius: '6px',
+                            fontSize: '13px',
+                          }}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
