@@ -316,6 +316,24 @@ export default function Header() {
                       )}
                     </div>
                   ))}
+
+                  <button
+                    onClick={() => handleNavigate('/owner/account')}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      color: 'white',
+                      padding: '1rem',
+                      fontSize: '16px',
+                      background: 'none',
+                      border: 'none',
+                      borderBottom: '1px solid rgba(255,255,255,0.1)',
+                      cursor: 'pointer',
+                      marginTop: '1rem',
+                    }}
+                  >
+                    {language === 'en' ? 'My Account' : 'Mi Cuenta'}
+                  </button>
                 </>
               ) : (
                 <>
@@ -370,6 +388,24 @@ export default function Header() {
                       {language === 'en' ? 'My Earnings' : 'Mis Ganancias'}
                     </button>
                   )}
+
+                  <button
+                    onClick={() => handleNavigate('/barber/account')}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      color: 'white',
+                      padding: '1rem',
+                      fontSize: '16px',
+                      background: 'none',
+                      border: 'none',
+                      borderBottom: '1px solid rgba(255,255,255,0.1)',
+                      cursor: 'pointer',
+                      marginTop: '1rem',
+                    }}
+                  >
+                    {language === 'en' ? 'My Account' : 'Mi Cuenta'}
+                  </button>
                 </>
               )}
 

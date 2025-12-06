@@ -90,12 +90,12 @@ export default function OwnerInventoryReports() {
       <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '1rem' }}>
         <div style={{ marginBottom: '1.5rem' }}>
           <h2 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '0.5rem' }}>
-            {language === 'en' ? 'Inventory Reports (Beta)' : 'Reportes de Inventario (Beta)'}
+            {language === 'en' ? 'Inventory Reports' : 'Reportes de Inventario'}
           </h2>
           <p style={{ fontSize: '14px', color: '#666', marginBottom: '1rem' }}>
             {language === 'en'
-              ? 'View stock snapshots and valuation summaries.'
-              : 'Ver resúmenes de stock y valoración.'}
+              ? 'View current stock levels and valuation summaries for all products.'
+              : 'Ver niveles de stock actuales y resúmenes de valoración para todos los productos.'}
           </p>
         </div>
 

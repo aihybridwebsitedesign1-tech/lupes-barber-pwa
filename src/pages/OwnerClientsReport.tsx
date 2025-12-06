@@ -112,12 +112,12 @@ export default function OwnerClientsReport() {
       <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '1rem' }}>
         <div style={{ marginBottom: '1.5rem' }}>
           <h2 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '0.5rem' }}>
-            {language === 'en' ? 'Clients Report (Beta)' : 'Reporte de Clientes (Beta)'}
+            {language === 'en' ? 'Clients Report' : 'Reporte de Clientes'}
           </h2>
           <p style={{ fontSize: '14px', color: '#666', marginBottom: '1rem' }}>
             {language === 'en'
-              ? 'Acquisition channels and retention metrics for all active clients.'
-              : 'Canales de adquisición y métricas de retención para todos los clientes activos.'}
+              ? 'Track acquisition channels and retention metrics for all active clients.'
+              : 'Seguimiento de canales de adquisición y métricas de retención para todos los clientes activos.'}
           </p>
           <p style={{ fontSize: '13px', color: '#666' }}>
             {language === 'en'
