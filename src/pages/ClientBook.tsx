@@ -432,6 +432,22 @@ export default function ClientBook() {
   console.log('[ClientBook DEBUG] barbers array:', barbers);
   console.log('[ClientBook DEBUG] Will show "No barbers" message:', barbers.length === 0);
 
+  // Compute render list: if DB has barbers, use them; never hide them
+  const hasDbBarbers = (rawBarbersFromDb?.length ?? 0) > 0;
+  const barbersToRender: Barber[] =
+    barbers && barbers.length > 0
+      ? barbers
+      : (hasDbBarbers ? rawBarbersFromDb : []);
+
+  console.log(
+    '[ClientBook DEBUG] pre-render step1 - rawDb:',
+    rawBarbersFromDb?.length ?? 0,
+    'state:',
+    barbers?.length ?? 0,
+    'render:',
+    barbersToRender.length
+  );
+
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
       <ClientHeader />
@@ -469,82 +485,72 @@ export default function ClientBook() {
         )}
 
         <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '12px', boxShadow: '0 4px 8px rgba(0,0,0,0.1)' }}>
-          {step === 1 && (() => {
-            // Guarantee rendering: if DB has barbers, use them; never hide them
-            const hasDbBarbers = (rawBarbersFromDb?.length ?? 0) > 0;
-            const barbersToRender = barbers && barbers.length > 0
-              ? barbers
-              : (hasDbBarbers ? rawBarbersFromDb : []);
+          {step === 1 && (
+            <>
+              <h2 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '1.5rem' }}>
+                {language === 'en' ? 'Select Barber' : 'Seleccionar Barbero'}
+              </h2>
 
-            console.log('[ClientBook DEBUG] render step1 - rawDb:', rawBarbersFromDb.length, 'state:', barbers.length, 'render:', barbersToRender.length);
-
-            return (
-              <div>
-                <h2 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '1.5rem' }}>
-                  {language === 'en' ? 'Select Barber' : 'Seleccionar Barbero'}
-                </h2>
-
-                {/* Debug info for testing */}
-                <div style={{ fontSize: '12px', color: '#999', marginBottom: '8px' }}>
-                  Debug: rawDb={rawBarbersFromDb?.length ?? 0}, state={barbers?.length ?? 0}, render={barbersToRender?.length ?? 0}
-                </div>
-
-                {barbersToRender.length === 0 && !hasDbBarbers ? (
-                  <div style={{ textAlign: 'center', padding: '2rem', color: '#666', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
-                    <div style={{ fontSize: '18px', marginBottom: '0.5rem' }}>
-                      {language === 'en' ? 'No barbers available for booking right now.' : 'No hay barberos disponibles para reservar en este momento.'}
-                    </div>
-                    <div style={{ fontSize: '14px' }}>
-                      {language === 'en' ? 'Please contact the shop for assistance.' : 'Por favor contacta a la tienda para asistencia.'}
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ display: 'grid', gap: '1rem' }}>
-                    {barbersToRender.map((barber) => (
-                      <div
-                        key={barber.id}
-                        onClick={() => setSelectedBarber(barber.id)}
-                        style={{
-                          padding: '1rem',
-                          border: `2px solid ${selectedBarber === barber.id ? '#e74c3c' : '#ddd'}`,
-                          borderRadius: '8px',
-                          cursor: 'pointer',
-                          backgroundColor: selectedBarber === barber.id ? '#fee' : 'white',
-                          transition: 'all 0.2s',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '1rem',
-                        }}
-                      >
-                        {barber.photo_url && (
-                          <img
-                            src={barber.photo_url}
-                            alt={barber.public_display_name || barber.name}
-                            style={{
-                              width: '60px',
-                              height: '60px',
-                              borderRadius: '50%',
-                              objectFit: 'cover',
-                            }}
-                          />
-                        )}
-                        <div>
-                          <div style={{ fontSize: '18px', fontWeight: '600' }}>
-                            {barber.public_display_name || barber.name}
-                          </div>
-                          {barber.public_display_name && (
-                            <div style={{ fontSize: '14px', color: '#666' }}>
-                              {barber.name}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              {/* Debug info for testing */}
+              <div style={{ fontSize: '12px', color: '#999', marginBottom: '8px' }}>
+                Debug: rawDb={rawBarbersFromDb?.length ?? 0}, state={barbers?.length ?? 0}, render={barbersToRender.length}
               </div>
-            );
-          })()}
+
+              {barbersToRender.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2rem', color: '#666', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
+                  <div style={{ fontSize: '18px', marginBottom: '0.5rem' }}>
+                    {language === 'en' ? 'No barbers available for booking right now.' : 'No hay barberos disponibles para reservar en este momento.'}
+                  </div>
+                  <div style={{ fontSize: '14px' }}>
+                    {language === 'en' ? 'Please contact the shop for assistance.' : 'Por favor contacta a la tienda para asistencia.'}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gap: '1rem' }}>
+                  {barbersToRender.map((barber) => (
+                    <div
+                      key={barber.id}
+                      onClick={() => setSelectedBarber(barber.id)}
+                      style={{
+                        padding: '1rem',
+                        border: `2px solid ${selectedBarber === barber.id ? '#e74c3c' : '#ddd'}`,
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        backgroundColor: selectedBarber === barber.id ? '#fee' : 'white',
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '1rem',
+                      }}
+                    >
+                      {barber.photo_url && (
+                        <img
+                          src={barber.photo_url}
+                          alt={barber.public_display_name || barber.name}
+                          style={{
+                            width: '60px',
+                            height: '60px',
+                            borderRadius: '50%',
+                            objectFit: 'cover',
+                          }}
+                        />
+                      )}
+                      <div>
+                        <div style={{ fontSize: '18px', fontWeight: '600' }}>
+                          {barber.public_display_name || barber.name}
+                        </div>
+                        {barber.public_display_name && (
+                          <div style={{ fontSize: '14px', color: '#666' }}>
+                            {barber.name}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
 
           {step === 2 && (
             <div>
