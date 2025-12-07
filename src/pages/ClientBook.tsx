@@ -9,6 +9,8 @@ import ClientHeader from '../components/ClientHeader';
 type Barber = {
   id: string;
   name: string;
+  public_display_name?: string;
+  photo_url?: string;
 };
 
 type Service = {
@@ -79,15 +81,35 @@ export default function ClientBook() {
     try {
       console.log('🔵 Loading booking page data...');
 
+      // Step 1 shows all active barbers that are allowed on the client website.
+      // Availability and booking rules are enforced later when generating time slots.
       const [barbersRes, servicesRes, shopConfig, shopConfigFull] = await Promise.all([
-        supabase.from('users').select('id, name').eq('role', 'BARBER').eq('active', true).order('name'),
+        supabase
+          .from('users')
+          .select('id, name, public_display_name, photo_url')
+          .eq('role', 'BARBER')
+          .eq('active', true)
+          .eq('show_on_client_site', true)
+          .order('name'),
         supabase.from('services').select('id, name_en, name_es, price, duration_minutes').eq('active', true).order('name_en'),
         getShopConfig(),
         supabase.from('shop_config').select('shop_name, phone, enable_confirmations').single()
       ]);
 
-      if (barbersRes.error) throw barbersRes.error;
-      if (servicesRes.error) throw servicesRes.error;
+      console.log('📊 Query results:', {
+        barbersError: barbersRes.error,
+        barbersData: barbersRes.data,
+        barbersCount: barbersRes.data?.length || 0
+      });
+
+      if (barbersRes.error) {
+        console.error('❌ Error loading barbers:', barbersRes.error);
+        throw barbersRes.error;
+      }
+      if (servicesRes.error) {
+        console.error('❌ Error loading services:', servicesRes.error);
+        throw servicesRes.error;
+      }
 
       const loadedBarbers = barbersRes.data || [];
       const loadedServices = servicesRes.data || [];
@@ -416,10 +438,32 @@ export default function ClientBook() {
                         cursor: 'pointer',
                         backgroundColor: selectedBarber === barber.id ? '#fee' : 'white',
                         transition: 'all 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '1rem',
                       }}
                     >
-                      <div style={{ fontSize: '18px', fontWeight: '600' }}>
-                        {barber.name}
+                      {barber.photo_url && (
+                        <img
+                          src={barber.photo_url}
+                          alt={barber.public_display_name || barber.name}
+                          style={{
+                            width: '60px',
+                            height: '60px',
+                            borderRadius: '50%',
+                            objectFit: 'cover',
+                          }}
+                        />
+                      )}
+                      <div>
+                        <div style={{ fontSize: '18px', fontWeight: '600' }}>
+                          {barber.public_display_name || barber.name}
+                        </div>
+                        {barber.public_display_name && (
+                          <div style={{ fontSize: '14px', color: '#666' }}>
+                            {barber.name}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
