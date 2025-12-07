@@ -5,30 +5,21 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import Header from '../components/Header';
 import { exportToCSV } from '../lib/csvExport';
-
-type TimeEntry = {
-  id: string;
-  barber_id: string;
-  entry_type: 'clock_in' | 'clock_out' | 'break_start' | 'break_end';
-  timestamp: string;
-};
-
-type DailyReport = {
-  barber_id: string;
-  barber_name: string;
-  date: string;
-  total_hours: number;
-  break_hours: number;
-  net_hours: number;
-  entry_count: number;
-};
+import {
+  TimeEntry,
+  DailySummary,
+  calculateDailySummaries,
+  formatTime,
+  formatDuration,
+} from '../lib/timeTracking';
 
 export default function OwnerBarbersTimeTracking() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedBarber, setSelectedBarber] = useState('');
   const [barbers, setBarbers] = useState<{ id: string; name: string }[]>([]);
-  const [reports, setReports] = useState<DailyReport[]>([]);
+  const [reports, setReports] = useState<DailySummary[]>([]);
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const { language } = useLanguage();
   const { userData } = useAuth();
@@ -95,11 +86,19 @@ export default function OwnerBarbersTimeTracking() {
         barber_id: e.barber_id,
         entry_type: e.entry_type,
         timestamp: e.timestamp,
+        note: e.note,
       }));
 
-      const dailyReports = calculateDailyReports(entries, data || []);
+      const barberNamesMap = new Map<string, string>();
+      (data || []).forEach((e: any) => {
+        if (e.users?.name) {
+          barberNamesMap.set(e.barber_id, e.users.name);
+        }
+      });
 
-      setReports(dailyReports);
+      const dailySummaries = calculateDailySummaries(entries, barberNamesMap);
+
+      setReports(dailySummaries);
     } catch (error) {
       console.error('❌ [TimeTracking] Error loading time data:', error);
     } finally {
@@ -107,96 +106,31 @@ export default function OwnerBarbersTimeTracking() {
     }
   };
 
-  const calculateDailyReports = (entries: TimeEntry[], rawData: any[]): DailyReport[] => {
-    const reportMap = new Map<string, DailyReport>();
-
-    const barbersByDate = new Map<string, Map<string, TimeEntry[]>>();
-
-    entries.forEach((entry) => {
-      const date = entry.timestamp.split('T')[0];
-      // Use a separator that won't conflict with UUID dashes
-      const key = `${entry.barber_id}|${date}`;
-
-      if (!barbersByDate.has(key)) {
-        barbersByDate.set(key, new Map());
-      }
-
-      const dateEntries = barbersByDate.get(key)!;
-      if (!dateEntries.has(entry.barber_id)) {
-        dateEntries.set(entry.barber_id, []);
-      }
-
-      dateEntries.get(entry.barber_id)!.push(entry);
-    });
-
-    barbersByDate.forEach((dateEntries, key) => {
-      // Split by pipe separator to correctly parse barber_id and date
-      const [_barberId, date] = key.split('|');
-
-      dateEntries.forEach((dayEntries, bid) => {
-        const clockIns = dayEntries.filter(e => e.entry_type === 'clock_in');
-        const clockOuts = dayEntries.filter(e => e.entry_type === 'clock_out');
-        const breakStarts = dayEntries.filter(e => e.entry_type === 'break_start');
-        const breakEnds = dayEntries.filter(e => e.entry_type === 'break_end');
-
-        let totalWorked = 0;
-        let totalBreak = 0;
-
-        for (let i = 0; i < clockIns.length; i++) {
-          const clockInTime = new Date(clockIns[i].timestamp).getTime();
-          const clockOutTime = clockOuts[i] ? new Date(clockOuts[i].timestamp).getTime() : new Date(date + 'T23:59:59').getTime();
-          totalWorked += clockOutTime - clockInTime;
-        }
-
-        for (let i = 0; i < breakStarts.length; i++) {
-          const breakStartTime = new Date(breakStarts[i].timestamp).getTime();
-          const breakEndTime = breakEnds[i] ? new Date(breakEnds[i].timestamp).getTime() : breakStartTime;
-          totalBreak += breakEndTime - breakStartTime;
-        }
-
-        const barberEntry = rawData.find(e => e.barber_id === bid);
-        const barberName = barberEntry?.users?.name || 'Unknown';
-
-        const totalHours = totalWorked / (1000 * 60 * 60);
-        const breakHours = totalBreak / (1000 * 60 * 60);
-        const netHours = (totalWorked - totalBreak) / (1000 * 60 * 60);
-
-        reportMap.set(key, {
-          barber_id: bid,
-          barber_name: barberName,
-          date,
-          total_hours: totalHours,
-          break_hours: breakHours,
-          net_hours: netHours,
-          entry_count: dayEntries.length,
-        });
-      });
-    });
-
-    return Array.from(reportMap.values()).sort((a, b) => {
-      const dateCompare = b.date.localeCompare(a.date);
-      if (dateCompare !== 0) return dateCompare;
-      return a.barber_name.localeCompare(b.barber_name);
-    });
-  };
-
   const handleExport = () => {
     const exportData = reports.map((r) => ({
-      barber: r.barber_name,
+      barber: r.barberName,
       date: new Date(r.date).toLocaleDateString(),
-      total_hours: r.total_hours.toFixed(2),
-      break_hours: r.break_hours.toFixed(2),
-      net_hours: r.net_hours.toFixed(2),
-      entry_count: r.entry_count,
+      clock_in: r.shift.clockIn ? formatTime(r.shift.clockIn) : 'N/A',
+      clock_out: r.shift.clockOut ? formatTime(r.shift.clockOut) : 'N/A',
+      total_hours: r.totalHours.toFixed(2),
+      break_hours: r.breakHours.toFixed(2),
+      net_hours: r.netHours.toFixed(2),
+      status: r.shift.status,
+      has_issues: r.hasIssues ? 'Yes' : 'No',
+      issue: r.issueDescription || '',
     }));
 
     exportToCSV(exportData, 'time-tracking', {
       barber: 'Barber',
       date: 'Date',
+      clock_in: 'Clock In',
+      clock_out: 'Clock Out',
       total_hours: 'Total Hours',
       break_hours: 'Break Hours',
       net_hours: 'Net Hours',
-      entry_count: 'Entry Count',
+      status: 'Status',
+      has_issues: 'Has Issues',
+      issue: 'Issue',
     });
   };
 
@@ -348,49 +282,216 @@ export default function OwnerBarbersTimeTracking() {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead style={{ backgroundColor: '#f9f9f9' }}>
                   <tr>
+                    <th style={{ padding: '1rem', textAlign: 'left', fontSize: '14px', fontWeight: '500', width: '40px' }}></th>
                     <th style={{ padding: '1rem', textAlign: 'left', fontSize: '14px', fontWeight: '500' }}>
                       {language === 'en' ? 'Barber' : 'Barbero'}
                     </th>
                     <th style={{ padding: '1rem', textAlign: 'left', fontSize: '14px', fontWeight: '500' }}>
                       {language === 'en' ? 'Date' : 'Fecha'}
                     </th>
-                    <th style={{ padding: '1rem', textAlign: 'right', fontSize: '14px', fontWeight: '500' }}>
-                      {language === 'en' ? 'Total Hours' : 'Horas Totales'}
+                    <th style={{ padding: '1rem', textAlign: 'left', fontSize: '14px', fontWeight: '500' }}>
+                      {language === 'en' ? 'Clock In' : 'Entrada'}
+                    </th>
+                    <th style={{ padding: '1rem', textAlign: 'left', fontSize: '14px', fontWeight: '500' }}>
+                      {language === 'en' ? 'Clock Out' : 'Salida'}
                     </th>
                     <th style={{ padding: '1rem', textAlign: 'right', fontSize: '14px', fontWeight: '500' }}>
-                      {language === 'en' ? 'Break Hours' : 'Horas de Descanso'}
+                      {language === 'en' ? 'Break' : 'Descanso'}
                     </th>
                     <th style={{ padding: '1rem', textAlign: 'right', fontSize: '14px', fontWeight: '500', backgroundColor: '#e8f5e9' }}>
                       {language === 'en' ? 'Net Hours' : 'Horas Netas'}
                     </th>
                     <th style={{ padding: '1rem', textAlign: 'center', fontSize: '14px', fontWeight: '500' }}>
-                      {language === 'en' ? 'Entries' : 'Registros'}
+                      {language === 'en' ? 'Status' : 'Estado'}
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {reports.map((report) => (
-                    <tr key={`${report.barber_id}-${report.date}`} style={{ borderBottom: '1px solid #eee' }}>
-                      <td style={{ padding: '1rem', fontSize: '14px', fontWeight: '500' }}>
-                        {report.barber_name}
-                      </td>
-                      <td style={{ padding: '1rem', fontSize: '14px' }}>
-                        {new Date(report.date).toLocaleDateString()}
-                      </td>
-                      <td style={{ padding: '1rem', textAlign: 'right', fontSize: '14px' }}>
-                        {report.total_hours.toFixed(2)}h
-                      </td>
-                      <td style={{ padding: '1rem', textAlign: 'right', fontSize: '14px' }}>
-                        {report.break_hours.toFixed(2)}h
-                      </td>
-                      <td style={{ padding: '1rem', textAlign: 'right', fontSize: '14px', fontWeight: '500', backgroundColor: '#f1f8f4' }}>
-                        {report.net_hours.toFixed(2)}h
-                      </td>
-                      <td style={{ padding: '1rem', textAlign: 'center', fontSize: '14px', color: '#666' }}>
-                        {report.entry_count}
-                      </td>
-                    </tr>
-                  ))}
+                  {reports.map((report) => {
+                    const rowKey = `${report.barberId}-${report.date}`;
+                    const isExpanded = expandedRow === rowKey;
+
+                    return (
+                      <>
+                        <tr
+                          key={rowKey}
+                          style={{
+                            borderBottom: '1px solid #eee',
+                            cursor: 'pointer',
+                            backgroundColor: report.hasIssues ? '#fff3cd' : 'transparent',
+                          }}
+                          onClick={() => setExpandedRow(isExpanded ? null : rowKey)}
+                        >
+                          <td style={{ padding: '1rem', textAlign: 'center' }}>
+                            <span style={{ fontSize: '16px' }}>{isExpanded ? '▼' : '▶'}</span>
+                          </td>
+                          <td style={{ padding: '1rem', fontSize: '14px', fontWeight: '500' }}>
+                            {report.barberName}
+                            {report.hasIssues && (
+                              <span
+                                style={{
+                                  marginLeft: '0.5rem',
+                                  fontSize: '12px',
+                                  padding: '2px 6px',
+                                  backgroundColor: '#f59e0b',
+                                  color: 'white',
+                                  borderRadius: '4px',
+                                }}
+                              >
+                                ⚠
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ padding: '1rem', fontSize: '14px' }}>
+                            {new Date(report.date).toLocaleDateString()}
+                          </td>
+                          <td style={{ padding: '1rem', fontSize: '13px', color: '#666' }}>
+                            {report.shift.clockIn ? formatTime(report.shift.clockIn) : '—'}
+                          </td>
+                          <td style={{ padding: '1rem', fontSize: '13px', color: '#666' }}>
+                            {report.shift.clockOut ? formatTime(report.shift.clockOut) : '—'}
+                          </td>
+                          <td style={{ padding: '1rem', textAlign: 'right', fontSize: '14px' }}>
+                            {report.breakHours.toFixed(2)}h
+                          </td>
+                          <td
+                            style={{
+                              padding: '1rem',
+                              textAlign: 'right',
+                              fontSize: '16px',
+                              fontWeight: '600',
+                              backgroundColor: '#f1f8f4',
+                              color: '#16a34a',
+                            }}
+                          >
+                            {report.netHours.toFixed(2)}h
+                          </td>
+                          <td style={{ padding: '1rem', textAlign: 'center', fontSize: '12px' }}>
+                            <span
+                              style={{
+                                padding: '4px 8px',
+                                borderRadius: '4px',
+                                backgroundColor:
+                                  report.shift.status === 'complete'
+                                    ? '#d4edda'
+                                    : report.shift.status === 'in_progress'
+                                    ? '#cfe2ff'
+                                    : report.shift.status === 'on_break'
+                                    ? '#fff3cd'
+                                    : '#f8d7da',
+                                color:
+                                  report.shift.status === 'complete'
+                                    ? '#155724'
+                                    : report.shift.status === 'in_progress'
+                                    ? '#004085'
+                                    : report.shift.status === 'on_break'
+                                    ? '#856404'
+                                    : '#721c24',
+                                fontWeight: '500',
+                              }}
+                            >
+                              {report.shift.status.replace('_', ' ')}
+                            </span>
+                          </td>
+                        </tr>
+
+                        {isExpanded && (
+                          <tr key={`${rowKey}-detail`} style={{ backgroundColor: '#f9f9f9' }}>
+                            <td colSpan={8} style={{ padding: '1.5rem' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                <div>
+                                  <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '0.75rem' }}>
+                                    {language === 'en' ? 'Shift Details' : 'Detalles del Turno'}
+                                  </h4>
+                                  <div
+                                    style={{
+                                      display: 'grid',
+                                      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                                      gap: '1rem',
+                                    }}
+                                  >
+                                    <div>
+                                      <div style={{ fontSize: '12px', color: '#666', marginBottom: '0.25rem' }}>
+                                        {language === 'en' ? 'Total Worked' : 'Total Trabajado'}
+                                      </div>
+                                      <div style={{ fontSize: '16px', fontWeight: '500' }}>
+                                        {formatDuration(report.shift.totalWorkedMs)}
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <div style={{ fontSize: '12px', color: '#666', marginBottom: '0.25rem' }}>
+                                        {language === 'en' ? 'Break Time' : 'Tiempo de Descanso'}
+                                      </div>
+                                      <div style={{ fontSize: '16px', fontWeight: '500' }}>
+                                        {formatDuration(report.shift.breakTimeMs)}
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <div style={{ fontSize: '12px', color: '#666', marginBottom: '0.25rem' }}>
+                                        {language === 'en' ? 'Net Worked' : 'Neto Trabajado'}
+                                      </div>
+                                      <div style={{ fontSize: '16px', fontWeight: '600', color: '#16a34a' }}>
+                                        {formatDuration(report.shift.netWorkedMs)}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {report.shift.breaks.length > 0 && (
+                                  <div>
+                                    <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '0.5rem' }}>
+                                      {language === 'en' ? 'Breaks' : 'Descansos'}
+                                    </h4>
+                                    {report.shift.breaks.map((brk, idx) => (
+                                      <div
+                                        key={idx}
+                                        style={{
+                                          display: 'flex',
+                                          gap: '1rem',
+                                          alignItems: 'center',
+                                          padding: '0.5rem',
+                                          backgroundColor: 'white',
+                                          borderRadius: '4px',
+                                          marginBottom: '0.5rem',
+                                        }}
+                                      >
+                                        <span style={{ fontSize: '13px', color: '#666' }}>
+                                          {language === 'en' ? 'Break' : 'Descanso'} #{idx + 1}:
+                                        </span>
+                                        <span style={{ fontSize: '14px', fontWeight: '500' }}>
+                                          {formatTime(brk.start)}
+                                        </span>
+                                        <span>→</span>
+                                        <span style={{ fontSize: '14px', fontWeight: '500' }}>
+                                          {brk.end ? formatTime(brk.end) : language === 'en' ? 'In Progress' : 'En Curso'}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {report.hasIssues && report.issueDescription && (
+                                  <div
+                                    style={{
+                                      padding: '0.75rem',
+                                      backgroundColor: '#fff3cd',
+                                      borderLeft: '4px solid #f59e0b',
+                                      borderRadius: '4px',
+                                    }}
+                                  >
+                                    <div style={{ fontSize: '12px', fontWeight: '600', color: '#856404', marginBottom: '0.25rem' }}>
+                                      ⚠ {language === 'en' ? 'Issue Detected' : 'Problema Detectado'}
+                                    </div>
+                                    <div style={{ fontSize: '13px', color: '#856404' }}>{report.issueDescription}</div>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
