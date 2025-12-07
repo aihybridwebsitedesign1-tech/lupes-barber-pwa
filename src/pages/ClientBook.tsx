@@ -81,17 +81,22 @@ export default function ClientBook() {
 
   const loadInitialData = async () => {
     setLoading(true);
-    console.log('[ClientBook DEBUG] === STARTING DATA LOAD ===');
+    console.log('[ClientBook BARBERS] === STARTING DATA LOAD ===');
 
     try {
+      // Check current session
+      const { data: sessionData } = await supabase.auth.getSession();
+      console.log('[ClientBook BARBERS] Current session user:', sessionData.session?.user?.email || 'anonymous');
+      console.log('[ClientBook BARBERS] Loading barbers as:', sessionData.session ? 'authenticated user' : 'anonymous client');
+
       // Check if a specific barber was preselected via query param
       const preselectedBarberId = searchParams.get('barber');
-      console.log('[ClientBook DEBUG] Preselected barber ID from URL:', preselectedBarberId || 'none');
+      console.log('[ClientBook BARBERS] Preselected barber ID from URL:', preselectedBarberId || 'none');
 
       // Step 1 shows all active barbers that accept online bookings.
-      // If a barber is preselected via direct link, we fetch that barber separately.
-      // Availability and booking rules are enforced later when generating time slots.
-      console.log('[ClientBook DEBUG] Building Supabase query...');
+      // NO schedule, appointment, or availability checks here - those happen in slot generation.
+      console.log('[ClientBook BARBERS] Building query for eligible barbers...');
+      console.log('[ClientBook BARBERS] Query filters: role=BARBER, active=true, show_on_client_site=true, accept_online_bookings=true');
 
       // Main query: Get all barbers available for general booking
       const barbersQuery = supabase
@@ -116,7 +121,7 @@ export default function ClientBook() {
           .maybeSingle();
       }
 
-      console.log('[ClientBook DEBUG] Executing queries...');
+      console.log('[ClientBook BARBERS] Executing queries...');
       const [barbersRes, servicesRes, shopConfig, shopConfigFull, preselectedBarberRes] = await Promise.all([
         barbersQuery,
         supabase.from('services').select('id, name_en, name_es, price, duration_minutes').eq('active', true).order('name_en'),
@@ -125,24 +130,37 @@ export default function ClientBook() {
         preselectedBarberQuery || Promise.resolve({ data: null, error: null } as any)
       ]);
 
-      console.log('[ClientBook DEBUG] === RAW QUERY RESULTS ===');
-      console.log('[ClientBook DEBUG] Barbers query error:', barbersRes.error);
-      console.log('[ClientBook DEBUG] Barbers query data:', barbersRes.data);
-      console.log('[ClientBook DEBUG] Barbers count from DB:', barbersRes.data?.length || 0);
-
+      console.log('[ClientBook BARBERS] === QUERY RESULTS ===');
       if (barbersRes.error) {
-        console.error('[ClientBook DEBUG] ❌ ERROR loading barbers:', barbersRes.error);
+        console.error('[ClientBook BARBERS] ❌ ERROR loading barbers:', barbersRes.error);
+        console.error('[ClientBook BARBERS] Error details:', JSON.stringify(barbersRes.error, null, 2));
         throw barbersRes.error;
       }
 
+      const rawDbBarbers = barbersRes.data || [];
+      console.log('[ClientBook BARBERS] ✅ Query successful!');
+      console.log('[ClientBook BARBERS] Rows returned from DB:', rawDbBarbers.length);
+
+      if (rawDbBarbers.length > 0) {
+        console.log('[ClientBook BARBERS] Barbers found:', rawDbBarbers.map(b => ({
+          name: b.name,
+          display_name: b.public_display_name,
+          active: b.active,
+          show_on_client_site: b.show_on_client_site,
+          accept_online_bookings: b.accept_online_bookings
+        })));
+      } else {
+        console.warn('[ClientBook BARBERS] ⚠️ ZERO barbers returned from query!');
+        console.warn('[ClientBook BARBERS] This should not happen if Carlos Martinez exists in DB with correct flags.');
+      }
+
       if (servicesRes.error) {
-        console.error('[ClientBook DEBUG] ❌ ERROR loading services:', servicesRes.error);
+        console.error('[ClientBook BARBERS] ❌ ERROR loading services:', servicesRes.error);
         throw servicesRes.error;
       }
 
       // Store the raw DB result before any processing
-      const rawDbBarbers = barbersRes.data || [];
-      console.log('[ClientBook DEBUG] Storing rawBarbersFromDb:', rawDbBarbers.length, 'barbers');
+      console.log('[ClientBook BARBERS] Storing rawBarbersFromDb:', rawDbBarbers.length, 'barbers');
       setRawBarbersFromDb(rawDbBarbers);
 
       let loadedBarbers = [...rawDbBarbers];
@@ -162,17 +180,13 @@ export default function ClientBook() {
 
       const loadedServices = servicesRes.data || [];
 
-      console.log('[ClientBook DEBUG] === FINAL BARBERS LIST ===');
-      console.log('[ClientBook DEBUG] Final barbers count:', loadedBarbers.length);
-      console.log('[ClientBook DEBUG] Final barbers:', loadedBarbers.map(b => ({
-        id: b.id,
-        name: b.name,
-        active: b.active,
-        show_on_client_site: b.show_on_client_site,
-        accept_online_bookings: b.accept_online_bookings
-      })));
+      console.log('[ClientBook BARBERS] === FINAL BARBERS LIST ===');
+      console.log('[ClientBook BARBERS] Final barbers count:', loadedBarbers.length);
+      if (loadedBarbers.length > 0) {
+        console.log('[ClientBook BARBERS] Will render these barbers:', loadedBarbers.map(b => b.name).join(', '));
+      }
 
-      console.log('[ClientBook DEBUG] Calling setBarbers() with', loadedBarbers.length, 'barbers');
+      console.log('[ClientBook BARBERS] Calling setBarbers() with', loadedBarbers.length, 'barbers');
       setBarbers(loadedBarbers);
       setServices(loadedServices);
 
@@ -186,7 +200,7 @@ export default function ClientBook() {
       if (shopConfig) {
         setConfig(shopConfig);
       } else {
-        console.warn('[ClientBook DEBUG] No shop config, using defaults');
+        console.warn('[ClientBook BARBERS] No shop config, using defaults');
         const fallbackConfig = {
           days_bookable_in_advance: 30,
           min_book_ahead_hours: 2,
@@ -195,7 +209,7 @@ export default function ClientBook() {
         setConfig(fallbackConfig);
       }
     } catch (error) {
-      console.error('[ClientBook DEBUG] ❌ FATAL ERROR in loadInitialData:', error);
+      console.error('[ClientBook BARBERS] ❌ FATAL ERROR in loadInitialData:', error);
       const fallbackConfig = {
         days_bookable_in_advance: 30,
         min_book_ahead_hours: 2,
@@ -203,7 +217,7 @@ export default function ClientBook() {
       };
       setConfig(fallbackConfig);
     } finally {
-      console.log('[ClientBook DEBUG] Setting loading=false');
+      console.log('[ClientBook BARBERS] Data load complete, setting loading=false');
       setLoading(false);
     }
   };
@@ -426,12 +440,6 @@ export default function ClientBook() {
     );
   }
 
-  // CRITICAL DEBUG: Log barbers array at render time
-  console.log('[ClientBook DEBUG] === RENDER TIME CHECK ===');
-  console.log('[ClientBook DEBUG] barbers.length:', barbers.length);
-  console.log('[ClientBook DEBUG] barbers array:', barbers);
-  console.log('[ClientBook DEBUG] Will show "No barbers" message:', barbers.length === 0);
-
   // Compute render list: if DB has barbers, use them; never hide them
   const hasDbBarbers = (rawBarbersFromDb?.length ?? 0) > 0;
   const barbersToRender: Barber[] =
@@ -439,14 +447,13 @@ export default function ClientBook() {
       ? barbers
       : (hasDbBarbers ? rawBarbersFromDb : []);
 
-  console.log(
-    '[ClientBook DEBUG] pre-render step1 - rawDb:',
-    rawBarbersFromDb?.length ?? 0,
-    'state:',
-    barbers?.length ?? 0,
-    'render:',
-    barbersToRender.length
-  );
+  console.log('[ClientBook BARBERS] === RENDER CHECK ===');
+  console.log('[ClientBook BARBERS] rawDb:', rawBarbersFromDb?.length ?? 0, 'state:', barbers?.length ?? 0, 'render:', barbersToRender.length);
+  if (barbersToRender.length > 0) {
+    console.log('[ClientBook BARBERS] Will render:', barbersToRender.map(b => b.name).join(', '));
+  } else {
+    console.warn('[ClientBook BARBERS] ⚠️ Will show "No barbers available" message');
+  }
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
