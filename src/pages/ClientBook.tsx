@@ -2,9 +2,22 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
-import { validateBookingRules, formatBookingRuleError, getShopConfig } from '../lib/bookingRules';
+import { validateBookingRules, formatBookingRuleError, getShopConfig, generateAvailableSlotsForBarber } from '../lib/bookingRules';
 import { sendConfirmation } from '../lib/notificationHelper';
+import { formatTime12h } from '../utils/dateTime';
 import ClientHeader from '../components/ClientHeader';
+
+const debug = (...args: any[]) => {
+  if (import.meta.env.DEV) {
+    debug(...args);
+  }
+};
+
+const debugError = (...args: any[]) => {
+  if (import.meta.env.DEV) {
+    debugError(...args);
+  }
+};
 
 type Barber = {
   id: string;
@@ -29,6 +42,8 @@ export default function ClientBook() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
+  const stripeEnabled = Boolean(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
+
   const [step, setStep] = useState(1);
   const [barbers, setBarbers] = useState<Barber[]>([]);
   const [rawBarbersFromDb, setRawBarbersFromDb] = useState<Barber[]>([]);
@@ -45,8 +60,8 @@ export default function ClientBook() {
   const [clientPhone, setClientPhone] = useState('');
   const [clientNotes, setClientNotes] = useState('');
 
-  const [timeSlots, setTimeSlots] = useState<string[]>([]);
-  const [config, setConfig] = useState<{ days_bookable_in_advance: number; min_book_ahead_hours: number; client_booking_interval_minutes: number } | null>(null);
+  const [timeSlots, setTimeSlots] = useState<{ start: string; end: string }[]>([]);
+  const [config, setConfig] = useState<{ days_bookable_in_advance: number; min_book_ahead_hours: number; min_cancel_ahead_hours: number; client_booking_interval_minutes: number } | null>(null);
   const [shopInfo, setShopInfo] = useState<{ shop_name: string; phone: string | null }>({ shop_name: "Lupe's Barber", phone: null });
 
   useEffect(() => {
@@ -74,24 +89,24 @@ export default function ClientBook() {
   }, [searchParams, services]);
 
   useEffect(() => {
-    if (selectedDate && config) {
+    if (selectedDate && selectedBarber && selectedService && config) {
       generateTimeSlots();
     }
-  }, [selectedDate, config]);
+  }, [selectedDate, selectedBarber, selectedService, config]);
 
   const loadInitialData = async () => {
     setLoading(true);
     setError('');
-    console.log('[ClientBook BARBERS] === STARTING DATA LOAD ===');
+    debug('[ClientBook BARBERS] === STARTING DATA LOAD ===');
 
     // Check current session
     const { data: sessionData } = await supabase.auth.getSession();
-    console.log('[ClientBook BARBERS] Current session user:', sessionData.session?.user?.email || 'anonymous');
-    console.log('[ClientBook BARBERS] Loading barbers as:', sessionData.session ? 'authenticated user' : 'anonymous client');
+    debug('[ClientBook BARBERS] Current session user:', sessionData.session?.user?.email || 'anonymous');
+    debug('[ClientBook BARBERS] Loading barbers as:', sessionData.session ? 'authenticated user' : 'anonymous client');
 
     // Check if a specific barber was preselected via query param
     const preselectedBarberId = searchParams.get('barber');
-    console.log('[ClientBook BARBERS] Preselected barber ID from URL:', preselectedBarberId || 'none');
+    debug('[ClientBook BARBERS] Preselected barber ID from URL:', preselectedBarberId || 'none');
 
     // ========================================
     // SECTION 1: BARBERS (CRITICAL - MUST SUCCEED FOR STEP 1)
@@ -100,8 +115,8 @@ export default function ClientBook() {
     let loadedBarbers: Barber[] = [];
 
     try {
-      console.log('[ClientBook BARBERS] Building query for eligible barbers...');
-      console.log('[ClientBook BARBERS] Query filters: role=BARBER, active=true, show_on_client_site=true, accept_online_bookings=true');
+      debug('[ClientBook BARBERS] Building query for eligible barbers...');
+      debug('[ClientBook BARBERS] Query filters: role=BARBER, active=true, show_on_client_site=true, accept_online_bookings=true');
 
       // Main query: Get all barbers available for general booking
       const barbersQuery = supabase
@@ -126,26 +141,26 @@ export default function ClientBook() {
           .maybeSingle();
       }
 
-      console.log('[ClientBook BARBERS] Executing barbers queries...');
+      debug('[ClientBook BARBERS] Executing barbers queries...');
       const [barbersRes, preselectedBarberRes] = await Promise.all([
         barbersQuery,
         preselectedBarberQuery || Promise.resolve({ data: null, error: null } as any)
       ]);
 
-      console.log('[ClientBook BARBERS] === QUERY RESULTS ===');
+      debug('[ClientBook BARBERS] === QUERY RESULTS ===');
       if (barbersRes.error) {
-        console.error('[ClientBook BARBERS] ❌ ERROR loading barbers:', barbersRes.error);
-        console.error('[ClientBook BARBERS] Error details:', JSON.stringify(barbersRes.error, null, 2));
+        debugError('[ClientBook BARBERS] ❌ ERROR loading barbers:', barbersRes.error);
+        debugError('[ClientBook BARBERS] Error details:', JSON.stringify(barbersRes.error, null, 2));
         // Set empty barbers but DO NOT crash the component
         rawDbBarbers = [];
         loadedBarbers = [];
       } else {
         rawDbBarbers = barbersRes.data || [];
-        console.log('[ClientBook BARBERS] ✅ Query successful!');
-        console.log('[ClientBook BARBERS] Rows returned from DB:', rawDbBarbers.length);
+        debug('[ClientBook BARBERS] ✅ Query successful!');
+        debug('[ClientBook BARBERS] Rows returned from DB:', rawDbBarbers.length);
 
         if (rawDbBarbers.length > 0) {
-          console.log('[ClientBook BARBERS] Barbers found:', rawDbBarbers.map(b => ({
+          debug('[ClientBook BARBERS] Barbers found:', rawDbBarbers.map(b => ({
             name: b.name,
             display_name: b.public_display_name,
             active: b.active,
@@ -165,7 +180,7 @@ export default function ClientBook() {
           const alreadyInList = loadedBarbers.find(b => b.id === preselectedBarber.id);
 
           if (!alreadyInList) {
-            console.log('[ClientBook BARBERS] Adding preselected barber (direct link):', preselectedBarber.name);
+            debug('[ClientBook BARBERS] Adding preselected barber (direct link):', preselectedBarber.name);
             loadedBarbers = [preselectedBarber, ...loadedBarbers];
           }
         } else if (preselectedBarberId && !preselectedBarberRes?.data) {
@@ -174,19 +189,19 @@ export default function ClientBook() {
       }
 
       // Store the raw DB result and commit to state
-      console.log('[ClientBook BARBERS] Storing rawBarbersFromDb:', rawDbBarbers.length, 'barbers');
+      debug('[ClientBook BARBERS] Storing rawBarbersFromDb:', rawDbBarbers.length, 'barbers');
       setRawBarbersFromDb(rawDbBarbers);
 
-      console.log('[ClientBook BARBERS] === FINAL BARBERS LIST ===');
-      console.log('[ClientBook BARBERS] Final barbers count:', loadedBarbers.length);
+      debug('[ClientBook BARBERS] === FINAL BARBERS LIST ===');
+      debug('[ClientBook BARBERS] Final barbers count:', loadedBarbers.length);
       if (loadedBarbers.length > 0) {
-        console.log('[ClientBook BARBERS] Will render these barbers:', loadedBarbers.map(b => b.name).join(', '));
+        debug('[ClientBook BARBERS] Will render these barbers:', loadedBarbers.map(b => b.name).join(', '));
       }
 
-      console.log('[ClientBook BARBERS] Calling setBarbers() with', loadedBarbers.length, 'barbers');
+      debug('[ClientBook BARBERS] Calling setBarbers() with', loadedBarbers.length, 'barbers');
       setBarbers(loadedBarbers);
     } catch (error) {
-      console.error('[ClientBook BARBERS] ❌ UNEXPECTED ERROR in barbers section:', error);
+      debugError('[ClientBook BARBERS] ❌ UNEXPECTED ERROR in barbers section:', error);
       // Even on unexpected error, commit empty arrays to state so UI can render
       setRawBarbersFromDb([]);
       setBarbers([]);
@@ -196,7 +211,7 @@ export default function ClientBook() {
     // SECTION 2: SERVICES (NON-CRITICAL - FAILURE IS OK)
     // ========================================
     try {
-      console.log('[ClientBook BARBERS] Loading services...');
+      debug('[ClientBook BARBERS] Loading services...');
       const servicesRes = await supabase
         .from('services')
         .select('id, name_en, name_es, base_price, duration_minutes')
@@ -204,17 +219,17 @@ export default function ClientBook() {
         .order('name_en', { ascending: true });
 
       if (servicesRes.error) {
-        console.error('[ClientBook BARBERS] ❌ ERROR loading services:', servicesRes.error);
-        console.error('[ClientBook BARBERS] Services error details:', JSON.stringify(servicesRes.error, null, 2));
+        debugError('[ClientBook BARBERS] ❌ ERROR loading services:', servicesRes.error);
+        debugError('[ClientBook BARBERS] Services error details:', JSON.stringify(servicesRes.error, null, 2));
         // DO NOT rethrow - just set empty services
         setServices([]);
       } else {
         const loadedServices = servicesRes.data || [];
-        console.log('[ClientBook BARBERS] ✅ Services loaded:', loadedServices.length);
+        debug('[ClientBook BARBERS] ✅ Services loaded:', loadedServices.length);
         setServices(loadedServices);
       }
     } catch (error) {
-      console.error('[ClientBook BARBERS] ❌ UNEXPECTED ERROR loading services:', error);
+      debugError('[ClientBook BARBERS] ❌ UNEXPECTED ERROR loading services:', error);
       // DO NOT rethrow - just set empty services
       setServices([]);
     }
@@ -223,7 +238,7 @@ export default function ClientBook() {
     // SECTION 3: SHOP CONFIG (NON-CRITICAL - FAILURE IS OK)
     // ========================================
     try {
-      console.log('[ClientBook BARBERS] Loading shop config...');
+      debug('[ClientBook BARBERS] Loading shop config...');
       const [shopConfig, shopConfigFull] = await Promise.all([
         getShopConfig(),
         supabase.from('shop_config').select('shop_name, phone, enable_confirmations').single()
@@ -243,16 +258,18 @@ export default function ClientBook() {
         const fallbackConfig = {
           days_bookable_in_advance: 30,
           min_book_ahead_hours: 2,
+          min_cancel_ahead_hours: 24,
           client_booking_interval_minutes: 15,
         };
         setConfig(fallbackConfig);
       }
     } catch (error) {
-      console.error('[ClientBook BARBERS] ❌ ERROR loading shop config:', error);
+      debugError('[ClientBook BARBERS] ❌ ERROR loading shop config:', error);
       // Use fallback config
       const fallbackConfig = {
         days_bookable_in_advance: 30,
         min_book_ahead_hours: 2,
+        min_cancel_ahead_hours: 24,
         client_booking_interval_minutes: 15,
       };
       setConfig(fallbackConfig);
@@ -261,24 +278,76 @@ export default function ClientBook() {
     // ========================================
     // DONE - Set loading to false
     // ========================================
-    console.log('[ClientBook BARBERS] Data load complete, setting loading=false');
+    debug('[ClientBook BARBERS] Data load complete, setting loading=false');
     setLoading(false);
   };
 
-  const generateTimeSlots = () => {
-    if (!config) return;
-
-    const slots: string[] = [];
-    const intervalMinutes = config.client_booking_interval_minutes || 15;
-
-    for (let hour = 9; hour < 19; hour++) {
-      for (let minute = 0; minute < 60; minute += intervalMinutes) {
-        const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-        slots.push(timeStr);
-      }
+  const generateTimeSlots = async () => {
+    if (!config || !selectedBarber || !selectedService || !selectedDate) {
+      setTimeSlots([]);
+      return;
     }
 
-    setTimeSlots(slots);
+    try {
+      const selectedServiceData = services.find(s => s.id === selectedService);
+      if (!selectedServiceData) {
+        setTimeSlots([]);
+        return;
+      }
+
+      const dayOfWeek = new Date(selectedDate).getDay();
+
+      const [scheduleRes, appointmentsRes, timeOffRes, barberOverridesRes] = await Promise.all([
+        supabase
+          .from('barber_schedules')
+          .select('day_of_week, active, start_time, end_time')
+          .eq('barber_id', selectedBarber)
+          .eq('day_of_week', dayOfWeek)
+          .maybeSingle(),
+        supabase
+          .from('appointments')
+          .select('id, scheduled_start, scheduled_end, status')
+          .eq('barber_id', selectedBarber)
+          .gte('scheduled_start', `${selectedDate}T00:00:00`)
+          .lte('scheduled_start', `${selectedDate}T23:59:59`),
+        supabase
+          .from('barber_time_off')
+          .select('id, start_time, end_time')
+          .eq('barber_id', selectedBarber)
+          .lte('start_time', `${selectedDate}T23:59:59`)
+          .gte('end_time', `${selectedDate}T00:00:00`),
+        supabase
+          .from('users')
+          .select('min_hours_before_booking_override, min_hours_before_cancellation_override, booking_interval_minutes_override')
+          .eq('id', selectedBarber)
+          .maybeSingle()
+      ]);
+
+      if (scheduleRes.error) {
+        debugError('[ClientBook] Error loading barber schedule:', scheduleRes.error);
+      }
+      if (appointmentsRes.error) {
+        debugError('[ClientBook] Error loading appointments:', appointmentsRes.error);
+      }
+      if (timeOffRes.error) {
+        debugError('[ClientBook] Error loading time off:', timeOffRes.error);
+      }
+
+      const slots = generateAvailableSlotsForBarber({
+        date: selectedDate,
+        serviceDurationMinutes: selectedServiceData.duration_minutes,
+        shopConfig: config,
+        scheduleForDay: scheduleRes.data,
+        appointments: appointmentsRes.data || [],
+        timeOffBlocks: timeOffRes.data || [],
+        barberOverrides: barberOverridesRes.data,
+      });
+
+      setTimeSlots(slots);
+    } catch (error) {
+      debugError('[ClientBook] Error generating time slots:', error);
+      setTimeSlots([]);
+    }
   };
 
   const getMinDate = () => {
@@ -313,7 +382,7 @@ export default function ClientBook() {
         return false;
       }
 
-      const appointmentDateTime = new Date(`${selectedDate}T${selectedTime}:00`);
+      const appointmentDateTime = new Date(selectedTime);
       const validationError = await validateBookingRules(appointmentDateTime, 'create');
 
       if (validationError) {
@@ -386,18 +455,21 @@ export default function ClientBook() {
         clientId = newClient.id;
       }
 
-      const appointmentDateTime = new Date(`${selectedDate}T${selectedTime}:00`);
       const selectedServiceData = services.find(s => s.id === selectedService);
       const amountDue = selectedServiceData?.base_price || 0;
 
-      const { data: newAppointment, error: appointmentError } = await supabase
+      const selectedSlot = timeSlots.find(slot => slot.start === selectedTime);
+      const appointmentStart = selectedTime;
+      const appointmentEnd = selectedSlot?.end || new Date(new Date(selectedTime).getTime() + (selectedServiceData?.duration_minutes || 30) * 60000).toISOString();
+
+      const { data: newAppointment, error: appointmentError} = await supabase
         .from('appointments')
         .insert({
           barber_id: selectedBarber,
           client_id: clientId,
           service_id: selectedService,
-          scheduled_start: appointmentDateTime.toISOString(),
-          scheduled_end: new Date(appointmentDateTime.getTime() + (selectedServiceData?.duration_minutes || 30) * 60000).toISOString(),
+          scheduled_start: appointmentStart,
+          scheduled_end: appointmentEnd,
           status: 'booked',
           notes: clientNotes || null,
           source: 'client_web',
@@ -419,50 +491,58 @@ export default function ClientBook() {
           appointmentId: newAppointment.id,
           clientId: clientId,
           phoneNumber: clientPhone,
-          scheduledStart: appointmentDateTime.toISOString(),
+          scheduledStart: appointmentStart,
           barberName,
           serviceName,
           shopName: shopInfo.shop_name,
           shopPhone: shopInfo.phone || undefined,
           language,
         }).catch(err => {
-          console.error('Failed to send confirmation:', err);
+          debugError('Failed to send confirmation:', err);
         });
       }
 
-      // Create Stripe checkout session
-      try {
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      // Check if Stripe is enabled
+      const stripeEnabled = Boolean(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
 
-        const response = await fetch(`${supabaseUrl}/functions/v1/create-checkout`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({ appointmentId: newAppointment.id }),
-        });
+      if (stripeEnabled) {
+        // Create Stripe checkout session
+        try {
+          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 
-        if (!response.ok) {
-          throw new Error('Failed to create checkout session');
+          const response = await fetch(`${supabaseUrl}/functions/v1/create-checkout`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            },
+            body: JSON.stringify({ appointmentId: newAppointment.id }),
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to create checkout session');
+          }
+
+          const { url } = await response.json();
+
+          if (url) {
+            window.location.href = url;
+          } else {
+            throw new Error('No checkout URL returned');
+          }
+        } catch (stripeError) {
+          debugError('Stripe checkout error:', stripeError);
+          alert(language === 'en'
+            ? 'Booking confirmed, but payment setup failed. You can pay when you arrive.'
+            : 'Reserva confirmada, pero falló la configuración de pago. Puedes pagar cuando llegues.');
+          navigate('/client/home');
         }
-
-        const { url } = await response.json();
-
-        if (url) {
-          window.location.href = url;
-        } else {
-          throw new Error('No checkout URL returned');
-        }
-      } catch (stripeError) {
-        console.error('Stripe checkout error:', stripeError);
-        alert(language === 'en'
-          ? 'Booking confirmed, but payment setup failed. You can pay when you arrive.'
-          : 'Reserva confirmada, pero falló la configuración de pago. Puedes pagar cuando llegues.');
+      } else {
+        // Stripe not enabled - redirect to success page
         navigate('/client/home');
       }
     } catch (error) {
-      console.error('Error creating booking:', error);
+      debugError('Error creating booking:', error);
       setError(language === 'en' ? 'Failed to create booking. Please try again.' : 'Error al crear la reserva. Por favor intenta de nuevo.');
     } finally {
       setSubmitting(false);
@@ -490,10 +570,10 @@ export default function ClientBook() {
       ? barbers
       : (hasDbBarbers ? rawBarbersFromDb : []);
 
-  console.log('[ClientBook BARBERS] === RENDER CHECK ===');
-  console.log('[ClientBook BARBERS] rawDb:', rawBarbersFromDb?.length ?? 0, 'state:', barbers?.length ?? 0, 'render:', barbersToRender.length);
+  debug('[ClientBook BARBERS] === RENDER CHECK ===');
+  debug('[ClientBook BARBERS] rawDb:', rawBarbersFromDb?.length ?? 0, 'state:', barbers?.length ?? 0, 'render:', barbersToRender.length);
   if (barbersToRender.length > 0) {
-    console.log('[ClientBook BARBERS] Will render:', barbersToRender.map(b => b.name).join(', '));
+    debug('[ClientBook BARBERS] Will render:', barbersToRender.map(b => b.name).join(', '));
   } else {
     console.warn('[ClientBook BARBERS] ⚠️ Will show "No barbers available" message');
   }
@@ -540,11 +620,6 @@ export default function ClientBook() {
               <h2 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '1.5rem' }}>
                 {language === 'en' ? 'Select Barber' : 'Seleccionar Barbero'}
               </h2>
-
-              {/* Debug info for testing */}
-              <div style={{ fontSize: '12px', color: '#999', marginBottom: '8px' }}>
-                Debug: rawDb={rawBarbersFromDb?.length ?? 0}, state={barbers?.length ?? 0}, render={barbersToRender.length}
-              </div>
 
               {barbersToRender.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '2rem', color: '#666', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
@@ -669,23 +744,23 @@ export default function ClientBook() {
                     {language === 'en' ? 'Time' : 'Hora'}
                   </label>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: '0.5rem', maxHeight: '300px', overflowY: 'auto', padding: '0.5rem' }}>
-                    {timeSlots.map((time) => (
+                    {timeSlots.map((slot) => (
                       <button
-                        key={time}
-                        onClick={() => setSelectedTime(time)}
+                        key={slot.start}
+                        onClick={() => setSelectedTime(slot.start)}
                         style={{
                           padding: '0.75rem',
-                          border: `2px solid ${selectedTime === time ? '#e74c3c' : '#ddd'}`,
+                          border: `2px solid ${selectedTime === slot.start ? '#e74c3c' : '#ddd'}`,
                           borderRadius: '6px',
                           cursor: 'pointer',
-                          backgroundColor: selectedTime === time ? '#e74c3c' : 'white',
-                          color: selectedTime === time ? 'white' : '#000',
+                          backgroundColor: selectedTime === slot.start ? '#e74c3c' : 'white',
+                          color: selectedTime === slot.start ? 'white' : '#000',
                           fontSize: '14px',
                           fontWeight: '500',
                           transition: 'all 0.2s',
                         }}
                       >
-                        {time}
+                        {formatTime12h(slot.start)}
                       </button>
                     ))}
                   </div>
@@ -782,7 +857,7 @@ export default function ClientBook() {
                     })}
                   </div>
                   <div style={{ fontSize: '18px', fontWeight: '600' }}>
-                    {selectedTime}
+                    {selectedTime ? formatTime12h(selectedTime) : ''}
                   </div>
                 </div>
 
@@ -794,6 +869,26 @@ export default function ClientBook() {
                   <div style={{ fontSize: '16px' }}>{clientPhone}</div>
                 </div>
               </div>
+
+              {!stripeEnabled && (
+                <div style={{
+                  backgroundColor: '#fff3cd',
+                  border: '1px solid #ffc107',
+                  padding: '1rem',
+                  borderRadius: '8px',
+                  marginBottom: '1rem',
+                  fontSize: '14px',
+                  color: '#856404'
+                }}>
+                  {language === 'en'
+                    ? 'Payment will be collected at the shop. You can pay by cash or card when you arrive.'
+                    : 'El pago se recogerá en la tienda. Puedes pagar en efectivo o con tarjeta cuando llegues.'}
+                </div>
+              )}
+
+              {/* TODO (Phase 2): Use shop tip settings to show tip options when paying online
+                  - Tip percentage presets from shop_config.tip_percentage_presets
+                  - Tip flat presets from shop_config.tip_flat_presets */}
 
               <button
                 onClick={handleSubmit}
@@ -812,7 +907,9 @@ export default function ClientBook() {
               >
                 {submitting
                   ? (language === 'en' ? 'Processing...' : 'Procesando...')
-                  : (language === 'en' ? 'Pay & Confirm' : 'Pagar y Confirmar')}
+                  : stripeEnabled
+                    ? (language === 'en' ? 'Pay & Confirm' : 'Pagar y Confirmar')
+                    : (language === 'en' ? 'Confirm Booking' : 'Confirmar Reserva')}
               </button>
             </div>
           )}

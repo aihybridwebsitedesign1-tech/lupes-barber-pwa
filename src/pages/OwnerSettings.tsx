@@ -21,7 +21,7 @@ type ShopConfig = {
   lapsed_client_days: number;
 };
 
-type Tab = 'shop_info' | 'booking_rules' | 'retention' | 'commissions' | 'notifications';
+type Tab = 'shop_info' | 'booking_rules' | 'retention' | 'commissions' | 'payments' | 'notifications';
 
 export default function OwnerSettings() {
   const { language } = useLanguage();
@@ -56,6 +56,10 @@ export default function OwnerSettings() {
   const [reminderHoursBefore, setReminderHoursBefore] = useState('24');
   const [reminderHoursBeforeSecondary, setReminderHoursBeforeSecondary] = useState('');
   const [barbers, setBarbers] = useState<any[]>([]);
+
+  const [enableTipping, setEnableTipping] = useState(true);
+  const [tipPercentagePresets, setTipPercentagePresets] = useState('15, 18, 20, 25');
+  const [tipFlatPresets, setTipFlatPresets] = useState('5, 10, 15');
 
   useEffect(() => {
     if (!userData) return;
@@ -96,6 +100,12 @@ export default function OwnerSettings() {
         setShopFacebookUrl(data.shop_facebook_url || '');
         setShopTiktokUrl(data.shop_tiktok_url || '');
         setShopWebsiteUrl(data.shop_website_url || '');
+
+        setEnableTipping(data.enable_tipping ?? true);
+        const tipPercents = data.tip_percentage_presets || [15, 18, 20, 25];
+        setTipPercentagePresets(Array.isArray(tipPercents) ? tipPercents.join(', ') : '15, 18, 20, 25');
+        const tipFlats = data.tip_flat_presets || [5, 10, 15];
+        setTipFlatPresets(Array.isArray(tipFlats) ? tipFlats.join(', ') : '5, 10, 15');
       }
 
       const { data: barbersData, error: barbersError } = await supabase
@@ -227,6 +237,45 @@ export default function OwnerSettings() {
     }
   };
 
+  const savePaymentSettings = async () => {
+    setSaving(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const percentages = tipPercentagePresets
+        .split(',')
+        .map(p => parseInt(p.trim()))
+        .filter(p => !isNaN(p) && p > 0)
+        .slice(0, 5);
+
+      const flats = tipFlatPresets
+        .split(',')
+        .map(f => parseFloat(f.trim()))
+        .filter(f => !isNaN(f) && f > 0)
+        .slice(0, 5);
+
+      const { error: updateError } = await supabase
+        .from('shop_config')
+        .update({
+          enable_tipping: enableTipping,
+          tip_percentage_presets: JSON.stringify(percentages),
+          tip_flat_presets: JSON.stringify(flats),
+        })
+        .eq('id', config?.id || 1);
+
+      if (updateError) throw updateError;
+
+      setSuccess(language === 'en' ? 'Payment settings saved successfully!' : '¡Configuración de pagos guardada exitosamente!');
+      loadShopConfig();
+    } catch (err: any) {
+      console.error('Error saving payment settings:', err);
+      setError(language === 'en' ? 'Failed to save payment settings' : 'Error al guardar configuración de pagos');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleSaveNotifications = async () => {
     setSaving(true);
     setError('');
@@ -280,6 +329,7 @@ export default function OwnerSettings() {
     { id: 'booking_rules', labelEn: 'Booking Rules', labelEs: 'Reglas de Reserva' },
     { id: 'retention', labelEn: 'Clients & Retention', labelEs: 'Clientes y Retención' },
     { id: 'commissions', labelEn: 'Commissions', labelEs: 'Comisiones' },
+    { id: 'payments', labelEn: 'Online Payments', labelEs: 'Pagos en Línea' },
     { id: 'notifications', labelEn: 'Notifications', labelEs: 'Notificaciones' },
   ];
 
@@ -971,6 +1021,91 @@ export default function OwnerSettings() {
                         </table>
                       </div>
                     )}
+                  </div>
+                )}
+
+                {activeTab === 'payments' && (
+                  <div>
+                    <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '0.5rem' }}>
+                      {language === 'en' ? 'Online Payments & Tipping' : 'Pagos en Línea y Propinas'}
+                    </h3>
+                    <p style={{ fontSize: '14px', color: '#666', marginBottom: '1.5rem' }}>
+                      {language === 'en'
+                        ? 'Configure tip options for online payments. These will be shown when Stripe is fully integrated.'
+                        : 'Configura las opciones de propina para pagos en línea. Se mostrarán cuando Stripe esté completamente integrado.'}
+                    </p>
+
+                    <div style={{ marginBottom: '1.5rem' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', fontSize: '16px', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={enableTipping}
+                          onChange={(e) => setEnableTipping(e.target.checked)}
+                          style={{ marginRight: '0.5rem', width: '18px', height: '18px', cursor: 'pointer' }}
+                        />
+                        {language === 'en' ? 'Enable Tipping' : 'Habilitar Propinas'}
+                      </label>
+                      <p style={{ fontSize: '13px', color: '#666', marginTop: '0.25rem', marginLeft: '1.5rem' }}>
+                        {language === 'en'
+                          ? 'Allow clients to add tips when paying online'
+                          : 'Permitir que los clientes agreguen propinas al pagar en línea'}
+                      </p>
+                    </div>
+
+                    <div style={{ marginBottom: '1.5rem' }}>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '16px', fontWeight: '500' }}>
+                        {language === 'en' ? 'Tip Percentage Presets (%)' : 'Porcentajes de Propina Preestablecidos (%)'}
+                      </label>
+                      <input
+                        type="text"
+                        value={tipPercentagePresets}
+                        onChange={(e) => setTipPercentagePresets(e.target.value)}
+                        placeholder={language === 'en' ? 'e.g., 15, 18, 20, 25' : 'ej., 15, 18, 20, 25'}
+                        style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '16px' }}
+                      />
+                      <p style={{ fontSize: '13px', color: '#666', marginTop: '0.25rem' }}>
+                        {language === 'en'
+                          ? 'Enter up to 5 percentage values, separated by commas'
+                          : 'Ingresa hasta 5 valores de porcentaje, separados por comas'}
+                      </p>
+                    </div>
+
+                    <div style={{ marginBottom: '1.5rem' }}>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '16px', fontWeight: '500' }}>
+                        {language === 'en' ? 'Tip Flat Amount Presets ($)' : 'Montos de Propina Fijos ($)'}
+                      </label>
+                      <input
+                        type="text"
+                        value={tipFlatPresets}
+                        onChange={(e) => setTipFlatPresets(e.target.value)}
+                        placeholder={language === 'en' ? 'e.g., 5, 10, 15' : 'ej., 5, 10, 15'}
+                        style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '16px' }}
+                      />
+                      <p style={{ fontSize: '13px', color: '#666', marginTop: '0.25rem' }}>
+                        {language === 'en'
+                          ? 'Enter up to 5 dollar amounts, separated by commas'
+                          : 'Ingresa hasta 5 cantidades en dólares, separadas por comas'}
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={savePaymentSettings}
+                      disabled={saving}
+                      style={{
+                        padding: '0.75rem 1.5rem',
+                        backgroundColor: saving ? '#999' : '#e74c3c',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: saving ? 'not-allowed' : 'pointer',
+                        fontSize: '16px',
+                        fontWeight: '500',
+                      }}
+                    >
+                      {saving
+                        ? (language === 'en' ? 'Saving...' : 'Guardando...')
+                        : (language === 'en' ? 'Save Changes' : 'Guardar Cambios')}
+                    </button>
                   </div>
                 )}
 

@@ -1,10 +1,41 @@
 import { supabase } from './supabase';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 type ShopConfig = {
   days_bookable_in_advance: number;
   min_book_ahead_hours: number;
   min_cancel_ahead_hours: number;
   client_booking_interval_minutes: number;
+};
+
+type BarberScheduleDay = {
+  day_of_week: number;
+  active: boolean;
+  start_time: string;
+  end_time: string;
+};
+
+type BarberAppointment = {
+  id: string;
+  scheduled_start: string;
+  scheduled_end: string;
+  status: string;
+};
+
+type BarberTimeOff = {
+  id: string;
+  start_time: string;
+  end_time: string;
+};
+
+type TimeSlot = {
+  start: string;
+  end: string;
 };
 
 type BarberOverrides = {
@@ -124,4 +155,99 @@ export async function validateBookingRules(
 export function formatBookingRuleError(error: BookingValidationError | null, language: 'en' | 'es'): string {
   if (!error) return '';
   return language === 'en' ? error.message : error.messageEs;
+}
+
+export function generateAvailableSlotsForBarber(args: {
+  date: string;
+  serviceDurationMinutes: number;
+  shopConfig: ShopConfig;
+  scheduleForDay: BarberScheduleDay | null;
+  appointments: BarberAppointment[];
+  timeOffBlocks: BarberTimeOff[];
+  now?: Date;
+  barberOverrides?: BarberOverrides | null;
+}): TimeSlot[] {
+  const {
+    date,
+    serviceDurationMinutes,
+    shopConfig,
+    scheduleForDay,
+    appointments,
+    timeOffBlocks,
+    now = new Date(),
+    barberOverrides = null,
+  } = args;
+
+  const SHOP_TIMEZONE = 'America/Chicago';
+  const slots: TimeSlot[] = [];
+
+  const minBookAheadHours = barberOverrides?.min_hours_before_booking_override ?? shopConfig.min_book_ahead_hours;
+  const intervalMinutes = barberOverrides?.booking_interval_minutes_override ?? shopConfig.client_booking_interval_minutes;
+
+  const selectedDate = dayjs.tz(date, SHOP_TIMEZONE);
+  const todayInShop = dayjs.tz(now, SHOP_TIMEZONE);
+  const daysUntilAppointment = selectedDate.diff(todayInShop.startOf('day'), 'day');
+
+  if (daysUntilAppointment > shopConfig.days_bookable_in_advance) {
+    return [];
+  }
+
+  if (!scheduleForDay || !scheduleForDay.active) {
+    return [];
+  }
+
+  const [startHour, startMin] = scheduleForDay.start_time.split(':').map(Number);
+  const [endHour, endMin] = scheduleForDay.end_time.split(':').map(Number);
+
+  let currentSlot = selectedDate.hour(startHour).minute(startMin).second(0).millisecond(0);
+  const dayEnd = selectedDate.hour(endHour).minute(endMin).second(0).millisecond(0);
+  const lastPossibleStart = dayEnd.subtract(serviceDurationMinutes, 'minute');
+
+  while (currentSlot.isBefore(lastPossibleStart) || currentSlot.isSame(lastPossibleStart)) {
+    const slotStart = currentSlot;
+    const slotEnd = slotStart.add(serviceDurationMinutes, 'minute');
+
+    const nowWithBuffer = dayjs(now).add(minBookAheadHours, 'hour');
+    if (slotStart.isBefore(nowWithBuffer)) {
+      currentSlot = currentSlot.add(intervalMinutes, 'minute');
+      continue;
+    }
+
+    const overlapsAppointment = appointments.some(appt => {
+      if (appt.status === 'cancelled' || appt.status === 'no_show') {
+        return false;
+      }
+
+      const apptStart = dayjs(appt.scheduled_start);
+      const apptEnd = dayjs(appt.scheduled_end);
+
+      return slotStart.isBefore(apptEnd) && slotEnd.isAfter(apptStart);
+    });
+
+    if (overlapsAppointment) {
+      currentSlot = currentSlot.add(intervalMinutes, 'minute');
+      continue;
+    }
+
+    const overlapsTimeOff = timeOffBlocks.some(block => {
+      const blockStart = dayjs(block.start_time);
+      const blockEnd = dayjs(block.end_time);
+
+      return slotStart.isBefore(blockEnd) && slotEnd.isAfter(blockStart);
+    });
+
+    if (overlapsTimeOff) {
+      currentSlot = currentSlot.add(intervalMinutes, 'minute');
+      continue;
+    }
+
+    slots.push({
+      start: slotStart.toISOString(),
+      end: slotEnd.toISOString(),
+    });
+
+    currentSlot = currentSlot.add(intervalMinutes, 'minute');
+  }
+
+  return slots;
 }
