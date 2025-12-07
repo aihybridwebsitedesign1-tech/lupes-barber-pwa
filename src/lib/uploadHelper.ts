@@ -1,10 +1,16 @@
 import { supabase } from './supabase';
 
-const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 export type UploadResult = {
   success: boolean;
   url?: string;
+  path?: string;
+  error?: string;
+};
+
+export type DeleteResult = {
+  success: boolean;
   error?: string;
 };
 
@@ -17,7 +23,7 @@ export const uploadImage = async (
     if (file.size > MAX_FILE_SIZE) {
       return {
         success: false,
-        error: 'File size must be less than 100MB',
+        error: 'File size must be less than 5MB',
       };
     }
 
@@ -55,6 +61,7 @@ export const uploadImage = async (
     return {
       success: true,
       url: publicUrl,
+      path: filePath,
     };
   } catch (error) {
     console.error('Unexpected upload error:', error);
@@ -65,6 +72,49 @@ export const uploadImage = async (
   }
 };
 
+export const deleteImage = async (
+  bucketName: string,
+  filePath: string
+): Promise<DeleteResult> => {
+  try {
+    const { error: deleteError } = await supabase.storage
+      .from(bucketName)
+      .remove([filePath]);
+
+    if (deleteError) {
+      console.error('Delete error:', deleteError);
+      return {
+        success: false,
+        error: deleteError.message || 'Failed to delete image',
+      };
+    }
+
+    return {
+      success: true,
+    };
+  } catch (error) {
+    console.error('Unexpected delete error:', error);
+    return {
+      success: false,
+      error: 'An unexpected error occurred during deletion',
+    };
+  }
+};
+
+export const extractPathFromUrl = (url: string, bucketName: string): string | null => {
+  try {
+    const urlObj = new URL(url);
+    const pathParts = urlObj.pathname.split(`/${bucketName}/`);
+    if (pathParts.length > 1) {
+      return pathParts[1];
+    }
+    return null;
+  } catch (error) {
+    console.error('Error extracting path from URL:', error);
+    return null;
+  }
+};
+
 export const getUploadLimitText = (language: 'en' | 'es'): string => {
-  return language === 'en' ? 'Max 100MB. JPG, PNG, WEBP.' : 'Máx 100MB. JPG, PNG, WEBP.';
+  return language === 'en' ? 'Max 5MB. JPG, PNG, WEBP.' : 'Máx 5MB. JPG, PNG, WEBP.';
 };
