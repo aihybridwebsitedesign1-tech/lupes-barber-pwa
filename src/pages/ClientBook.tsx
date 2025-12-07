@@ -8,8 +8,7 @@ import ClientHeader from '../components/ClientHeader';
 
 type Barber = {
   id: string;
-  first_name: string;
-  last_name: string;
+  name: string;
 };
 
 type Service = {
@@ -42,7 +41,6 @@ export default function ClientBook() {
 
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
   const [config, setConfig] = useState<{ days_bookable_in_advance: number; min_book_ahead_hours: number; client_booking_interval_minutes: number } | null>(null);
-  const [configWarning, setConfigWarning] = useState<string>('');
   const [shopInfo, setShopInfo] = useState<{ shop_name: string; phone: string | null }>({ shop_name: "Lupe's Barber", phone: null });
 
   useEffect(() => {
@@ -77,30 +75,32 @@ export default function ClientBook() {
 
   const loadInitialData = async () => {
     setLoading(true);
-    setConfigWarning('');
 
     try {
       console.log('🔵 Loading booking page data...');
 
       const [barbersRes, servicesRes, shopConfig, shopConfigFull] = await Promise.all([
-        supabase.from('users').select('id, first_name, last_name').eq('role', 'BARBER').eq('active', true).order('first_name'),
+        supabase.from('users').select('id, name').eq('role', 'BARBER').eq('active', true).order('name'),
         supabase.from('services').select('id, name_en, name_es, price, duration_minutes').eq('active', true).order('name_en'),
         getShopConfig(),
         supabase.from('shop_config').select('shop_name, phone, enable_confirmations').single()
       ]);
 
-      console.log('📊 Load results:', {
-        barbersCount: barbersRes.data?.length || 0,
-        servicesCount: servicesRes.data?.length || 0,
-        hasShopConfig: !!shopConfig,
-        shopConfigData: shopConfig
-      });
-
       if (barbersRes.error) throw barbersRes.error;
       if (servicesRes.error) throw servicesRes.error;
 
-      setBarbers(barbersRes.data || []);
-      setServices(servicesRes.data || []);
+      const loadedBarbers = barbersRes.data || [];
+      const loadedServices = servicesRes.data || [];
+
+      console.log('✅ Booking data loaded:', {
+        barbersCount: loadedBarbers.length,
+        barbers: loadedBarbers.map(b => ({ id: b.id, name: b.name })),
+        servicesCount: loadedServices.length,
+        hasShopConfig: !!shopConfig
+      });
+
+      setBarbers(loadedBarbers);
+      setServices(loadedServices);
 
       if (shopConfigFull.data) {
         setShopInfo({
@@ -113,18 +113,13 @@ export default function ClientBook() {
         console.log('✅ Using shop config from database');
         setConfig(shopConfig);
       } else {
-        console.warn('⚠️ Shop config not available, using fallback');
+        console.warn('⚠️ Shop config not available, using fallback defaults');
         const fallbackConfig = {
           days_bookable_in_advance: 30,
           min_book_ahead_hours: 2,
           client_booking_interval_minutes: 15,
         };
         setConfig(fallbackConfig);
-        setConfigWarning(
-          language === 'en'
-            ? 'Some booking settings could not be loaded. Using default rules. Please contact the shop for details.'
-            : 'Algunas configuraciones de reserva no se pudieron cargar. Usando reglas predeterminadas. Por favor contacta a la tienda para más detalles.'
-        );
       }
     } catch (error) {
       console.error('❌ Error loading booking page data:', error);
@@ -134,11 +129,6 @@ export default function ClientBook() {
         client_booking_interval_minutes: 15,
       };
       setConfig(fallbackConfig);
-      setConfigWarning(
-        language === 'en'
-          ? 'Some booking settings could not be loaded. Using default rules. Please contact the shop for details.'
-          : 'Algunas configuraciones de reserva no se pudieron cargar. Usando reglas predeterminadas. Por favor contacta a la tienda para más detalles.'
-      );
     } finally {
       setLoading(false);
     }
@@ -291,7 +281,7 @@ export default function ClientBook() {
 
       // Send confirmation SMS (don't block on failure)
       if (newAppointment && selectedBarberObj && selectedServiceData) {
-        const barberName = `${selectedBarberObj.first_name} ${selectedBarberObj.last_name}`;
+        const barberName = selectedBarberObj.name;
         const serviceName = language === 'es' ? selectedServiceData.name_es : selectedServiceData.name_en;
 
         sendConfirmation({
@@ -392,12 +382,6 @@ export default function ClientBook() {
           ))}
         </div>
 
-        {configWarning && (
-          <div style={{ backgroundColor: '#fff3cd', color: '#856404', padding: '1rem', borderRadius: '6px', marginBottom: '1.5rem', border: '1px solid #ffeaa7' }}>
-            {configWarning}
-          </div>
-        )}
-
         {error && (
           <div style={{ backgroundColor: '#f8d7da', color: '#721c24', padding: '1rem', borderRadius: '6px', marginBottom: '1.5rem', border: '1px solid #f5c6cb' }}>
             {error}
@@ -410,26 +394,37 @@ export default function ClientBook() {
               <h2 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '1.5rem' }}>
                 {language === 'en' ? 'Select Barber' : 'Seleccionar Barbero'}
               </h2>
-              <div style={{ display: 'grid', gap: '1rem' }}>
-                {barbers.map((barber) => (
-                  <div
-                    key={barber.id}
-                    onClick={() => setSelectedBarber(barber.id)}
-                    style={{
-                      padding: '1rem',
-                      border: `2px solid ${selectedBarber === barber.id ? '#e74c3c' : '#ddd'}`,
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      backgroundColor: selectedBarber === barber.id ? '#fee' : 'white',
-                      transition: 'all 0.2s',
-                    }}
-                  >
-                    <div style={{ fontSize: '18px', fontWeight: '600' }}>
-                      {barber.first_name} {barber.last_name}
-                    </div>
+              {barbers.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2rem', color: '#666', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
+                  <div style={{ fontSize: '18px', marginBottom: '0.5rem' }}>
+                    {language === 'en' ? 'No barbers available for booking right now.' : 'No hay barberos disponibles para reservar en este momento.'}
                   </div>
-                ))}
-              </div>
+                  <div style={{ fontSize: '14px' }}>
+                    {language === 'en' ? 'Please contact the shop for assistance.' : 'Por favor contacta a la tienda para asistencia.'}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gap: '1rem' }}>
+                  {barbers.map((barber) => (
+                    <div
+                      key={barber.id}
+                      onClick={() => setSelectedBarber(barber.id)}
+                      style={{
+                        padding: '1rem',
+                        border: `2px solid ${selectedBarber === barber.id ? '#e74c3c' : '#ddd'}`,
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        backgroundColor: selectedBarber === barber.id ? '#fee' : 'white',
+                        transition: 'all 0.2s',
+                      }}
+                    >
+                      <div style={{ fontSize: '18px', fontWeight: '600' }}>
+                        {barber.name}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -584,7 +579,7 @@ export default function ClientBook() {
                     {language === 'en' ? 'Barber' : 'Barbero'}
                   </div>
                   <div style={{ fontSize: '18px', fontWeight: '600' }}>
-                    {selectedBarberObj?.first_name} {selectedBarberObj?.last_name}
+                    {selectedBarberObj?.name}
                   </div>
                 </div>
 
