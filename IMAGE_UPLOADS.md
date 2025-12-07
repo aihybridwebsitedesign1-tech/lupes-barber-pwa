@@ -13,26 +13,26 @@ Three public buckets store all application images:
 1. **`barber-photos`**
    - Purpose: Barber profile photos
    - Path convention: `barbers/{barber_id}/{timestamp}_{filename}`
-   - Max size: 5MB per file
+   - Max size: 100MB per file
    - Allowed types: JPG, JPEG, PNG, WEBP
 
 2. **`service-images`**
    - Purpose: Service promotional images
    - Path convention: `services/{service_id}/{timestamp}_{filename}`
-   - Max size: 5MB per file
+   - Max size: 100MB per file
    - Allowed types: JPG, JPEG, PNG, WEBP
 
 3. **`product-images`**
    - Purpose: Product catalog images
    - Path convention: `products/{product_id}/{timestamp}_{filename}`
-   - Max size: 5MB per file
+   - Max size: 100MB per file
    - Allowed types: JPG, JPEG, PNG, WEBP
 
 ### Bucket Configuration
 
 All buckets are configured with:
 - **Public access**: Enabled (anyone can view via public URL)
-- **File size limit**: 5MB enforced at storage level
+- **File size limit**: 100MB enforced at storage level (allows high-quality professional photography)
 - **MIME type restrictions**: Only image/jpeg, image/jpg, image/png, image/webp
 - **RLS policies**: Control who can upload/delete
 
@@ -86,7 +86,7 @@ Uploads an image file to Supabase Storage.
 ```
 
 **Validation:**
-- File size must be ≤ 5MB
+- File size must be ≤ 100MB
 - File type must be JPG, JPEG, PNG, or WEBP
 - Filename is sanitized (special characters replaced with underscore)
 - Timestamp prefix added to prevent conflicts
@@ -162,8 +162,8 @@ Returns localized text describing upload limits.
 - `language: 'en' | 'es'` - Language for text
 
 **Returns:**
-- English: "Max 5MB. JPG, PNG, WEBP."
-- Spanish: "Máx 5MB. JPG, PNG, WEBP."
+- English: "Max 100MB. JPG, PNG, WEBP."
+- Spanish: "Máx 100MB. JPG, PNG, WEBP."
 
 ## Security & Permissions
 
@@ -382,12 +382,59 @@ function ImageUploadComponent() {
 }
 ```
 
-### Display Pattern with Fallback
+### Display Pattern with Error Handling
 
-All views that display images use this pattern:
+All client-facing views use robust image error handling to prevent broken image icons:
+
+**For Service and Product Cards:**
+
+Services and products use a **clean, no-placeholder approach**:
+- If image exists and loads: Display 200px tall image at top of card
+- If no image or image fails to load: Show NO placeholder icon, just text content
+- Cards without images have slightly more padding to maintain visual balance
 
 ```typescript
-// For barber photos
+// Track image errors per item
+const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
+
+// Determine if image should display
+const hasImage = service.image_url && !imageErrors[service.id];
+
+return (
+  <div className="service-card">
+    {hasImage && (
+      <img
+        src={service.image_url!}
+        alt={service.name_en}
+        style={{ width: '100%', height: '200px', objectFit: 'cover' }}
+        onError={() => {
+          // Hide image if it fails to load - no broken icon shown
+          setImageErrors(prev => ({ ...prev, [service.id]: true }));
+        }}
+      />
+    )}
+
+    <div style={{ padding: hasImage ? '1.5rem' : '2rem 1.5rem' }}>
+      <h3>{service.name_en}</h3>
+      <p>{service.description_en}</p>
+      <div className="price">${service.base_price.toFixed(2)}</div>
+    </div>
+  </div>
+);
+```
+
+**Key Benefits:**
+- No broken image icons ever shown to users
+- Invalid URLs fail gracefully and silently
+- Clean, professional appearance
+- Cards without images still look polished
+- Image errors don't break layout
+
+**For Barber Photos:**
+
+Barbers can use initials as fallback since profile photos are less critical:
+
+```typescript
 {barber.photo_url ? (
   <img
     src={barber.photo_url}
@@ -417,35 +464,6 @@ All views that display images use this pattern:
     {getInitials(barber.name)}
   </div>
 )}
-
-// For service/product images
-{service.image_url ? (
-  <img
-    src={service.image_url}
-    alt={service.name_en}
-    style={{
-      width: '100%',
-      height: '200px',
-      objectFit: 'cover',
-      borderRadius: '8px'
-    }}
-  />
-) : (
-  <div
-    style={{
-      width: '100%',
-      height: '200px',
-      backgroundColor: '#f0f0f0',
-      borderRadius: '8px',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      color: '#999'
-    }}
-  >
-    <span style={{ fontSize: '48px' }}>📷</span>
-  </div>
-)}
 ```
 
 ## File Size & Format Constraints
@@ -454,9 +472,10 @@ All views that display images use this pattern:
 
 The `uploadImage` function enforces:
 
-- **Max file size**: 5MB (5,242,880 bytes)
+- **Max file size**: 100MB (104,857,600 bytes)
   - Validation occurs before upload attempt
-  - Error: "File size must be less than 5MB"
+  - Error: "File size must be less than 100MB"
+  - Large limit accommodates high-quality professional photography
 
 - **Allowed formats**: JPG, JPEG, PNG, WEBP
   - Checked via `file.type` MIME type
@@ -471,7 +490,7 @@ The `uploadImage` function enforces:
 Supabase Storage buckets are configured with:
 
 ```sql
-file_size_limit: 5242880 -- 5MB in bytes
+file_size_limit: 104857600 -- 100MB in bytes
 allowed_mime_types: ARRAY['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 ```
 

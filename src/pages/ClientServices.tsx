@@ -22,6 +22,7 @@ export default function ClientServices() {
   const navigate = useNavigate();
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
+  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     loadServices();
@@ -120,75 +121,68 @@ export default function ClientServices() {
               </h2>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
-                {groupedServices[category].map((service) => (
-                  <div
-                    key={service.id}
-                    onClick={() => navigate(`/client/book?service=${service.id}`)}
-                    style={{
-                      backgroundColor: 'white',
-                      borderRadius: '12px',
-                      boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
-                      overflow: 'hidden',
-                      transition: 'transform 0.2s, box-shadow 0.2s',
-                      cursor: 'pointer',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-4px)';
-                      e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.15)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
-                    }}
-                  >
-                    {service.image_url ? (
-                      <img
-                        src={service.image_url}
-                        alt={language === 'es' ? service.name_es : service.name_en}
-                        style={{ width: '100%', height: '200px', objectFit: 'cover' }}
-                      />
-                    ) : (
-                      <div
-                        style={{
-                          width: '100%',
-                          height: '200px',
-                          background: 'linear-gradient(135deg, #333 0%, #000 100%)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '64px',
-                        }}
-                      >
-                        ✂️
-                      </div>
-                    )}
+                {groupedServices[category].map((service) => {
+                  const hasImage = service.image_url && !imageErrors[service.id];
 
-                    <div style={{ padding: '1.5rem' }}>
-                      <h3 style={{ fontSize: '22px', fontWeight: 'bold', marginBottom: '0.5rem' }}>
-                        {language === 'es' ? service.name_es : service.name_en}
-                      </h3>
-
-                      {(service.description_en || service.description_es) && (
-                        <p style={{ fontSize: '14px', color: '#666', marginBottom: '1rem', lineHeight: '1.5' }}>
-                          {language === 'es' ? service.description_es : service.description_en}
-                        </p>
+                  return (
+                    <div
+                      key={service.id}
+                      onClick={() => navigate(`/client/book?service=${service.id}`)}
+                      style={{
+                        backgroundColor: 'white',
+                        borderRadius: '12px',
+                        boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+                        overflow: 'hidden',
+                        transition: 'transform 0.2s, box-shadow 0.2s',
+                        cursor: 'pointer',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-4px)';
+                        e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.15)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+                      }}
+                    >
+                      {hasImage && (
+                        <img
+                          src={service.image_url!}
+                          alt={language === 'es' ? service.name_es : service.name_en}
+                          style={{ width: '100%', height: '200px', objectFit: 'cover' }}
+                          onError={() => {
+                            setImageErrors(prev => ({ ...prev, [service.id]: true }));
+                          }}
+                        />
                       )}
 
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#e74c3c' }}>
-                            ${(service.base_price || 0).toFixed(2)}
-                          </div>
-                          {service.duration_minutes && (
-                            <div style={{ fontSize: '14px', color: '#999', marginTop: '0.25rem' }}>
-                              {formatDuration(service.duration_minutes)}
+                      <div style={{ padding: hasImage ? '1.5rem' : '2rem 1.5rem' }}>
+                        <h3 style={{ fontSize: '22px', fontWeight: 'bold', marginBottom: '0.5rem' }}>
+                          {language === 'es' ? service.name_es : service.name_en}
+                        </h3>
+
+                        {(service.description_en || service.description_es) && (
+                          <p style={{ fontSize: '14px', color: '#666', marginBottom: '1rem', lineHeight: '1.5' }}>
+                            {language === 'es' ? service.description_es : service.description_en}
+                          </p>
+                        )}
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#e74c3c' }}>
+                              ${(service.base_price || 0).toFixed(2)}
                             </div>
-                          )}
+                            {service.duration_minutes && (
+                              <div style={{ fontSize: '14px', color: '#999', marginTop: '0.25rem' }}>
+                                {formatDuration(service.duration_minutes)}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ))

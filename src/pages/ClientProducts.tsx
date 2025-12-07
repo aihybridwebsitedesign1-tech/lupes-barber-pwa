@@ -23,6 +23,7 @@ export default function ClientProducts() {
   const { language } = useLanguage();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     loadProducts();
@@ -46,12 +47,6 @@ export default function ClientProducts() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const getInitials = (name: string, brand: string) => {
-    const nameInitial = name.charAt(0).toUpperCase();
-    const brandInitial = brand.charAt(0).toUpperCase();
-    return `${nameInitial}${brandInitial}`;
   };
 
   const groupedProducts = products.reduce((acc, product) => {
@@ -105,6 +100,7 @@ export default function ClientProducts() {
                     product.low_stock_threshold,
                     product.high_stock_threshold
                   );
+                  const hasImage = product.image_url && !imageErrors[product.id];
 
                   return (
                     <div
@@ -125,31 +121,18 @@ export default function ClientProducts() {
                         e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
                       }}
                     >
-                      {product.image_url ? (
+                      {hasImage && (
                         <img
-                          src={product.image_url}
+                          src={product.image_url!}
                           alt={language === 'es' ? product.name_es : product.name_en}
                           style={{ width: '100%', height: '200px', objectFit: 'cover' }}
-                        />
-                      ) : (
-                        <div
-                          style={{
-                            width: '100%',
-                            height: '200px',
-                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '64px',
-                            fontWeight: 'bold',
-                            color: 'white',
+                          onError={() => {
+                            setImageErrors(prev => ({ ...prev, [product.id]: true }));
                           }}
-                        >
-                          {getInitials(product.name_en, product.brand)}
-                        </div>
+                        />
                       )}
 
-                      <div style={{ padding: '1.5rem' }}>
+                      <div style={{ padding: hasImage ? '1.5rem' : '2rem 1.5rem' }}>
                         <div
                           style={{
                             display: 'inline-block',

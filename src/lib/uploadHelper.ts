@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_FILE_SIZE_MB = 100;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 export type UploadResult = {
   success: boolean;
@@ -20,10 +21,10 @@ export const uploadImage = async (
   pathPrefix: string
 ): Promise<UploadResult> => {
   try {
-    if (file.size > MAX_FILE_SIZE) {
+    if (file.size > MAX_FILE_SIZE_BYTES) {
       return {
         success: false,
-        error: 'File size must be less than 5MB',
+        error: `File size must be less than ${MAX_FILE_SIZE_MB}MB`,
       };
     }
 
@@ -116,5 +117,5 @@ export const extractPathFromUrl = (url: string, bucketName: string): string | nu
 };
 
 export const getUploadLimitText = (language: 'en' | 'es'): string => {
-  return language === 'en' ? 'Max 5MB. JPG, PNG, WEBP.' : 'Máx 5MB. JPG, PNG, WEBP.';
+  return language === 'en' ? 'Max 100MB. JPG, PNG, WEBP.' : 'Máx 100MB. JPG, PNG, WEBP.';
 };
