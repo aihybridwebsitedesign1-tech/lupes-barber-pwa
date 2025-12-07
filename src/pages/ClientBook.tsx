@@ -8,15 +8,15 @@ import { formatTime12h } from '../utils/dateTime';
 import ClientHeader from '../components/ClientHeader';
 
 const debug = (...args: any[]) => {
-  if (import.meta.env.DEV) {
-    debug(...args);
-  }
+  if (!import.meta.env.DEV) return;
+  // eslint-disable-next-line no-console
+  console.log('[ClientBook]', ...args);
 };
 
 const debugError = (...args: any[]) => {
-  if (import.meta.env.DEV) {
-    debugError(...args);
-  }
+  if (!import.meta.env.DEV) return;
+  // eslint-disable-next-line no-console
+  console.error('[ClientBook]', ...args);
 };
 
 type Barber = {
@@ -97,16 +97,18 @@ export default function ClientBook() {
   const loadInitialData = async () => {
     setLoading(true);
     setError('');
-    debug('[ClientBook BARBERS] === STARTING DATA LOAD ===');
 
-    // Check current session
-    const { data: sessionData } = await supabase.auth.getSession();
-    debug('[ClientBook BARBERS] Current session user:', sessionData.session?.user?.email || 'anonymous');
-    debug('[ClientBook BARBERS] Loading barbers as:', sessionData.session ? 'authenticated user' : 'anonymous client');
+    try {
+      debug('[ClientBook BARBERS] === STARTING DATA LOAD ===');
 
-    // Check if a specific barber was preselected via query param
-    const preselectedBarberId = searchParams.get('barber');
-    debug('[ClientBook BARBERS] Preselected barber ID from URL:', preselectedBarberId || 'none');
+      // Check current session
+      const { data: sessionData } = await supabase.auth.getSession();
+      debug('[ClientBook BARBERS] Current session user:', sessionData.session?.user?.email || 'anonymous');
+      debug('[ClientBook BARBERS] Loading barbers as:', sessionData.session ? 'authenticated user' : 'anonymous client');
+
+      // Check if a specific barber was preselected via query param
+      const preselectedBarberId = searchParams.get('barber');
+      debug('[ClientBook BARBERS] Preselected barber ID from URL:', preselectedBarberId || 'none');
 
     // ========================================
     // SECTION 1: BARBERS (CRITICAL - MUST SUCCEED FOR STEP 1)
@@ -275,11 +277,16 @@ export default function ClientBook() {
       setConfig(fallbackConfig);
     }
 
-    // ========================================
-    // DONE - Set loading to false
-    // ========================================
-    debug('[ClientBook BARBERS] Data load complete, setting loading=false');
-    setLoading(false);
+      // ========================================
+      // DONE - Data load complete
+      // ========================================
+      debug('[ClientBook BARBERS] Data load complete');
+    } catch (unexpectedError) {
+      debugError('[ClientBook] Unexpected error in loadInitialData:', unexpectedError);
+      setError('Failed to load booking page. Please refresh and try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const generateTimeSlots = async () => {
