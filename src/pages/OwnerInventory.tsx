@@ -56,7 +56,6 @@ export default function OwnerInventory() {
     if (error) {
       console.error('Error fetching products:', error);
     } else {
-      console.log(`[OwnerInventory] Fetched ${data?.length || 0} active products`);
       setProducts(data || []);
     }
     setLoading(false);

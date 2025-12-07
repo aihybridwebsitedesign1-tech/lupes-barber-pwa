@@ -66,7 +66,6 @@ export async function getShopConfig(): Promise<ShopConfig | null> {
     return null;
   }
 
-  console.log('✅ Shop config loaded successfully:', data);
   return data;
 }
 

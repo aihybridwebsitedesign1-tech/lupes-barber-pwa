@@ -46,7 +46,6 @@ export default function OwnerInventoryReports() {
     if (error) {
       console.error('Error fetching products:', error);
     } else {
-      console.log(`[OwnerInventoryReports] Fetched ${data?.length || 0} active products`);
       setProducts(data || []);
     }
     setLoading(false);
