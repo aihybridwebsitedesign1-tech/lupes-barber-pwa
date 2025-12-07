@@ -63,6 +63,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setUserData(data);
         setError(null);
+
+        // Check if JWT has role in app_metadata, if not, refresh the session
+        const { data: { session } } = await supabase.auth.getSession();
+        const jwtRole = session?.user?.app_metadata?.role;
+
+        if (data.role && !jwtRole) {
+          console.log('JWT missing role in app_metadata, refreshing session...');
+          await supabase.auth.refreshSession();
+        }
       }
     } catch (error) {
       console.error('Error loading user data:', error);
