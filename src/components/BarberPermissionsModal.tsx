@@ -51,16 +51,46 @@ export default function BarberPermissionsModal({
   }, [barberId]);
 
   const loadBarberData = async () => {
+    console.log('>>> loadBarberData called for barberId:', barberId);
     setLoading(true);
     try {
       const { data, error } = await supabase
         .from('users')
-        .select('*')
+        .select(`
+          id, name, email, phone, language, role, active,
+          can_view_own_stats, can_view_shop_reports,
+          can_manage_services, can_manage_products,
+          can_manage_appointments, can_manage_clients, can_send_sms,
+          commission_rate_override,
+          min_hours_before_booking_override,
+          min_hours_before_cancellation_override,
+          booking_interval_minutes_override,
+          show_on_client_site, public_display_name, bio, specialties, photo_url,
+          instagram_url, tiktok_url, facebook_url, website_url,
+          created_at, updated_at
+        `)
         .eq('id', barberId)
         .maybeSingle();
 
-      if (error) throw error;
-      if (!data) throw new Error('Barber not found');
+      if (error) {
+        console.error('>>> loadBarberData error:', error);
+        throw error;
+      }
+      if (!data) {
+        console.error('>>> loadBarberData: no data returned');
+        throw new Error('Barber not found');
+      }
+
+      console.log('>>> loadBarberData received:');
+      console.log('    show_on_client_site:', data.show_on_client_site);
+      console.log('    public_display_name:', data.public_display_name);
+      console.log('    bio:', data.bio);
+      console.log('    specialties:', data.specialties);
+      console.log('    photo_url:', data.photo_url);
+      console.log('    instagram_url:', data.instagram_url);
+      console.log('    tiktok_url:', data.tiktok_url);
+      console.log('    facebook_url:', data.facebook_url);
+      console.log('    website_url:', data.website_url);
 
       setName(data.name || '');
       setEmail(data.email || '');
@@ -87,6 +117,11 @@ export default function BarberPermissionsModal({
       setMinHoursBeforeCancellation(data.min_hours_before_cancellation_override?.toString() || '');
       setBookingIntervalMinutes(data.booking_interval_minutes_override?.toString() || '15');
 
+      console.log('>>> Setting public profile state:');
+      console.log('    setShowOnClientSite(' + (data.show_on_client_site ?? false) + ')');
+      console.log('    setPublicDisplayName("' + (data.public_display_name || '') + '")');
+      console.log('    setInstagramUrl("' + (data.instagram_url || '') + '")');
+
       setShowOnClientSite(data.show_on_client_site ?? false);
       setPublicDisplayName(data.public_display_name || '');
       setBio(data.bio || '');
@@ -96,6 +131,8 @@ export default function BarberPermissionsModal({
       setTiktokUrl(data.tiktok_url || '');
       setFacebookUrl(data.facebook_url || '');
       setWebsiteUrl(data.website_url || '');
+
+      console.log('>>> loadBarberData complete');
     } catch (err: any) {
       console.error('Error loading barber data:', err);
       setError(err.message);
@@ -172,22 +209,44 @@ export default function BarberPermissionsModal({
         website_url: websiteUrl?.trim() || null,
       };
 
-      console.log('Update payload:', updatePayload);
+      console.log('=== SAVE START ===');
+      console.log('Barber ID:', barberId);
+      console.log('Update payload:', JSON.stringify(updatePayload, null, 2));
 
       const { data: updateData, error: updateError } = await supabase
         .from('users')
         .update(updatePayload)
         .eq('id', barberId)
-        .select();
+        .select(`
+          id, name, show_on_client_site, public_display_name, bio, specialties, photo_url,
+          instagram_url, tiktok_url, facebook_url, website_url
+        `);
 
       if (updateError) {
         console.error('Update error:', updateError);
         throw updateError;
       }
 
-      console.log('Update successful, data returned:', updateData);
+      console.log('Update response data:', JSON.stringify(updateData, null, 2));
 
+      if (updateData && updateData.length > 0) {
+        console.log('Verifying saved values from DB response:');
+        console.log('  show_on_client_site:', updateData[0].show_on_client_site);
+        console.log('  public_display_name:', updateData[0].public_display_name);
+        console.log('  bio:', updateData[0].bio);
+        console.log('  specialties:', updateData[0].specialties);
+        console.log('  photo_url:', updateData[0].photo_url);
+        console.log('  instagram_url:', updateData[0].instagram_url);
+        console.log('  tiktok_url:', updateData[0].tiktok_url);
+        console.log('  facebook_url:', updateData[0].facebook_url);
+        console.log('  website_url:', updateData[0].website_url);
+      } else {
+        console.error('WARNING: Update returned no data!');
+      }
+
+      console.log('Reloading barber data from DB...');
       await loadBarberData();
+      console.log('=== SAVE END ===');
 
       alert(
         language === 'en'

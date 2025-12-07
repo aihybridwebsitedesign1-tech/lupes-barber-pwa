@@ -19,6 +19,7 @@ export default function OwnerBarbers() {
   const [scheduleBarber, setScheduleBarber] = useState<Barber | null>(null);
   const [timeOffBarber, setTimeOffBarber] = useState<Barber | null>(null);
   const [permissionsBarber, setPermissionsBarber] = useState<Barber | null>(null);
+  const [permissionsModalKey, setPermissionsModalKey] = useState(0);
   const [showNewBarberModal, setShowNewBarberModal] = useState(false);
   const { language, t } = useLanguage();
 
@@ -113,7 +114,10 @@ export default function OwnerBarbers() {
                           <td style={{ padding: '1rem', fontSize: '14px' }}>
                             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                               <button
-                                onClick={() => setPermissionsBarber(barber)}
+                                onClick={() => {
+                                  setPermissionsModalKey(prev => prev + 1);
+                                  setPermissionsBarber(barber);
+                                }}
                                 style={{
                                   padding: '6px 12px',
                                   backgroundColor: '#0066cc',
@@ -193,7 +197,10 @@ export default function OwnerBarbers() {
                           <td style={{ padding: '1rem', fontSize: '14px', color: '#999' }}>{barber.name}</td>
                           <td style={{ padding: '1rem', fontSize: '14px' }}>
                             <button
-                              onClick={() => setPermissionsBarber(barber)}
+                              onClick={() => {
+                                setPermissionsModalKey(prev => prev + 1);
+                                setPermissionsBarber(barber);
+                              }}
                               style={{
                                 padding: '6px 12px',
                                 backgroundColor: '#0066cc',
@@ -239,6 +246,7 @@ export default function OwnerBarbers() {
 
       {permissionsBarber && (
         <BarberPermissionsModal
+          key={`permissions-${permissionsBarber.id}-${permissionsModalKey}`}
           barberId={permissionsBarber.id}
           onClose={() => setPermissionsBarber(null)}
           onSave={() => {
