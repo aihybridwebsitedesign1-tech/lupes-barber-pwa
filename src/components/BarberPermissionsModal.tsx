@@ -28,6 +28,7 @@ export default function BarberPermissionsModal({
   const [canManageAppointments, setCanManageAppointments] = useState(false);
   const [canManageClients, setCanManageClients] = useState(false);
   const [canSendSms, setCanSendSms] = useState(false);
+  const [canManageTransformationPhotos, setCanManageTransformationPhotos] = useState(true);
   const [commissionRateOverride, setCommissionRateOverride] = useState<string>('');
   const [useDefaultBookingRules, setUseDefaultBookingRules] = useState(true);
   const [minHoursBeforeBooking, setMinHoursBeforeBooking] = useState<string>('');
@@ -61,6 +62,7 @@ export default function BarberPermissionsModal({
           can_view_own_stats, can_view_shop_reports,
           can_manage_services, can_manage_products,
           can_manage_appointments, can_manage_clients, can_send_sms,
+          can_manage_transformation_photos,
           commission_rate_override,
           min_hours_before_booking_override,
           min_hours_before_cancellation_override,
@@ -93,6 +95,7 @@ export default function BarberPermissionsModal({
       setCanManageAppointments(data.can_manage_appointments ?? false);
       setCanManageClients(data.can_manage_clients ?? false);
       setCanSendSms(data.can_send_sms ?? false);
+      setCanManageTransformationPhotos(data.can_manage_transformation_photos ?? true);
 
       setCommissionRateOverride(data.commission_rate_override ? (data.commission_rate_override * 100).toString() : '');
 
@@ -174,6 +177,7 @@ export default function BarberPermissionsModal({
         can_manage_appointments: canManageAppointments,
         can_manage_clients: canManageClients,
         can_send_sms: canSendSms,
+        can_manage_transformation_photos: canManageTransformationPhotos,
         commission_rate_override: commissionRate,
         min_hours_before_booking_override: minBookAhead,
         min_hours_before_cancellation_override: minCancelAhead,
@@ -507,6 +511,16 @@ export default function BarberPermissionsModal({
                     style={{ marginRight: '0.75rem', width: '16px', height: '16px', cursor: 'pointer' }}
                   />
                   <span>{language === 'en' ? 'Can send SMS messages (Engage)' : 'Puede enviar mensajes SMS (Engage)'}</span>
+                </label>
+
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={canManageTransformationPhotos}
+                    onChange={(e) => setCanManageTransformationPhotos(e.target.checked)}
+                    style={{ marginRight: '0.75rem', width: '16px', height: '16px', cursor: 'pointer' }}
+                  />
+                  <span>{language === 'en' ? 'Can manage transformation photos (add/delete)' : 'Puede gestionar fotos de transformación (agregar/eliminar)'}</span>
                 </label>
               </div>
             </div>

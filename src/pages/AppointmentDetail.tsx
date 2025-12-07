@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
-import { uploadImage, getUploadLimitText } from '../lib/uploadHelper';
+import { deleteImage } from '../lib/uploadHelper';
 import Header from '../components/Header';
 import PaymentModal from '../components/PaymentModal';
 import EditAppointmentModal from '../components/EditAppointmentModal';
@@ -11,6 +11,7 @@ import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 import CancelAppointmentModal from '../components/CancelAppointmentModal';
 import RescheduleAppointmentModal from '../components/RescheduleAppointmentModal';
 import PaymentStatusBadge from '../components/PaymentStatusBadge';
+import TransformationPhotosModal from '../components/TransformationPhotosModal';
 
 type Appointment = {
   id: string;
@@ -71,9 +72,14 @@ type Product = {
 
 type TransformationPhoto = {
   id: string;
-  image_url: string;
-  type: string | null;
-  notes: string | null;
+  appointment_id: string;
+  barber_id: string;
+  client_id: string | null;
+  before_image_url: string | null;
+  after_image_url: string;
+  created_by: string;
+  created_at: string;
+  is_featured: boolean;
 };
 
 export default function AppointmentDetail() {
@@ -89,13 +95,13 @@ export default function AppointmentDetail() {
   const [productQuantity, setProductQuantity] = useState(1);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [actualDuration, setActualDuration] = useState('');
-  const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [showTransformationModal, setShowTransformationModal] = useState(false);
   const [_notifications, setNotifications] = useState<Array<{ notification_type: string; status: string; created_at: string }>>([]);
 
   useEffect(() => {
@@ -429,80 +435,45 @@ export default function AppointmentDetail() {
     }
   };
 
-  const handleUploadPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !appointment || !user) return;
-
-    if (appointment.status !== 'completed') {
-      alert(
-        language === 'en'
-          ? 'Photos can only be added to completed appointments'
-          : 'Las fotos solo se pueden agregar a citas completadas'
-      );
-      return;
-    }
-
-    setUploading(true);
-    try {
-      const result = await uploadImage(file, 'transformation-photos', `appointments/${appointmentId}`);
-
-      if (!result.success) {
-        alert(language === 'en' ? result.error : result.error === 'File size must be less than 100MB' ? 'El tamaño del archivo debe ser menor a 100MB' : result.error);
-        setUploading(false);
-        return;
-      }
-
-      const { error: insertError } = await supabase.from('transformation_photos').insert({
-        appointment_id: appointmentId,
-        barber_id: appointment.barber?.id || user.id,
-        client_id: appointment.client.id,
-        image_url: result.url!,
-        type: 'single',
-      });
-
-      if (insertError) throw insertError;
-
-      alert(language === 'en' ? 'Photo uploaded successfully!' : '¡Foto subida exitosamente!');
-      loadAppointmentData();
-    } catch (error) {
-      console.error('Error uploading photo:', error);
-      alert(language === 'en' ? 'Error uploading photo' : 'Error al subir foto');
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleDeletePhoto = async (photo: TransformationPhoto) => {
+  const handleDeleteTransformation = async (photo: TransformationPhoto) => {
     const isOwner = userData?.role === 'OWNER';
     const isAssignedBarber = appointment?.barber?.id === userData?.id;
 
     if (!isOwner && !isAssignedBarber) {
       alert(
         language === 'en'
-          ? 'Only the owner or assigned barber can delete photos'
-          : 'Solo el propietario o el barbero asignado pueden eliminar fotos'
+          ? 'Only the owner or assigned barber can delete transformations'
+          : 'Solo el propietario o el barbero asignado pueden eliminar transformaciones'
+      );
+      return;
+    }
+
+    const canManage = userData?.can_manage_transformation_photos !== false;
+    if (!isOwner && !canManage) {
+      alert(
+        language === 'en'
+          ? 'You do not have permission to manage transformation photos'
+          : 'No tienes permiso para gestionar fotos de transformación'
       );
       return;
     }
 
     const confirmed = confirm(
       language === 'en'
-        ? 'Delete this photo? This cannot be undone.'
-        : '¿Eliminar esta foto? Esto no se puede deshacer.'
+        ? 'Delete this transformation? This will delete both before and after photos. This cannot be undone.'
+        : '¿Eliminar esta transformación? Esto eliminará las fotos de antes y después. Esto no se puede deshacer.'
     );
 
     if (!confirmed) return;
 
     try {
-      const imagePath = photo.image_url.split('/').pop();
-      if (imagePath) {
-        try {
-          await supabase.storage
-            .from('transformation-photos')
-            .remove([`appointments/${appointmentId}/${imagePath}`]);
-        } catch (storageError) {
-          console.warn('Storage deletion failed, continuing with DB deletion:', storageError);
-        }
+      if (photo.before_image_url) {
+        const beforePath = photo.before_image_url.split('/').slice(-3).join('/');
+        await deleteImage('transformations', beforePath);
+      }
+      if (photo.after_image_url) {
+        const afterPath = photo.after_image_url.split('/').slice(-3).join('/');
+        await deleteImage('transformations', afterPath);
       }
 
       const { error: deleteError } = await supabase
@@ -514,10 +485,10 @@ export default function AppointmentDetail() {
 
       setPhotos((prevPhotos) => prevPhotos.filter((p) => p.id !== photo.id));
 
-      alert(language === 'en' ? 'Photo deleted successfully!' : '¡Foto eliminada exitosamente!');
+      alert(language === 'en' ? 'Transformation deleted successfully!' : '¡Transformación eliminada exitosamente!');
     } catch (error) {
-      console.error('Error deleting photo:', error);
-      alert(language === 'en' ? 'Error deleting photo' : 'Error al eliminar foto');
+      console.error('Error deleting transformation:', error);
+      alert(language === 'en' ? 'Error deleting transformation' : 'Error al eliminar transformación');
     }
   };
 
@@ -1090,91 +1061,128 @@ export default function AppointmentDetail() {
               {language === 'en' ? 'Transformation Photos' : 'Fotos de Transformación'}
             </h3>
 
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label
-                style={{
-                  display: 'inline-block',
-                  padding: '10px 20px',
-                  backgroundColor: '#000',
-                  color: 'white',
-                  borderRadius: '4px',
-                  cursor: uploading ? 'not-allowed' : 'pointer',
-                  fontSize: '14px',
-                }}
-              >
-                {uploading
-                  ? language === 'en'
-                    ? 'Uploading...'
-                    : 'Subiendo...'
-                  : language === 'en'
-                  ? 'Add Photo'
-                  : 'Agregar Foto'}
-                <input
-                  type="file"
-                  accept=".jpg,.jpeg,.png,.webp"
-                  onChange={handleUploadPhoto}
-                  disabled={uploading}
-                  style={{ display: 'none' }}
-                />
-              </label>
-              <div style={{ marginTop: '0.5rem', fontSize: '12px', color: '#666' }}>
-                {getUploadLimitText(language)}
-              </div>
-            </div>
-
             {photos.length === 0 ? (
-              <p style={{ color: '#666', fontSize: '14px' }}>
-                {language === 'en' ? 'No photos yet' : 'Sin fotos aún'}
-              </p>
+              <div>
+                <p style={{ color: '#666', fontSize: '14px', marginBottom: '1rem' }}>
+                  {language === 'en'
+                    ? 'No transformation photos yet for this appointment.'
+                    : 'No hay fotos de transformación para esta cita aún.'}
+                </p>
+                <button
+                  onClick={() => setShowTransformationModal(true)}
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: '#2563eb',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                  }}
+                >
+                  {language === 'en' ? 'Add Transformation Photos' : 'Agregar Fotos de Transformación'}
+                </button>
+              </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
-                {photos.map((photo) => (
-                  <div
-                    key={photo.id}
-                    style={{
-                      position: 'relative',
-                      backgroundColor: 'white',
-                      borderRadius: '8px',
-                      padding: '0.5rem',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                    }}
-                  >
-                    <img
-                      src={photo.image_url}
-                      alt="Transformation"
+              <div>
+                <button
+                  onClick={() => setShowTransformationModal(true)}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: '#2563eb',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    marginBottom: '1rem',
+                  }}
+                >
+                  {language === 'en' ? 'Add More' : 'Agregar Más'}
+                </button>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '1.5rem' }}>
+                  {photos.map((photo) => (
+                    <div
+                      key={photo.id}
                       style={{
-                        width: '100%',
-                        height: '200px',
-                        objectFit: 'cover',
+                        position: 'relative',
+                        backgroundColor: 'white',
                         borderRadius: '8px',
-                        border: '1px solid #ddd',
+                        padding: '1rem',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                        border: '1px solid #e5e7eb',
                       }}
-                    />
-                    {photo.notes && (
-                      <p style={{ fontSize: '12px', color: '#666', marginTop: '0.5rem' }}>{photo.notes}</p>
-                    )}
-                    {(userData?.role === 'OWNER' || appointment?.barber?.id === userData?.id) && (
-                      <button
-                        onClick={() => handleDeletePhoto(photo)}
-                        style={{
-                          position: 'absolute',
-                          top: '1rem',
-                          right: '1rem',
-                          padding: '6px 12px',
-                          backgroundColor: '#dc3545',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          fontSize: '12px',
-                          cursor: 'pointer',
-                          boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                        }}
-                      >
-                        {language === 'en' ? 'Delete' : 'Eliminar'}
-                      </button>
-                    )}
-                  </div>
-                ))}
+                    >
+                      <div style={{ display: 'grid', gridTemplateColumns: photo.before_image_url ? '1fr 1fr' : '1fr', gap: '1rem' }}>
+                        {photo.before_image_url && (
+                          <div>
+                            <p style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280', marginBottom: '0.5rem' }}>
+                              {language === 'en' ? 'BEFORE' : 'ANTES'}
+                            </p>
+                            <img
+                              src={photo.before_image_url}
+                              alt="Before"
+                              style={{
+                                width: '100%',
+                                height: '200px',
+                                objectFit: 'cover',
+                                borderRadius: '6px',
+                                border: '1px solid #d1d5db',
+                              }}
+                            />
+                          </div>
+                        )}
+                        <div>
+                          <p style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280', marginBottom: '0.5rem' }}>
+                            {language === 'en' ? 'AFTER' : 'DESPUÉS'}
+                          </p>
+                          <img
+                            src={photo.after_image_url}
+                            alt="After"
+                            style={{
+                              width: '100%',
+                              height: '200px',
+                              objectFit: 'cover',
+                              borderRadius: '6px',
+                              border: '1px solid #d1d5db',
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '0.75rem' }}>
+                        {language === 'en' ? 'Uploaded' : 'Subido'} {new Date(photo.created_at).toLocaleString(language === 'en' ? 'en-US' : 'es-ES', {
+                          dateStyle: 'medium',
+                          timeStyle: 'short',
+                        })}
+                      </p>
+                      {(userData?.role === 'OWNER' || (appointment?.barber?.id === userData?.id && userData?.can_manage_transformation_photos !== false)) && (
+                        <button
+                          onClick={() => handleDeleteTransformation(photo)}
+                          style={{
+                            position: 'absolute',
+                            top: '1rem',
+                            right: '1rem',
+                            padding: '6px 10px',
+                            backgroundColor: '#dc3545',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          🗑️ {language === 'en' ? 'Delete' : 'Eliminar'}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -1279,6 +1287,24 @@ export default function AppointmentDetail() {
           serviceId={appointment.service.id}
           onClose={() => setShowRescheduleModal(false)}
           onSuccess={handleRescheduleSuccess}
+        />
+      )}
+
+      {showTransformationModal && appointment && appointmentId && (
+        <TransformationPhotosModal
+          appointment={{
+            id: appointmentId,
+            barber_id: appointment.barber?.id || '',
+            client_id: appointment.client.id,
+            client_name: `${appointment.client.first_name} ${appointment.client.last_name}`,
+            barber_name: appointment.barber?.name || '',
+            scheduled_start: appointment.scheduled_start,
+          }}
+          onClose={() => setShowTransformationModal(false)}
+          onSuccess={() => {
+            setShowTransformationModal(false);
+            loadAppointmentData();
+          }}
         />
       )}
     </div>

@@ -42,6 +42,8 @@ export type Database = {
           can_manage_schedules: boolean;
           can_manage_appointments: boolean;
           can_manage_clients: boolean;
+          can_send_sms: boolean;
+          can_manage_transformation_photos: boolean;
           created_at: string;
           updated_at: string;
         };
