@@ -57,9 +57,10 @@ export default function BarberPermissionsModal({
         .from('users')
         .select('*')
         .eq('id', barberId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
+      if (!data) throw new Error('Barber not found');
 
       setName(data.name || '');
       setEmail(data.email || '');
@@ -143,35 +144,39 @@ export default function BarberPermissionsModal({
         ? parseInt(bookingIntervalMinutes, 10)
         : null;
 
+      const updatePayload = {
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim() || null,
+        language: preferredLanguage,
+        active,
+        can_view_own_stats: canViewOwnStats,
+        can_view_shop_reports: canViewShopReports,
+        can_manage_services: canManageServices,
+        can_manage_products: canManageProducts,
+        can_manage_appointments: canManageAppointments,
+        can_manage_clients: canManageClients,
+        can_send_sms: canSendSms,
+        commission_rate_override: commissionRate,
+        min_hours_before_booking_override: minBookAhead,
+        min_hours_before_cancellation_override: minCancelAhead,
+        booking_interval_minutes_override: intervalMins,
+        show_on_client_site: showOnClientSite,
+        public_display_name: publicDisplayName?.trim() || null,
+        bio: bio?.trim() || null,
+        specialties: specialties?.trim() || null,
+        photo_url: photoUrl?.trim() || null,
+        instagram_url: instagramUrl?.trim() || null,
+        tiktok_url: tiktokUrl?.trim() || null,
+        facebook_url: facebookUrl?.trim() || null,
+        website_url: websiteUrl?.trim() || null,
+      };
+
+      console.log('Update payload:', updatePayload);
+
       const { data: updateData, error: updateError } = await supabase
         .from('users')
-        .update({
-          name: name.trim(),
-          email: email.trim(),
-          phone: phone.trim() || null,
-          language: preferredLanguage,
-          active,
-          can_view_own_stats: canViewOwnStats,
-          can_view_shop_reports: canViewShopReports,
-          can_manage_services: canManageServices,
-          can_manage_products: canManageProducts,
-          can_manage_appointments: canManageAppointments,
-          can_manage_clients: canManageClients,
-          can_send_sms: canSendSms,
-          commission_rate_override: commissionRate,
-          min_hours_before_booking_override: minBookAhead,
-          min_hours_before_cancellation_override: minCancelAhead,
-          booking_interval_minutes_override: intervalMins,
-          show_on_client_site: showOnClientSite,
-          public_display_name: publicDisplayName.trim() || null,
-          bio: bio.trim() || null,
-          specialties: specialties.trim() || null,
-          photo_url: photoUrl.trim() || null,
-          instagram_url: instagramUrl.trim() || null,
-          tiktok_url: tiktokUrl.trim() || null,
-          facebook_url: facebookUrl.trim() || null,
-          website_url: websiteUrl.trim() || null,
-        })
+        .update(updatePayload)
         .eq('id', barberId)
         .select();
 

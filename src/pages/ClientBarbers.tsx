@@ -116,6 +116,12 @@ export default function ClientBarbers() {
               const displayName = getDisplayName(barber);
               const firstName = displayName.split(' ')[0];
 
+              const hasInstagram = !!barber.instagram_url && barber.instagram_url.trim() !== '';
+              const hasTiktok = !!barber.tiktok_url && barber.tiktok_url.trim() !== '';
+              const hasFacebook = !!barber.facebook_url && barber.facebook_url.trim() !== '';
+              const hasWebsite = !!barber.website_url && barber.website_url.trim() !== '';
+              const hasSocialLinks = hasInstagram || hasTiktok || hasFacebook || hasWebsite;
+
               return (
                 <div
                   key={barber.id}
@@ -174,11 +180,11 @@ export default function ClientBarbers() {
                       </p>
                     )}
 
-                    {(barber.instagram_url || barber.tiktok_url || barber.facebook_url || barber.website_url) && (
+                    {hasSocialLinks && (
                       <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-                        {barber.instagram_url && (
+                        {hasInstagram && (
                           <a
-                            href={barber.instagram_url}
+                            href={barber.instagram_url!}
                             target="_blank"
                             rel="noopener noreferrer"
                             style={{ fontSize: '13px', color: '#e74c3c', textDecoration: 'none', fontWeight: '500' }}
@@ -187,9 +193,9 @@ export default function ClientBarbers() {
                             📷 IG
                           </a>
                         )}
-                        {barber.tiktok_url && (
+                        {hasTiktok && (
                           <a
-                            href={barber.tiktok_url}
+                            href={barber.tiktok_url!}
                             target="_blank"
                             rel="noopener noreferrer"
                             style={{ fontSize: '13px', color: '#e74c3c', textDecoration: 'none', fontWeight: '500' }}
@@ -198,9 +204,9 @@ export default function ClientBarbers() {
                             🎵 TikTok
                           </a>
                         )}
-                        {barber.facebook_url && (
+                        {hasFacebook && (
                           <a
-                            href={barber.facebook_url}
+                            href={barber.facebook_url!}
                             target="_blank"
                             rel="noopener noreferrer"
                             style={{ fontSize: '13px', color: '#e74c3c', textDecoration: 'none', fontWeight: '500' }}
@@ -209,9 +215,9 @@ export default function ClientBarbers() {
                             👤 FB
                           </a>
                         )}
-                        {barber.website_url && (
+                        {hasWebsite && (
                           <a
-                            href={barber.website_url}
+                            href={barber.website_url!}
                             target="_blank"
                             rel="noopener noreferrer"
                             style={{ fontSize: '13px', color: '#e74c3c', textDecoration: 'none', fontWeight: '500' }}
