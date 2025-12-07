@@ -26,10 +26,16 @@ export async function getShopConfig(): Promise<ShopConfig | null> {
     .single();
 
   if (error) {
-    console.error('Error fetching shop config:', error);
+    console.error('❌ Error fetching shop config:', error);
     return null;
   }
 
+  if (!data) {
+    console.error('❌ No shop config data returned');
+    return null;
+  }
+
+  console.log('✅ Shop config loaded successfully:', data);
   return data;
 }
 

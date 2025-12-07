@@ -77,7 +77,11 @@ export default function ClientBook() {
 
   const loadInitialData = async () => {
     setLoading(true);
+    setConfigWarning('');
+
     try {
+      console.log('🔵 Loading booking page data...');
+
       const [barbersRes, servicesRes, shopConfig, shopConfigFull] = await Promise.all([
         supabase.from('users').select('id, first_name, last_name').eq('role', 'BARBER').eq('active', true).order('first_name'),
         supabase.from('services').select('id, name_en, name_es, price, duration_minutes').eq('active', true).order('name_en'),
@@ -85,13 +89,19 @@ export default function ClientBook() {
         supabase.from('shop_config').select('shop_name, phone, enable_confirmations').single()
       ]);
 
+      console.log('📊 Load results:', {
+        barbersCount: barbersRes.data?.length || 0,
+        servicesCount: servicesRes.data?.length || 0,
+        hasShopConfig: !!shopConfig,
+        shopConfigData: shopConfig
+      });
+
       if (barbersRes.error) throw barbersRes.error;
       if (servicesRes.error) throw servicesRes.error;
 
       setBarbers(barbersRes.data || []);
       setServices(servicesRes.data || []);
 
-      // Store shop info for confirmations
       if (shopConfigFull.data) {
         setShopInfo({
           shop_name: shopConfigFull.data.shop_name || "Lupe's Barber",
@@ -100,8 +110,10 @@ export default function ClientBook() {
       }
 
       if (shopConfig) {
+        console.log('✅ Using shop config from database');
         setConfig(shopConfig);
       } else {
+        console.warn('⚠️ Shop config not available, using fallback');
         const fallbackConfig = {
           days_bookable_in_advance: 30,
           min_book_ahead_hours: 2,
@@ -115,7 +127,7 @@ export default function ClientBook() {
         );
       }
     } catch (error) {
-      console.error('Error loading data:', error);
+      console.error('❌ Error loading booking page data:', error);
       const fallbackConfig = {
         days_bookable_in_advance: 30,
         min_book_ahead_hours: 2,
