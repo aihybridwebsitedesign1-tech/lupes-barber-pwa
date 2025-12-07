@@ -4,6 +4,14 @@ import { supabase } from '../lib/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import Header from '../components/Header';
+import ConfirmResetModal from '../components/ConfirmResetModal';
+import {
+  resetTestAppointments,
+  resetTestPayouts,
+  resetTimeTracking,
+  resetAllNonCoreData,
+  formatResetResult,
+} from '../lib/resetTools';
 
 type ShopConfig = {
   id: number;
@@ -22,7 +30,7 @@ type ShopConfig = {
   test_mode_enabled: boolean;
 };
 
-type Tab = 'shop_info' | 'booking_rules' | 'retention' | 'commissions' | 'payments' | 'notifications' | 'test_mode';
+type Tab = 'shop_info' | 'booking_rules' | 'retention' | 'commissions' | 'payments' | 'notifications' | 'test_mode' | 'data_tools';
 
 export default function OwnerSettings() {
   const { language } = useLanguage();
@@ -65,6 +73,10 @@ export default function OwnerSettings() {
   const [testModeEnabled, setTestModeEnabled] = useState(false);
   const [showDeleteTestModal, setShowDeleteTestModal] = useState(false);
   const [deletingTestData, setDeletingTestData] = useState(false);
+
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetType, setResetType] = useState<'test_appointments' | 'test_payouts' | 'time_tracking' | 'all_data' | null>(null);
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
     if (!userData) return;
@@ -405,6 +417,120 @@ export default function OwnerSettings() {
     }
   };
 
+  const handleResetData = async () => {
+    if (!resetType) return;
+
+    setResetting(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      let result;
+
+      switch (resetType) {
+        case 'test_appointments':
+          result = await resetTestAppointments();
+          break;
+        case 'test_payouts':
+          result = await resetTestPayouts();
+          break;
+        case 'time_tracking':
+          result = await resetTimeTracking();
+          break;
+        case 'all_data':
+          result = await resetAllNonCoreData();
+          break;
+        default:
+          throw new Error('Invalid reset type');
+      }
+
+      if (!result.success) {
+        setError(result.error || (language === 'en' ? 'Reset operation failed' : 'Operación de reinicio falló'));
+        return;
+      }
+
+      const details = formatResetResult(result, language);
+      setSuccess(
+        language === 'en'
+          ? `Reset completed successfully! ${details}`
+          : `¡Reinicio completado con éxito! ${details}`
+      );
+      setShowResetModal(false);
+      setResetType(null);
+    } catch (err: any) {
+      console.error('Error resetting data:', err);
+      setError(language === 'en' ? 'Failed to reset data' : 'Error al reiniciar datos');
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  const openResetModal = (type: typeof resetType) => {
+    setResetType(type);
+    setShowResetModal(true);
+    setError('');
+    setSuccess('');
+  };
+
+  const getResetModalContent = () => {
+    switch (resetType) {
+      case 'test_appointments':
+        return {
+          title: language === 'en' ? 'Reset Test Appointments' : 'Reiniciar Citas de Prueba',
+          description:
+            language === 'en'
+              ? 'This will permanently delete all appointments marked as test data, along with related transformation photos and reminders.'
+              : 'Esto eliminará permanentemente todas las citas marcadas como datos de prueba, junto con fotos de transformación y recordatorios relacionados.',
+          warningText:
+            language === 'en'
+              ? 'WARNING: This action cannot be undone. All test appointment data will be permanently deleted.'
+              : 'ADVERTENCIA: Esta acción no se puede deshacer. Todos los datos de citas de prueba se eliminarán permanentemente.',
+        };
+      case 'test_payouts':
+        return {
+          title: language === 'en' ? 'Reset Test Payouts' : 'Reiniciar Pagos de Prueba',
+          description:
+            language === 'en'
+              ? 'This will permanently delete payouts linked only to test appointments and unmark commission_paid flags for affected items.'
+              : 'Esto eliminará permanentemente los pagos vinculados solo a citas de prueba y desmarcará las banderas commission_paid para los elementos afectados.',
+          warningText:
+            language === 'en'
+              ? 'WARNING: This action cannot be undone. Test payout data will be permanently deleted.'
+              : 'ADVERTENCIA: Esta acción no se puede deshacer. Los datos de pagos de prueba se eliminarán permanentemente.',
+        };
+      case 'time_tracking':
+        return {
+          title: language === 'en' ? 'Reset Time Tracking' : 'Reiniciar Seguimiento de Tiempo',
+          description:
+            language === 'en'
+              ? 'This will permanently delete all time tracking entries. Barber profiles and settings will remain intact.'
+              : 'Esto eliminará permanentemente todas las entradas de seguimiento de tiempo. Los perfiles de barberos y la configuración permanecerán intactos.',
+          warningText:
+            language === 'en'
+              ? 'WARNING: This action cannot be undone. All time tracking history will be permanently deleted.'
+              : 'ADVERTENCIA: Esta acción no se puede deshacer. Todo el historial de seguimiento de tiempo se eliminará permanentemente.',
+        };
+      case 'all_data':
+        return {
+          title: language === 'en' ? 'Full Reset (Recommended Before Go-Live)' : 'Reinicio Completo (Recomendado Antes del Lanzamiento)',
+          description:
+            language === 'en'
+              ? 'This will permanently delete ALL appointments, payouts, time tracking, transformation photos, reminders, inventory transactions, and messages. Barbers, services, products, and shop settings will NOT be affected.'
+              : 'Esto eliminará permanentemente TODAS las citas, pagos, seguimiento de tiempo, fotos de transformación, recordatorios, transacciones de inventario y mensajes. Los barberos, servicios, productos y la configuración de la tienda NO se verán afectados.',
+          warningText:
+            language === 'en'
+              ? 'CRITICAL WARNING: This action cannot be undone. ALL transactional data will be permanently deleted. Only use this before going live.'
+              : 'ADVERTENCIA CRÍTICA: Esta acción no se puede deshacer. TODOS los datos transaccionales se eliminarán permanentemente. Solo use esto antes del lanzamiento.',
+        };
+      default:
+        return {
+          title: '',
+          description: '',
+          warningText: '',
+        };
+    }
+  };
+
   if (!userData || userData.role !== 'OWNER') {
     return null;
   }
@@ -417,6 +543,7 @@ export default function OwnerSettings() {
     { id: 'payments', labelEn: 'Online Payments', labelEs: 'Pagos en Línea' },
     { id: 'notifications', labelEn: 'Notifications', labelEs: 'Notificaciones' },
     { id: 'test_mode', labelEn: 'Test Mode', labelEs: 'Modo de Prueba' },
+    { id: 'data_tools', labelEn: 'Data Tools', labelEs: 'Herramientas de Datos' },
   ];
 
   return (
@@ -1527,8 +1654,202 @@ export default function OwnerSettings() {
                 )}
               </>
             )}
+
+            {activeTab === 'data_tools' && (
+              <div>
+                <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '1rem' }}>
+                  {language === 'en' ? 'Data Tools (Reset & Cleanup)' : 'Herramientas de Datos (Reinicio y Limpieza)'}
+                </h3>
+
+                <div
+                  style={{
+                    padding: '1.25rem',
+                    backgroundColor: '#fff3cd',
+                    borderLeft: '4px solid #ffc107',
+                    borderRadius: '6px',
+                    marginBottom: '2rem',
+                  }}
+                >
+                  <p style={{ fontSize: '15px', fontWeight: '600', marginBottom: '0.75rem', color: '#856404' }}>
+                    {language === 'en' ? 'Safe Data Reset Tools' : 'Herramientas Seguras de Reinicio de Datos'}
+                  </p>
+                  <p style={{ fontSize: '14px', color: '#856404', lineHeight: '1.6', marginBottom: 0 }}>
+                    {language === 'en'
+                      ? 'These tools allow you to selectively delete test data or perform a full reset before going live. All operations are logged for audit purposes. Core configuration (barbers, services, products, shop settings) will NEVER be deleted.'
+                      : 'Estas herramientas le permiten eliminar selectivamente datos de prueba o realizar un reinicio completo antes del lanzamiento. Todas las operaciones se registran con fines de auditoría. La configuración principal (barberos, servicios, productos, configuración de la tienda) NUNCA se eliminará.'}
+                  </p>
+                </div>
+
+                <div style={{ display: 'grid', gap: '1.5rem' }}>
+                  <div
+                    style={{
+                      padding: '1.5rem',
+                      backgroundColor: 'white',
+                      border: '2px solid #ddd',
+                      borderRadius: '8px',
+                    }}
+                  >
+                    <h4 style={{ fontSize: '17px', fontWeight: '600', marginBottom: '0.75rem', color: '#333' }}>
+                      {language === 'en' ? '1. Reset Test Appointments Only' : '1. Reiniciar Solo Citas de Prueba'}
+                    </h4>
+                    <p style={{ fontSize: '14px', color: '#666', marginBottom: '1rem', lineHeight: '1.5' }}>
+                      {language === 'en'
+                        ? 'Deletes all appointments marked as test data, along with their transformation photos and reminders. Does not affect payouts or other data.'
+                        : 'Elimina todas las citas marcadas como datos de prueba, junto con sus fotos de transformación y recordatorios. No afecta los pagos u otros datos.'}
+                    </p>
+                    <button
+                      onClick={() => openResetModal('test_appointments')}
+                      style={{
+                        padding: '0.75rem 1.5rem',
+                        backgroundColor: '#dc2626',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {language === 'en' ? 'Reset Test Appointments' : 'Reiniciar Citas de Prueba'}
+                    </button>
+                  </div>
+
+                  <div
+                    style={{
+                      padding: '1.5rem',
+                      backgroundColor: 'white',
+                      border: '2px solid #ddd',
+                      borderRadius: '8px',
+                    }}
+                  >
+                    <h4 style={{ fontSize: '17px', fontWeight: '600', marginBottom: '0.75rem', color: '#333' }}>
+                      {language === 'en' ? '2. Reset Test Payouts Only' : '2. Reiniciar Solo Pagos de Prueba'}
+                    </h4>
+                    <p style={{ fontSize: '14px', color: '#666', marginBottom: '1rem', lineHeight: '1.5' }}>
+                      {language === 'en'
+                        ? 'Deletes payouts that are linked only to test appointments. Unmarks commission_paid flags so items can be recalculated.'
+                        : 'Elimina los pagos que están vinculados solo a citas de prueba. Desmarca las banderas commission_paid para que los elementos puedan recalcularse.'}
+                    </p>
+                    <button
+                      onClick={() => openResetModal('test_payouts')}
+                      style={{
+                        padding: '0.75rem 1.5rem',
+                        backgroundColor: '#dc2626',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {language === 'en' ? 'Reset Test Payouts' : 'Reiniciar Pagos de Prueba'}
+                    </button>
+                  </div>
+
+                  <div
+                    style={{
+                      padding: '1.5rem',
+                      backgroundColor: 'white',
+                      border: '2px solid #ddd',
+                      borderRadius: '8px',
+                    }}
+                  >
+                    <h4 style={{ fontSize: '17px', fontWeight: '600', marginBottom: '0.75rem', color: '#333' }}>
+                      {language === 'en' ? '3. Reset Time Tracking History' : '3. Reiniciar Historial de Seguimiento de Tiempo'}
+                    </h4>
+                    <p style={{ fontSize: '14px', color: '#666', marginBottom: '1rem', lineHeight: '1.5' }}>
+                      {language === 'en'
+                        ? 'Deletes all time tracking entries (clock-ins and clock-outs). Barber profiles and settings remain intact.'
+                        : 'Elimina todas las entradas de seguimiento de tiempo (entradas y salidas). Los perfiles de barberos y la configuración permanecen intactos.'}
+                    </p>
+                    <button
+                      onClick={() => openResetModal('time_tracking')}
+                      style={{
+                        padding: '0.75rem 1.5rem',
+                        backgroundColor: '#dc2626',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {language === 'en' ? 'Reset Time Tracking' : 'Reiniciar Seguimiento de Tiempo'}
+                    </button>
+                  </div>
+
+                  <div
+                    style={{
+                      padding: '1.5rem',
+                      backgroundColor: '#fee',
+                      border: '2px solid #fcc',
+                      borderRadius: '8px',
+                    }}
+                  >
+                    <h4 style={{ fontSize: '17px', fontWeight: '600', marginBottom: '0.75rem', color: '#c00' }}>
+                      {language === 'en' ? '4. Full Reset (Recommended Before Go-Live)' : '4. Reinicio Completo (Recomendado Antes del Lanzamiento)'}
+                    </h4>
+                    <p style={{ fontSize: '14px', color: '#666', marginBottom: '1rem', lineHeight: '1.5' }}>
+                      {language === 'en'
+                        ? 'Deletes ALL appointments, payouts, time tracking, transformation photos, reminders, inventory transactions, and messages. Use this to start fresh before launching your shop. Barbers, services, products, and shop settings are preserved.'
+                        : 'Elimina TODAS las citas, pagos, seguimiento de tiempo, fotos de transformación, recordatorios, transacciones de inventario y mensajes. Use esto para comenzar de nuevo antes de lanzar su tienda. Los barberos, servicios, productos y la configuración de la tienda se conservan.'}
+                    </p>
+                    <button
+                      onClick={() => openResetModal('all_data')}
+                      style={{
+                        padding: '0.75rem 1.5rem',
+                        backgroundColor: '#991b1b',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {language === 'en' ? 'Full Reset (Danger)' : 'Reinicio Completo (Peligro)'}
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    marginTop: '2rem',
+                    padding: '1rem',
+                    backgroundColor: '#e3f2fd',
+                    borderLeft: '4px solid #2196f3',
+                    borderRadius: '6px',
+                  }}
+                >
+                  <p style={{ fontSize: '13px', fontWeight: '600', marginBottom: '0.5rem', color: '#1565c0' }}>
+                    {language === 'en' ? 'What is NOT deleted:' : 'Lo que NO se elimina:'}
+                  </p>
+                  <ul style={{ fontSize: '13px', color: '#1565c0', marginLeft: '1.5rem', lineHeight: '1.8' }}>
+                    <li>{language === 'en' ? 'Barber profiles and commission rates' : 'Perfiles de barberos y tasas de comisión'}</li>
+                    <li>{language === 'en' ? 'Services and pricing' : 'Servicios y precios'}</li>
+                    <li>{language === 'en' ? 'Products and inventory settings' : 'Productos y configuración de inventario'}</li>
+                    <li>{language === 'en' ? 'Shop configuration and business hours' : 'Configuración de la tienda y horario comercial'}</li>
+                    <li>{language === 'en' ? 'User accounts and permissions' : 'Cuentas de usuario y permisos'}</li>
+                  </ul>
+                </div>
+              </div>
+            )}
           </div>
         </div>
+
+        {showResetModal && resetType && (
+          <ConfirmResetModal
+            {...getResetModalContent()}
+            onConfirm={handleResetData}
+            onClose={() => {
+              setShowResetModal(false);
+              setResetType(null);
+            }}
+            isLoading={resetting}
+          />
+        )}
       </main>
     </div>
   );
