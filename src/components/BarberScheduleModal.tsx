@@ -41,9 +41,17 @@ export default function BarberScheduleModal({ barberId, barberName, onClose, onS
       if (error) throw error;
 
       if (data && data.length > 0) {
-        setSchedules(data);
+        // Ensure all days 0-6 are present in the data
+        const allDays = [0, 1, 2, 3, 4, 5, 6];
+        const completeSchedules = allDays.map(day => {
+          const existing = data.find(s => s.day_of_week === day);
+          return existing || { day_of_week: day, start_time: '10:00', end_time: '19:00', active: false };
+        });
+        setSchedules(completeSchedules);
       } else {
+        // Default: Mon-Sat active, Sunday inactive
         setSchedules([
+          { day_of_week: 0, start_time: '10:00', end_time: '19:00', active: false },
           { day_of_week: 1, start_time: '10:00', end_time: '19:00', active: true },
           { day_of_week: 2, start_time: '10:00', end_time: '19:00', active: true },
           { day_of_week: 3, start_time: '10:00', end_time: '19:00', active: true },
@@ -60,13 +68,22 @@ export default function BarberScheduleModal({ barberId, barberName, onClose, onS
   };
 
   const handleToggleDay = (dayOfWeek: number) => {
-    setSchedules((prev) =>
-      prev.map((s) =>
-        s.day_of_week === dayOfWeek
-          ? { ...s, active: !s.active }
-          : s
-      )
-    );
+    setSchedules((prev) => {
+      const existing = prev.find(s => s.day_of_week === dayOfWeek);
+
+      if (existing) {
+        // Toggle existing schedule
+        return prev.map((s) =>
+          s.day_of_week === dayOfWeek
+            ? { ...s, active: !s.active }
+            : s
+        );
+      } else {
+        // Add new schedule for this day
+        return [...prev, { day_of_week: dayOfWeek, start_time: '10:00', end_time: '19:00', active: true }]
+          .sort((a, b) => a.day_of_week - b.day_of_week);
+      }
+    });
   };
 
   const handleTimeChange = (dayOfWeek: number, field: 'start_time' | 'end_time', value: string) => {
@@ -102,6 +119,14 @@ export default function BarberScheduleModal({ barberId, barberName, onClose, onS
         .insert(schedulesToInsert);
 
       if (insertError) throw insertError;
+
+      console.log('✅ [BarberSchedule] Saved schedule for barber', barberId, ':',
+        schedulesToInsert.map(s => ({
+          day: DAYS[s.day_of_week],
+          active: s.active,
+          hours: s.active ? `${s.start_time}-${s.end_time}` : 'closed'
+        }))
+      );
 
       alert(language === 'en' ? 'Schedule saved successfully!' : '¡Horario guardado exitosamente!');
       onSuccess();

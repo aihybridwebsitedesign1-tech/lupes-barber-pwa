@@ -77,50 +77,70 @@ export default function ClientBook() {
 
   const loadInitialData = async () => {
     setLoading(true);
+    console.log('🔵 [ClientBook] Starting loadInitialData...');
 
     try {
-      console.log('🔵 Loading booking page data...');
-
       // Step 1 shows all active barbers that are allowed on the client website.
       // Availability and booking rules are enforced later when generating time slots.
+      console.log('🔵 [ClientBook] Building queries...');
+
+      const barbersQuery = supabase
+        .from('users')
+        .select('id, name, public_display_name, photo_url')
+        .eq('role', 'BARBER')
+        .eq('active', true)
+        .eq('show_on_client_site', true)
+        .order('name');
+
+      console.log('🔵 [ClientBook] Executing parallel queries...');
       const [barbersRes, servicesRes, shopConfig, shopConfigFull] = await Promise.all([
-        supabase
-          .from('users')
-          .select('id, name, public_display_name, photo_url')
-          .eq('role', 'BARBER')
-          .eq('active', true)
-          .eq('show_on_client_site', true)
-          .order('name'),
+        barbersQuery,
         supabase.from('services').select('id, name_en, name_es, price, duration_minutes').eq('active', true).order('name_en'),
         getShopConfig(),
         supabase.from('shop_config').select('shop_name, phone, enable_confirmations').single()
       ]);
 
-      console.log('📊 Query results:', {
+      console.log('📊 [ClientBook] Raw query results:', {
         barbersError: barbersRes.error,
+        barbersStatus: barbersRes.status,
         barbersData: barbersRes.data,
-        barbersCount: barbersRes.data?.length || 0
+        barbersCount: barbersRes.data?.length || 0,
+        servicesError: servicesRes.error,
+        servicesCount: servicesRes.data?.length || 0
       });
 
       if (barbersRes.error) {
-        console.error('❌ Error loading barbers:', barbersRes.error);
+        console.error('❌ [ClientBook] Error loading barbers:', {
+          error: barbersRes.error,
+          message: barbersRes.error.message,
+          details: barbersRes.error.details,
+          hint: barbersRes.error.hint,
+          code: barbersRes.error.code
+        });
         throw barbersRes.error;
       }
+
       if (servicesRes.error) {
-        console.error('❌ Error loading services:', servicesRes.error);
+        console.error('❌ [ClientBook] Error loading services:', servicesRes.error);
         throw servicesRes.error;
       }
 
       const loadedBarbers = barbersRes.data || [];
       const loadedServices = servicesRes.data || [];
 
-      console.log('✅ Booking data loaded:', {
+      console.log('✅ [ClientBook] Data processed:', {
         barbersCount: loadedBarbers.length,
-        barbers: loadedBarbers.map(b => ({ id: b.id, name: b.name })),
+        barbers: loadedBarbers.map(b => ({
+          id: b.id,
+          name: b.name,
+          public_display_name: b.public_display_name,
+          has_photo: !!b.photo_url
+        })),
         servicesCount: loadedServices.length,
         hasShopConfig: !!shopConfig
       });
 
+      console.log('🔵 [ClientBook] Setting state with barbers:', loadedBarbers);
       setBarbers(loadedBarbers);
       setServices(loadedServices);
 

@@ -61,6 +61,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setError('User account exists but no profile found. Please contact support.');
         setUserData(null);
       } else {
+        // Check if user account is inactive
+        if (!data.active) {
+          console.warn('⚠️ [Auth] Inactive user attempted to access app:', data.email);
+          setError('Your account is inactive. Please contact the shop owner.');
+          setUserData(null);
+          // Sign out inactive users immediately
+          await supabase.auth.signOut();
+          return;
+        }
+
         setUserData(data);
         setError(null);
 
@@ -83,8 +93,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
+
+    // Check if the user account is active
+    if (authData.user) {
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('active')
+        .eq('id', authData.user.id)
+        .maybeSingle();
+
+      if (userError) {
+        console.error('Error checking user status:', userError);
+      }
+
+      if (userData && !userData.active) {
+        // Sign out immediately and throw error
+        await supabase.auth.signOut();
+        throw new Error('Your account is inactive. Please contact the shop owner.');
+      }
+    }
   };
 
   const signOut = async () => {

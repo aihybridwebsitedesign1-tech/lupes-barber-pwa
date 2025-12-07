@@ -72,6 +72,12 @@ export default function OwnerBarbersTimeTracking() {
 
     setLoading(true);
     try {
+      console.log('🔵 [TimeTracking] Loading time data...', {
+        startDate,
+        endDate,
+        selectedBarber: selectedBarber || 'All'
+      });
+
       const startDateTime = new Date(startDate + 'T00:00:00').toISOString();
       const endDateTime = new Date(endDate + 'T23:59:59').toISOString();
 
@@ -88,6 +94,16 @@ export default function OwnerBarbersTimeTracking() {
 
       const { data, error } = await query;
 
+      console.log('📊 [TimeTracking] Query result:', {
+        error,
+        entriesCount: data?.length || 0,
+        entries: data?.map(e => ({
+          barber: e.users?.name,
+          type: e.entry_type,
+          timestamp: e.timestamp
+        }))
+      });
+
       if (error) throw error;
 
       const entries: TimeEntry[] = (data || []).map(e => ({
@@ -98,9 +114,18 @@ export default function OwnerBarbersTimeTracking() {
       }));
 
       const dailyReports = calculateDailyReports(entries, data || []);
+      console.log('✅ [TimeTracking] Generated reports:', {
+        reportCount: dailyReports.length,
+        reports: dailyReports.map(r => ({
+          barber: r.barber_name,
+          date: r.date,
+          net_hours: r.net_hours.toFixed(2)
+        }))
+      });
+
       setReports(dailyReports);
     } catch (error) {
-      console.error('Error loading time data:', error);
+      console.error('❌ [TimeTracking] Error loading time data:', error);
     } finally {
       setLoading(false);
     }
@@ -113,7 +138,8 @@ export default function OwnerBarbersTimeTracking() {
 
     entries.forEach((entry) => {
       const date = entry.timestamp.split('T')[0];
-      const key = `${entry.barber_id}-${date}`;
+      // Use a separator that won't conflict with UUID dashes
+      const key = `${entry.barber_id}|${date}`;
 
       if (!barbersByDate.has(key)) {
         barbersByDate.set(key, new Map());
@@ -128,7 +154,8 @@ export default function OwnerBarbersTimeTracking() {
     });
 
     barbersByDate.forEach((dateEntries, key) => {
-      const [, date] = key.split('-');
+      // Split by pipe separator to correctly parse barber_id and date
+      const [_barberId, date] = key.split('|');
 
       dateEntries.forEach((dayEntries, bid) => {
         const clockIns = dayEntries.filter(e => e.entry_type === 'clock_in');
@@ -157,6 +184,13 @@ export default function OwnerBarbersTimeTracking() {
         const totalHours = totalWorked / (1000 * 60 * 60);
         const breakHours = totalBreak / (1000 * 60 * 60);
         const netHours = (totalWorked - totalBreak) / (1000 * 60 * 60);
+
+        console.log(`✅ [TimeTracking] Report for ${barberName} on ${date}:`, {
+          total_hours: totalHours.toFixed(2),
+          break_hours: breakHours.toFixed(2),
+          net_hours: netHours.toFixed(2),
+          entry_count: dayEntries.length
+        });
 
         reportMap.set(key, {
           barber_id: bid,
