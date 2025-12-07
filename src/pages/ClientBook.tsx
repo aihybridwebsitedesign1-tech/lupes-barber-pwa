@@ -64,6 +64,9 @@ export default function ClientBook() {
   const [config, setConfig] = useState<{ days_bookable_in_advance: number; min_book_ahead_hours: number; min_cancel_ahead_hours: number; client_booking_interval_minutes: number } | null>(null);
   const [shopInfo, setShopInfo] = useState<{ shop_name: string; phone: string | null }>({ shop_name: "Lupe's Barber", phone: null });
 
+  // TEST MODE: When true, bookings are marked as test data, SMS not sent, payments forced to "pay in shop"
+  const [testMode, setTestMode] = useState(false);
+
   useEffect(() => {
     loadInitialData();
   }, []);
@@ -243,7 +246,7 @@ export default function ClientBook() {
       debug('[ClientBook BARBERS] Loading shop config...');
       const [shopConfig, shopConfigFull] = await Promise.all([
         getShopConfig(),
-        supabase.from('shop_config').select('shop_name, phone, enable_confirmations').single()
+        supabase.from('shop_config').select('shop_name, phone, enable_confirmations, test_mode_enabled').single()
       ]);
 
       if (shopConfigFull.data) {
@@ -251,6 +254,9 @@ export default function ClientBook() {
           shop_name: shopConfigFull.data.shop_name || "Lupe's Barber",
           phone: shopConfigFull.data.phone || null
         });
+
+        // TEST MODE: Load test mode setting from database
+        setTestMode(shopConfigFull.data.test_mode_enabled ?? false);
       }
 
       if (shopConfig) {
@@ -469,6 +475,7 @@ export default function ClientBook() {
       const appointmentStart = selectedTime;
       const appointmentEnd = selectedSlot?.end || new Date(new Date(selectedTime).getTime() + (selectedServiceData?.duration_minutes || 30) * 60000).toISOString();
 
+      // TEST MODE: Mark appointment as test data when test mode is enabled
       const { data: newAppointment, error: appointmentError} = await supabase
         .from('appointments')
         .insert({
@@ -483,6 +490,7 @@ export default function ClientBook() {
           payment_status: 'unpaid',
           amount_due: amountDue,
           amount_paid: 0,
+          is_test: testMode, // TEST MODE: Mark as test when test mode is enabled
         })
         .select('id')
         .single();
@@ -510,7 +518,8 @@ export default function ClientBook() {
       }
 
       // Check if Stripe is enabled
-      const stripeEnabled = Boolean(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
+      // TEST MODE: Force "pay in shop" mode when test mode is enabled (no real payments)
+      const stripeEnabled = Boolean(import.meta.env.VITE_STRIPE_PUBLIC_KEY) && !testMode;
 
       if (stripeEnabled) {
         // Create Stripe checkout session
@@ -877,7 +886,27 @@ export default function ClientBook() {
                 </div>
               </div>
 
-              {!stripeEnabled && (
+              {/* TEST MODE: Show warning banner when test mode is enabled */}
+              {testMode && (
+                <div style={{
+                  backgroundColor: '#fff3cd',
+                  border: '2px solid #ffc107',
+                  padding: '1.25rem',
+                  borderRadius: '8px',
+                  marginBottom: '1rem',
+                  fontSize: '14px',
+                  color: '#856404'
+                }}>
+                  <div style={{ fontWeight: 'bold', marginBottom: '0.5rem' }}>
+                    {language === 'en' ? '⚠️ Test Mode Enabled' : '⚠️ Modo de Prueba Activado'}
+                  </div>
+                  {language === 'en'
+                    ? 'This booking is for testing only. No real payment will be processed and no SMS notifications will be sent.'
+                    : 'Esta reserva es solo para pruebas. No se procesará ningún pago real y no se enviarán notificaciones SMS.'}
+                </div>
+              )}
+
+              {!stripeEnabled && !testMode && (
                 <div style={{
                   backgroundColor: '#fff3cd',
                   border: '1px solid #ffc107',
@@ -914,9 +943,11 @@ export default function ClientBook() {
               >
                 {submitting
                   ? (language === 'en' ? 'Processing...' : 'Procesando...')
-                  : stripeEnabled
-                    ? (language === 'en' ? 'Pay & Confirm' : 'Pagar y Confirmar')
-                    : (language === 'en' ? 'Confirm Booking' : 'Confirmar Reserva')}
+                  : testMode
+                    ? (language === 'en' ? 'Confirm Test Booking' : 'Confirmar Reserva de Prueba')
+                    : stripeEnabled
+                      ? (language === 'en' ? 'Pay & Confirm' : 'Pagar y Confirmar')
+                      : (language === 'en' ? 'Confirm Booking' : 'Confirmar Reserva')}
               </button>
             </div>
           )}

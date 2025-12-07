@@ -130,6 +130,46 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Create Supabase client with service role (needed for test mode check)
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // TEST MODE: Check if test mode is enabled - if so, skip sending real SMS
+    const { data: shopConfig } = await supabase
+      .from("shop_config")
+      .select("test_mode_enabled")
+      .single();
+
+    if (shopConfig?.test_mode_enabled) {
+      const maskedPhone = phoneNumber.substring(0, 5) + "...";
+      console.log(`[Notification TEST MODE] Would send ${notificationType} to ${maskedPhone}: "${message.substring(0, 50)}..."`);
+
+      // Record the message as "sent_test" in client_messages
+      await supabase.from("client_messages").insert({
+        client_id: clientId,
+        phone_number: phoneNumber,
+        message: message,
+        channel: "sms",
+        source: `${notificationType}_auto`,
+        notification_type: notificationType,
+        appointment_id: appointmentId,
+        status: "sent_test",
+        sent_by_user_id: null,
+      });
+
+      return new Response(
+        JSON.stringify({ status: "sent_test", message: "Test mode: SMS not actually sent" }),
+        {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
+
     // Send via Twilio
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`;
     const credentials = btoa(`${twilioAccountSid}:${twilioAuthToken}`);
@@ -147,11 +187,6 @@ Deno.serve(async (req: Request) => {
       },
       body: formData.toString(),
     });
-
-    // Create Supabase client with service role
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     if (!twilioResponse.ok) {
       const errorData = await twilioResponse.json();

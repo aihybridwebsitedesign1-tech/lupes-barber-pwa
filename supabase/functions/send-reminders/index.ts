@@ -64,7 +64,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: config } = await supabase
       .from("shop_config")
-      .select("enable_reminders, shop_name, phone")
+      .select("enable_reminders, shop_name, phone, test_mode_enabled")
       .single();
 
     if (!config || !config.enable_reminders) {
@@ -77,6 +77,12 @@ Deno.serve(async (req: Request) => {
 
     const shopName = config.shop_name || "Lupe's Barber";
     const shopPhone = config.phone;
+
+    // TEST MODE: Check if test mode is enabled
+    const isTestMode = config.test_mode_enabled ?? false;
+    if (isTestMode) {
+      console.log("[Reminders] TEST MODE ENABLED - will mark reminders as sent_test without sending SMS");
+    }
 
     const now = new Date();
     const { data: dueReminders, error: remindersError } = await supabase
@@ -197,6 +203,33 @@ Deno.serve(async (req: Request) => {
         const serviceName = language === 'es' ? appointment.services.name_es : appointment.services.name_en;
         const date = formatDate(appointment.scheduled_start, language);
         const time = formatTime(appointment.scheduled_start);
+
+        // TEST MODE: Skip actual SMS sending, mark as sent_test
+        if (isTestMode) {
+          const maskedPhone = client.phone.substring(0, 5) + "...";
+          console.log(`[Reminders TEST MODE] Would send reminder to ${maskedPhone} for appointment ${appointment.id}`);
+
+          await supabase
+            .from("booking_reminders")
+            .update({
+              status: "sent_test",
+              sent_at: now.toISOString()
+            })
+            .eq("id", reminder.id);
+
+          await supabase
+            .from("appointment_reminders_sent")
+            .insert({
+              appointment_id: appointment.id,
+              reminder_type: "reminder",
+              reminder_offset_hours: reminder.reminder_offset_hours,
+            })
+            .onConflict("appointment_id,reminder_offset_hours")
+            .ignoreDuplicates();
+
+          sentCount++;
+          continue;
+        }
 
         const notificationUrl = `${supabaseUrl}/functions/v1/send-notification`;
         const notificationResponse = await fetch(notificationUrl, {

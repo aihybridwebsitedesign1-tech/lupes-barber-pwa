@@ -63,6 +63,8 @@ export default function OwnerSettings() {
   const [tipFlatPresets, setTipFlatPresets] = useState('5, 10, 15');
 
   const [testModeEnabled, setTestModeEnabled] = useState(false);
+  const [showDeleteTestModal, setShowDeleteTestModal] = useState(false);
+  const [deletingTestData, setDeletingTestData] = useState(false);
 
   useEffect(() => {
     if (!userData) return;
@@ -347,6 +349,59 @@ export default function OwnerSettings() {
       setError(language === 'en' ? 'Failed to save test mode settings' : 'Error al guardar configuración de modo de prueba');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDeleteTestBookings = async () => {
+    setDeletingTestData(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      // Get all test appointment IDs first
+      const { data: testAppointments } = await supabase
+        .from('appointments')
+        .select('id')
+        .eq('is_test', true);
+
+      const testAppointmentIds = (testAppointments || []).map(a => a.id);
+
+      // Cancel all test appointments (soft delete - set status to cancelled)
+      const { error: cancelError } = await supabase
+        .from('appointments')
+        .update({
+          status: 'cancelled',
+          cancelled_at: new Date().toISOString(),
+        })
+        .eq('is_test', true)
+        .neq('status', 'cancelled');
+
+      if (cancelError) throw cancelError;
+
+      // Cancel all booking reminders for test appointments (only if there are test appointments)
+      if (testAppointmentIds.length > 0) {
+        const { error: remindersError } = await supabase
+          .from('booking_reminders')
+          .update({
+            status: 'cancelled',
+            error_message: 'Test appointment deleted',
+          })
+          .eq('status', 'pending')
+          .in('appointment_id', testAppointmentIds);
+
+        if (remindersError) {
+          console.error('Error cancelling test reminders:', remindersError);
+          // Don't throw - reminders are secondary
+        }
+      }
+
+      setSuccess(language === 'en' ? 'All test bookings have been cancelled!' : '¡Todas las reservas de prueba han sido canceladas!');
+      setShowDeleteTestModal(false);
+    } catch (err: any) {
+      console.error('Error deleting test bookings:', err);
+      setError(language === 'en' ? 'Failed to delete test bookings' : 'Error al eliminar reservas de prueba');
+    } finally {
+      setDeletingTestData(false);
     }
   };
 
@@ -1339,6 +1394,35 @@ export default function OwnerSettings() {
                       </ul>
                     </div>
 
+                    <div style={{ marginTop: '3rem', marginBottom: '2rem', paddingTop: '2rem', borderTop: '2px solid #e5e5e5' }}>
+                      <h4 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '1rem', color: '#333' }}>
+                        {language === 'en' ? 'Test Data Tools' : 'Herramientas de Datos de Prueba'}
+                      </h4>
+
+                      <p style={{ fontSize: '14px', color: '#666', marginBottom: '1.5rem', lineHeight: '1.6' }}>
+                        {language === 'en'
+                          ? 'Clean up test appointments after testing. This only affects appointments marked as test data and will not touch real client bookings.'
+                          : 'Limpia las citas de prueba después de probar. Esto solo afecta las citas marcadas como datos de prueba y no tocará las reservas de clientes reales.'}
+                      </p>
+
+                      <button
+                        onClick={() => setShowDeleteTestModal(true)}
+                        disabled={deletingTestData}
+                        style={{
+                          padding: '0.75rem 1.5rem',
+                          backgroundColor: deletingTestData ? '#ccc' : '#dc2626',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          fontSize: '14px',
+                          fontWeight: '500',
+                          cursor: deletingTestData ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        {language === 'en' ? '🗑️ Delete Test Bookings' : '🗑️ Eliminar Reservas de Prueba'}
+                      </button>
+                    </div>
+
                     <button
                       onClick={handleSaveTestMode}
                       disabled={saving}
@@ -1361,6 +1445,84 @@ export default function OwnerSettings() {
                         ? 'Save Changes'
                         : 'Guardar Cambios'}
                     </button>
+                  </div>
+                )}
+
+                {/* Delete Test Bookings Confirmation Modal */}
+                {showDeleteTestModal && (
+                  <div
+                    style={{
+                      position: 'fixed',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      backgroundColor: 'rgba(0,0,0,0.6)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      zIndex: 1000,
+                    }}
+                    onClick={() => !deletingTestData && setShowDeleteTestModal(false)}
+                  >
+                    <div
+                      style={{
+                        backgroundColor: 'white',
+                        padding: '2rem',
+                        borderRadius: '12px',
+                        maxWidth: '500px',
+                        width: '90%',
+                        boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '1rem' }}>
+                        {language === 'en' ? 'Delete Test Bookings?' : '¿Eliminar Reservas de Prueba?'}
+                      </h3>
+
+                      <p style={{ fontSize: '15px', color: '#666', marginBottom: '1.5rem', lineHeight: '1.6' }}>
+                        {language === 'en'
+                          ? 'This will cancel all appointments marked as test data (is_test = true). Their reminders will also be cancelled. Live client data will NOT be touched.'
+                          : 'Esto cancelará todas las citas marcadas como datos de prueba (is_test = true). Sus recordatorios también se cancelarán. Los datos de clientes reales NO serán tocados.'}
+                      </p>
+
+                      <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                        <button
+                          onClick={() => setShowDeleteTestModal(false)}
+                          disabled={deletingTestData}
+                          style={{
+                            padding: '0.75rem 1.5rem',
+                            backgroundColor: 'white',
+                            color: '#333',
+                            border: '2px solid #ddd',
+                            borderRadius: '6px',
+                            fontSize: '14px',
+                            fontWeight: '500',
+                            cursor: deletingTestData ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          {language === 'en' ? 'Cancel' : 'Cancelar'}
+                        </button>
+                        <button
+                          onClick={handleDeleteTestBookings}
+                          disabled={deletingTestData}
+                          style={{
+                            padding: '0.75rem 1.5rem',
+                            backgroundColor: deletingTestData ? '#ccc' : '#dc2626',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '14px',
+                            fontWeight: '500',
+                            cursor: deletingTestData ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          {deletingTestData
+                            ? (language === 'en' ? 'Deleting...' : 'Eliminando...')
+                            : (language === 'en' ? 'Yes, Delete Test Bookings' : 'Sí, Eliminar Reservas de Prueba')}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </>

@@ -13,6 +13,7 @@ type AppointmentWithDetails = {
   status: string;
   source: string | null;
   payment_status: 'paid' | 'unpaid' | 'refunded' | 'partial' | null;
+  is_test: boolean;
   barber: { name: string } | null;
   client: { first_name: string; last_name: string };
   service: { name_en: string; name_es: string };
@@ -49,6 +50,7 @@ export default function OwnerToday() {
           source,
           services_total,
           payment_status,
+          is_test,
           barber:barber_id (name),
           client:client_id (first_name, last_name),
           service:service_id (name_en, name_es)
@@ -70,6 +72,7 @@ export default function OwnerToday() {
         status: apt.status,
         source: apt.source || null,
         payment_status: apt.payment_status as 'paid' | 'unpaid' | 'refunded' | 'partial' | null,
+        is_test: apt.is_test || false,
         barber: Array.isArray(apt.barber) ? apt.barber[0] : apt.barber,
         client: Array.isArray(apt.client) ? apt.client[0] : apt.client,
         service: Array.isArray(apt.service) ? apt.service[0] : apt.service,
@@ -258,6 +261,20 @@ export default function OwnerToday() {
                     <td style={{ padding: '1rem', fontSize: '14px' }}>{apt.barber?.name || t.unassigned}</td>
                     <td style={{ padding: '1rem', fontSize: '14px' }}>
                       {apt.client ? `${apt.client.first_name} ${apt.client.last_name}` : 'N/A'}
+                      {apt.is_test && (
+                        <span style={{
+                          marginLeft: '0.5rem',
+                          padding: '0.15rem 0.5rem',
+                          backgroundColor: '#fef3c7',
+                          color: '#92400e',
+                          borderRadius: '4px',
+                          fontSize: '11px',
+                          fontWeight: '600',
+                          border: '1px solid #fcd34d'
+                        }}>
+                          TEST
+                        </span>
+                      )}
                     </td>
                     <td style={{ padding: '1rem', fontSize: '14px' }}>
                       {apt.service ? (language === 'es' ? apt.service.name_es : apt.service.name_en) : 'N/A'}

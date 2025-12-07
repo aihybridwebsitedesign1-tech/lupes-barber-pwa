@@ -113,6 +113,39 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // TEST MODE: Check if test mode is enabled - if so, skip sending real SMS
+    const { data: shopConfig } = await supabase
+      .from("shop_config")
+      .select("test_mode_enabled")
+      .single();
+
+    if (shopConfig?.test_mode_enabled) {
+      const maskedPhone = phoneNumber.substring(0, 5) + "...";
+      console.log(`[SMS TEST MODE] Would send to ${maskedPhone}: "${message.substring(0, 50)}..."`);
+
+      // Record the message as "sent_test" in client_messages
+      await supabase.from("client_messages").insert({
+        client_id: clientId,
+        phone_number: phoneNumber,
+        message: message,
+        channel: "sms",
+        source: source || "engage_manual",
+        status: "sent_test",
+        sent_by_user_id: userData.id,
+      });
+
+      return new Response(
+        JSON.stringify({ status: "sent_test", message: "Test mode: SMS not actually sent" }),
+        {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
+
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`;
     const credentials = btoa(`${twilioAccountSid}:${twilioAuthToken}`);
 
