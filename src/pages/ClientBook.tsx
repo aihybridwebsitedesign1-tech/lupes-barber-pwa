@@ -11,6 +11,9 @@ type Barber = {
   name: string;
   public_display_name?: string;
   photo_url?: string;
+  active?: boolean;
+  show_on_client_site?: boolean;
+  accept_online_bookings?: boolean;
 };
 
 type Service = {
@@ -77,17 +80,17 @@ export default function ClientBook() {
 
   const loadInitialData = async () => {
     setLoading(true);
-    console.log('🔵 [ClientBook] Starting loadInitialData...');
+    console.log('[ClientBook DEBUG] === STARTING DATA LOAD ===');
 
     try {
       // Check if a specific barber was preselected via query param
       const preselectedBarberId = searchParams.get('barber');
-      console.log('🔵 [ClientBook] Preselected barber ID from URL:', preselectedBarberId || 'none');
+      console.log('[ClientBook DEBUG] Preselected barber ID from URL:', preselectedBarberId || 'none');
 
       // Step 1 shows all active barbers that accept online bookings.
       // If a barber is preselected via direct link, we fetch that barber separately.
       // Availability and booking rules are enforced later when generating time slots.
-      console.log('🔵 [ClientBook] Building queries...');
+      console.log('[ClientBook DEBUG] Building Supabase query...');
 
       // Main query: Get all barbers available for general booking
       const barbersQuery = supabase
@@ -112,7 +115,7 @@ export default function ClientBook() {
           .maybeSingle();
       }
 
-      console.log('🔵 [ClientBook] Executing parallel queries...');
+      console.log('[ClientBook DEBUG] Executing queries...');
       const [barbersRes, servicesRes, shopConfig, shopConfigFull, preselectedBarberRes] = await Promise.all([
         barbersQuery,
         supabase.from('services').select('id, name_en, name_es, price, duration_minutes').eq('active', true).order('name_en'),
@@ -121,30 +124,18 @@ export default function ClientBook() {
         preselectedBarberQuery || Promise.resolve({ data: null, error: null } as any)
       ]);
 
-      console.log('📊 [ClientBook] Raw query results:', {
-        barbersError: barbersRes.error,
-        barbersStatus: barbersRes.status,
-        barbersData: barbersRes.data,
-        barbersCount: barbersRes.data?.length || 0,
-        preselectedBarberData: preselectedBarberRes?.data || null,
-        preselectedBarberError: preselectedBarberRes?.error || null,
-        servicesError: servicesRes.error,
-        servicesCount: servicesRes.data?.length || 0
-      });
+      console.log('[ClientBook DEBUG] === RAW QUERY RESULTS ===');
+      console.log('[ClientBook DEBUG] Barbers query error:', barbersRes.error);
+      console.log('[ClientBook DEBUG] Barbers query data:', barbersRes.data);
+      console.log('[ClientBook DEBUG] Barbers count from DB:', barbersRes.data?.length || 0);
 
       if (barbersRes.error) {
-        console.error('❌ [ClientBook] Error loading barbers:', {
-          error: barbersRes.error,
-          message: barbersRes.error.message,
-          details: barbersRes.error.details,
-          hint: barbersRes.error.hint,
-          code: barbersRes.error.code
-        });
+        console.error('[ClientBook DEBUG] ❌ ERROR loading barbers:', barbersRes.error);
         throw barbersRes.error;
       }
 
       if (servicesRes.error) {
-        console.error('❌ [ClientBook] Error loading services:', servicesRes.error);
+        console.error('[ClientBook DEBUG] ❌ ERROR loading services:', servicesRes.error);
         throw servicesRes.error;
       }
 
@@ -156,33 +147,26 @@ export default function ClientBook() {
         const alreadyInList = loadedBarbers.find(b => b.id === preselectedBarber.id);
 
         if (!alreadyInList) {
-          console.log('✅ [ClientBook] Adding preselected barber to list (direct link):', {
-            id: preselectedBarber.id,
-            name: preselectedBarber.name,
-            accept_online_bookings: preselectedBarber.accept_online_bookings
-          });
+          console.log('[ClientBook DEBUG] Adding preselected barber (direct link):', preselectedBarber.name);
           loadedBarbers = [preselectedBarber, ...loadedBarbers];
         }
       } else if (preselectedBarberId && !preselectedBarberRes?.data) {
-        console.warn('⚠️ [ClientBook] Preselected barber not found or inactive:', preselectedBarberId);
+        console.warn('[ClientBook DEBUG] ⚠️ Preselected barber not found:', preselectedBarberId);
       }
 
       const loadedServices = servicesRes.data || [];
 
-      console.log('✅ [ClientBook] Data processed:', {
-        barbersCount: loadedBarbers.length,
-        barbers: loadedBarbers.map(b => ({
-          id: b.id,
-          name: b.name,
-          public_display_name: b.public_display_name,
-          has_photo: !!b.photo_url,
-          accept_online_bookings: b.accept_online_bookings
-        })),
-        servicesCount: loadedServices.length,
-        hasShopConfig: !!shopConfig
-      });
+      console.log('[ClientBook DEBUG] === FINAL BARBERS LIST ===');
+      console.log('[ClientBook DEBUG] Final barbers count:', loadedBarbers.length);
+      console.log('[ClientBook DEBUG] Final barbers:', loadedBarbers.map(b => ({
+        id: b.id,
+        name: b.name,
+        active: b.active,
+        show_on_client_site: b.show_on_client_site,
+        accept_online_bookings: b.accept_online_bookings
+      })));
 
-      console.log('🔵 [ClientBook] Setting state with barbers:', loadedBarbers);
+      console.log('[ClientBook DEBUG] Calling setBarbers() with', loadedBarbers.length, 'barbers');
       setBarbers(loadedBarbers);
       setServices(loadedServices);
 
@@ -194,10 +178,9 @@ export default function ClientBook() {
       }
 
       if (shopConfig) {
-        console.log('✅ Using shop config from database');
         setConfig(shopConfig);
       } else {
-        console.warn('⚠️ Shop config not available, using fallback defaults');
+        console.warn('[ClientBook DEBUG] No shop config, using defaults');
         const fallbackConfig = {
           days_bookable_in_advance: 30,
           min_book_ahead_hours: 2,
@@ -206,7 +189,7 @@ export default function ClientBook() {
         setConfig(fallbackConfig);
       }
     } catch (error) {
-      console.error('❌ Error loading booking page data:', error);
+      console.error('[ClientBook DEBUG] ❌ FATAL ERROR in loadInitialData:', error);
       const fallbackConfig = {
         days_bookable_in_advance: 30,
         min_book_ahead_hours: 2,
@@ -214,6 +197,7 @@ export default function ClientBook() {
       };
       setConfig(fallbackConfig);
     } finally {
+      console.log('[ClientBook DEBUG] Setting loading=false');
       setLoading(false);
     }
   };
@@ -436,6 +420,12 @@ export default function ClientBook() {
     );
   }
 
+  // CRITICAL DEBUG: Log barbers array at render time
+  console.log('[ClientBook DEBUG] === RENDER TIME CHECK ===');
+  console.log('[ClientBook DEBUG] barbers.length:', barbers.length);
+  console.log('[ClientBook DEBUG] barbers array:', barbers);
+  console.log('[ClientBook DEBUG] Will show "No barbers" message:', barbers.length === 0);
+
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
       <ClientHeader />
@@ -478,7 +468,10 @@ export default function ClientBook() {
               <h2 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '1.5rem' }}>
                 {language === 'en' ? 'Select Barber' : 'Seleccionar Barbero'}
               </h2>
-              {barbers.length === 0 ? (
+              {(() => {
+                console.log('[ClientBook DEBUG] Step 1 render - barbers.length:', barbers.length);
+                return barbers.length === 0;
+              })() ? (
                 <div style={{ textAlign: 'center', padding: '2rem', color: '#666', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
                   <div style={{ fontSize: '18px', marginBottom: '0.5rem' }}>
                     {language === 'en' ? 'No barbers available for booking right now.' : 'No hay barberos disponibles para reservar en este momento.'}
