@@ -19,9 +19,10 @@ type ShopConfig = {
   client_booking_interval_minutes: number;
   regular_client_min_visits: number;
   lapsed_client_days: number;
+  test_mode_enabled: boolean;
 };
 
-type Tab = 'shop_info' | 'booking_rules' | 'retention' | 'commissions' | 'payments' | 'notifications';
+type Tab = 'shop_info' | 'booking_rules' | 'retention' | 'commissions' | 'payments' | 'notifications' | 'test_mode';
 
 export default function OwnerSettings() {
   const { language } = useLanguage();
@@ -60,6 +61,8 @@ export default function OwnerSettings() {
   const [enableTipping, setEnableTipping] = useState(true);
   const [tipPercentagePresets, setTipPercentagePresets] = useState('15, 18, 20, 25');
   const [tipFlatPresets, setTipFlatPresets] = useState('5, 10, 15');
+
+  const [testModeEnabled, setTestModeEnabled] = useState(false);
 
   useEffect(() => {
     if (!userData) return;
@@ -106,6 +109,8 @@ export default function OwnerSettings() {
         setTipPercentagePresets(Array.isArray(tipPercents) ? tipPercents.join(', ') : '15, 18, 20, 25');
         const tipFlats = data.tip_flat_presets || [5, 10, 15];
         setTipFlatPresets(Array.isArray(tipFlats) ? tipFlats.join(', ') : '5, 10, 15');
+
+        setTestModeEnabled(data.test_mode_enabled ?? false);
       }
 
       const { data: barbersData, error: barbersError } = await supabase
@@ -320,6 +325,31 @@ export default function OwnerSettings() {
     }
   };
 
+  const handleSaveTestMode = async () => {
+    setSaving(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const { error: updateError } = await supabase
+        .from('shop_config')
+        .update({
+          test_mode_enabled: testModeEnabled,
+        })
+        .eq('id', config?.id || 1);
+
+      if (updateError) throw updateError;
+
+      setSuccess(language === 'en' ? 'Test mode settings saved!' : '¡Configuración de modo de prueba guardada!');
+      await loadShopConfig();
+    } catch (err: any) {
+      console.error('Error saving test mode:', err);
+      setError(language === 'en' ? 'Failed to save test mode settings' : 'Error al guardar configuración de modo de prueba');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (!userData || userData.role !== 'OWNER') {
     return null;
   }
@@ -331,6 +361,7 @@ export default function OwnerSettings() {
     { id: 'commissions', labelEn: 'Commissions', labelEs: 'Comisiones' },
     { id: 'payments', labelEn: 'Online Payments', labelEs: 'Pagos en Línea' },
     { id: 'notifications', labelEn: 'Notifications', labelEs: 'Notificaciones' },
+    { id: 'test_mode', labelEn: 'Test Mode', labelEs: 'Modo de Prueba' },
   ];
 
   return (
@@ -1201,6 +1232,115 @@ export default function OwnerSettings() {
 
                     <button
                       onClick={handleSaveNotifications}
+                      disabled={saving}
+                      style={{
+                        padding: '0.75rem 1.5rem',
+                        backgroundColor: saving ? '#ccc' : '#000',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        cursor: saving ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      {saving
+                        ? language === 'en'
+                          ? 'Saving...'
+                          : 'Guardando...'
+                        : language === 'en'
+                        ? 'Save Changes'
+                        : 'Guardar Cambios'}
+                    </button>
+                  </div>
+                )}
+
+                {activeTab === 'test_mode' && (
+                  <div>
+                    <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '1rem' }}>
+                      {language === 'en' ? 'Test Mode' : 'Modo de Prueba'}
+                    </h3>
+
+                    <div
+                      style={{
+                        padding: '1.25rem',
+                        backgroundColor: '#fff3cd',
+                        borderLeft: '4px solid #ffc107',
+                        borderRadius: '6px',
+                        marginBottom: '2rem',
+                      }}
+                    >
+                      <p style={{ fontSize: '15px', fontWeight: '600', marginBottom: '0.75rem', color: '#856404' }}>
+                        {language === 'en' ? '⚠️ Test Mode is for safe testing only' : '⚠️ Modo de Prueba es solo para pruebas seguras'}
+                      </p>
+                      <p style={{ fontSize: '14px', color: '#856404', lineHeight: '1.6' }}>
+                        {language === 'en'
+                          ? 'When enabled, SMS messages will NOT be sent, online payments will be disabled (forcing "pay in shop"), and new appointments will be marked as test data for easy cleanup.'
+                          : 'Cuando está habilitado, los mensajes SMS NO se enviarán, los pagos en línea estarán deshabilitados (forzando "pagar en tienda"), y las nuevas citas se marcarán como datos de prueba para fácil limpieza.'}
+                      </p>
+                    </div>
+
+                    <div style={{ marginBottom: '2rem' }}>
+                      <label
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          cursor: 'pointer',
+                          padding: '1rem',
+                          backgroundColor: testModeEnabled ? '#fff3cd' : '#f5f5f5',
+                          borderRadius: '8px',
+                          border: `2px solid ${testModeEnabled ? '#ffc107' : '#ddd'}`,
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={testModeEnabled}
+                          onChange={(e) => setTestModeEnabled(e.target.checked)}
+                          style={{ marginRight: '1rem', width: '20px', height: '20px', cursor: 'pointer' }}
+                        />
+                        <div>
+                          <span style={{ fontWeight: '600', fontSize: '16px', display: 'block', marginBottom: '0.25rem' }}>
+                            {language === 'en' ? 'Enable Test Mode' : 'Habilitar Modo de Prueba'}
+                          </span>
+                          <span style={{ fontSize: '14px', color: '#666' }}>
+                            {language === 'en'
+                              ? 'Sandbox mode for safe testing without affecting real clients'
+                              : 'Modo sandbox para pruebas seguras sin afectar clientes reales'}
+                          </span>
+                        </div>
+                      </label>
+                    </div>
+
+                    <div style={{ marginBottom: '2rem', padding: '1.5rem', backgroundColor: '#f0f9ff', borderRadius: '8px', border: '1px solid #bae6fd' }}>
+                      <p style={{ fontSize: '15px', fontWeight: '600', marginBottom: '1rem', color: '#0c4a6e' }}>
+                        {language === 'en' ? 'When Test Mode is ON:' : 'Cuando el Modo de Prueba está ACTIVO:'}
+                      </p>
+                      <ul style={{ fontSize: '14px', color: '#0c4a6e', marginLeft: '1.5rem', lineHeight: '1.8' }}>
+                        <li>
+                          {language === 'en'
+                            ? '🚫 SMS reminders and notifications will NOT be sent to real phone numbers'
+                            : '🚫 Los recordatorios y notificaciones SMS NO se enviarán a números de teléfono reales'}
+                        </li>
+                        <li>
+                          {language === 'en'
+                            ? '💳 Online payments are disabled - all bookings forced to "Pay in Shop" mode'
+                            : '💳 Los pagos en línea están deshabilitados - todas las reservas forzadas al modo "Pagar en Tienda"'}
+                        </li>
+                        <li>
+                          {language === 'en'
+                            ? '🏷️ New appointments are automatically tagged as test data'
+                            : '🏷️ Las nuevas citas se etiquetan automáticamente como datos de prueba'}
+                        </li>
+                        <li>
+                          {language === 'en'
+                            ? '📊 Client-facing booking site shows a "Test Mode" banner'
+                            : '📊 El sitio de reservas para clientes muestra un banner de "Modo de Prueba"'}
+                        </li>
+                      </ul>
+                    </div>
+
+                    <button
+                      onClick={handleSaveTestMode}
                       disabled={saving}
                       style={{
                         padding: '0.75rem 1.5rem',
