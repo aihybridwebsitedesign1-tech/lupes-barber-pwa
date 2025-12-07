@@ -1,85 +1,70 @@
-# ClientBook Step 1 JSX Fix - IIFE Removed
+# Client Booking Page - Barber List Fix (RESOLVED)
 
-## Summary
+## Problem Summary
 
-Fixed the Step 1 barber list rendering by removing the IIFE wrapper and moving logic to component scope. This ensures cleaner React code and guarantees that barbers from the database always render.
+The client booking page at `/client/book` was showing "No barbers available" even though Carlos Martinez exists in the database with all correct flags.
+
+**Console logs revealed the real issue:**
+```
+[ClientBook BARBERS] ✅ Query successful!
+[ClientBook BARBERS] Rows returned from DB: 1
+[ClientBook BARBERS] Barbers found: Array(1)
+
+Failed to load resource: ... status of 400
+[ClientBook BARBERS] ❌ ERROR loading services
+[ClientBook BARBERS] ❌ FATAL ERROR in loadInitialData
+
+[ClientBook BARBERS] === RENDER CHECK ===
+[ClientBook BARBERS] rawDb: 0 state: 0 render: 0
+[ClientBook BARBERS] ⚠️ Will show "No barbers available" message
+```
+
+**Root Cause:** The services query was failing with a 400 error, which caused the entire `loadInitialData` function to throw, preventing barbers from being committed to React state.
 
 ---
 
-## Changes Made
+## The Two Issues Fixed
 
-### File: `src/pages/ClientBook.tsx`
+### Issue 1: Services Query 400 Error (Schema Mismatch)
 
-#### Change 1: Added render logic before return statement (lines 435-449)
-
+**Problem:** The services query was selecting `price` but the column is actually `base_price`:
 ```typescript
-// Compute render list: if DB has barbers, use them; never hide them
-const hasDbBarbers = (rawBarbersFromDb?.length ?? 0) > 0;
-const barbersToRender: Barber[] =
-  barbers && barbers.length > 0
-    ? barbers
-    : (hasDbBarbers ? rawBarbersFromDb : []);
-
-console.log(
-  '[ClientBook DEBUG] pre-render step1 - rawDb:',
-  rawBarbersFromDb?.length ?? 0,
-  'state:',
-  barbers?.length ?? 0,
-  'render:',
-  barbersToRender.length
-);
+// OLD - BROKEN
+supabase.from('services').select('id, name_en, name_es, price, duration_minutes')
 ```
 
-**Why:** By computing `barbersToRender` in component scope (before the return statement), we ensure it's calculated on every render and can be used cleanly in JSX without wrapping in an IIFE.
-
-#### Change 2: Simplified Step 1 JSX - removed IIFE (lines 488-553)
-
-**Key improvements:**
-- No IIFE wrapper `(() => { ... })()` - cleaner React pattern
-- Uses React Fragment `<>` for multiple elements
-- Logic moved to component scope for clarity
-- Simplified conditional: `barbersToRender.length === 0`
-- All barber card styling and markup preserved exactly as before
-
----
-
-## Expected Console Output
-
-```
-[ClientBook DEBUG] Storing rawBarbersFromDb: 1 barbers
-[ClientBook DEBUG] Final barbers count: 1
-[ClientBook DEBUG] pre-render step1 - rawDb: 1 state: 1 render: 1
+**Fix:** Updated query to use `base_price`:
+```typescript
+// NEW - FIXED
+supabase.from('services').select('id, name_en, name_es, base_price, duration_minutes')
 ```
 
----
+### Issue 2: Services Failure Crashed Entire Data Load
 
-## Expected UI at /client/book
-
-### Debug Line (visible at top of Step 1)
-```
-Debug: rawDb=1, state=1, render=1
-```
-
-### Barber Card (Carlos Martinez)
-- Photo (circular, 60x60px)
-- Display name: "Carlos Pro Barber"
-- Internal name: "Carlos Martinez"
-- Clickable, selectable
-
-### NOT Shown
-- "No barbers available for booking right now" message (only shows when rawDb=0)
-
----
-
-## Build Status
-
-✅ **TypeScript compilation:** 0 errors
-✅ **Vite build:** Success
+Refactored `loadInitialData` into 3 independent sections where barbers always commit to state, and services/config errors are non-fatal.
 
 ---
 
 ## Files Changed
 
-- `src/pages/ClientBook.tsx` (2 changes)
-  - Lines 435-449: Added render logic in component scope
-  - Lines 488-553: Simplified Step 1 JSX (removed IIFE)
+- `src/pages/ClientBook.tsx` (lines 19-25, 82-266, 391, 634, 768)
+  - Fixed Service type: `price` → `base_price`
+  - Refactored loadInitialData into 3 independent sections
+  - Fixed all UI references to use `base_price`
+
+---
+
+## Expected Behavior
+
+**Step 1 at `/client/book`:**
+- Debug line: `Debug: rawDb=1, state=1, render=1` ✅
+- Carlos Martinez card visible ✅
+- No "No barbers available" message ✅
+- No 400 errors in console ✅
+
+---
+
+## Build Status
+
+✅ TypeScript: 0 errors
+✅ Vite build: Success
