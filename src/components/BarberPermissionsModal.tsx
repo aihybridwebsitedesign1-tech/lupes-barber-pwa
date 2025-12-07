@@ -34,6 +34,7 @@ export default function BarberPermissionsModal({
   const [minHoursBeforeCancellation, setMinHoursBeforeCancellation] = useState<string>('');
   const [bookingIntervalMinutes, setBookingIntervalMinutes] = useState<string>('15');
   const [showOnClientSite, setShowOnClientSite] = useState(false);
+  const [acceptOnlineBookings, setAcceptOnlineBookings] = useState(true);
   const [publicDisplayName, setPublicDisplayName] = useState('');
   const [bio, setBio] = useState('');
   const [specialties, setSpecialties] = useState('');
@@ -65,7 +66,7 @@ export default function BarberPermissionsModal({
           min_hours_before_booking_override,
           min_hours_before_cancellation_override,
           booking_interval_minutes_override,
-          show_on_client_site, public_display_name, bio, specialties, photo_url,
+          show_on_client_site, accept_online_bookings, public_display_name, bio, specialties, photo_url,
           instagram_url, tiktok_url, facebook_url, website_url,
           created_at, updated_at
         `)
@@ -119,10 +120,12 @@ export default function BarberPermissionsModal({
 
       console.log('>>> Setting public profile state:');
       console.log('    setShowOnClientSite(' + (data.show_on_client_site ?? false) + ')');
+      console.log('    setAcceptOnlineBookings(' + (data.accept_online_bookings ?? true) + ')');
       console.log('    setPublicDisplayName("' + (data.public_display_name || '') + '")');
       console.log('    setInstagramUrl("' + (data.instagram_url || '') + '")');
 
       setShowOnClientSite(data.show_on_client_site ?? false);
+      setAcceptOnlineBookings(data.accept_online_bookings ?? true);
       setPublicDisplayName(data.public_display_name || '');
       setBio(data.bio || '');
       setSpecialties(data.specialties || '');
@@ -208,6 +211,7 @@ export default function BarberPermissionsModal({
         min_hours_before_cancellation_override: minCancelAhead,
         booking_interval_minutes_override: intervalMins,
         show_on_client_site: showOnClientSite,
+        accept_online_bookings: acceptOnlineBookings,
         public_display_name: publicDisplayName?.trim() || null,
         bio: bio?.trim() || null,
         specialties: specialties?.trim() || null,
@@ -719,6 +723,34 @@ export default function BarberPermissionsModal({
                 {language === 'en'
                   ? 'When enabled, this barber will appear on the public "Our Barbers" page with their profile information.'
                   : 'Cuando está habilitado, este barbero aparecerá en la página pública "Nuestros Barberos" con su información de perfil.'}
+              </div>
+
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  cursor: 'pointer',
+                  padding: '0.75rem',
+                  backgroundColor: acceptOnlineBookings ? '#e8f5e9' : '#f5f5f5',
+                  borderRadius: '6px',
+                  border: `2px solid ${acceptOnlineBookings ? '#4caf50' : '#ddd'}`,
+                  marginBottom: '1rem',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={acceptOnlineBookings}
+                  onChange={(e) => setAcceptOnlineBookings(e.target.checked)}
+                  style={{ marginRight: '0.75rem', width: '18px', height: '18px', cursor: 'pointer' }}
+                />
+                <span style={{ fontWeight: '500', fontSize: '16px' }}>
+                  {language === 'en' ? 'Available for online booking' : 'Disponible para reservas en línea'}
+                </span>
+              </label>
+              <div style={{ marginBottom: '1.5rem', fontSize: '12px', color: '#666', paddingLeft: '0.75rem' }}>
+                {language === 'en'
+                  ? "If unchecked, this barber won't appear in the public booking flow, but their personal booking link will still work."
+                  : 'Si se desmarca, este barbero no aparecerá en el flujo de reserva público, pero su enlace de reserva personal seguirá funcionando.'}
               </div>
 
               {showOnClientSite && (

@@ -80,24 +80,45 @@ export default function ClientBook() {
     console.log('🔵 [ClientBook] Starting loadInitialData...');
 
     try {
-      // Step 1 shows all active barbers that are allowed on the client website.
+      // Check if a specific barber was preselected via query param
+      const preselectedBarberId = searchParams.get('barber');
+      console.log('🔵 [ClientBook] Preselected barber ID from URL:', preselectedBarberId || 'none');
+
+      // Step 1 shows all active barbers that accept online bookings.
+      // If a barber is preselected via direct link, we fetch that barber separately.
       // Availability and booking rules are enforced later when generating time slots.
       console.log('🔵 [ClientBook] Building queries...');
 
+      // Main query: Get all barbers available for general booking
       const barbersQuery = supabase
         .from('users')
-        .select('id, name, public_display_name, photo_url')
+        .select('id, name, public_display_name, photo_url, active, show_on_client_site, accept_online_bookings')
         .eq('role', 'BARBER')
         .eq('active', true)
         .eq('show_on_client_site', true)
+        .eq('accept_online_bookings', true)
         .order('name');
 
+      // If there's a preselected barber, also fetch that specific barber
+      // This allows direct booking links to work even if accept_online_bookings=false
+      let preselectedBarberQuery = null;
+      if (preselectedBarberId) {
+        preselectedBarberQuery = supabase
+          .from('users')
+          .select('id, name, public_display_name, photo_url, active, show_on_client_site, accept_online_bookings')
+          .eq('id', preselectedBarberId)
+          .eq('role', 'BARBER')
+          .eq('active', true)
+          .maybeSingle();
+      }
+
       console.log('🔵 [ClientBook] Executing parallel queries...');
-      const [barbersRes, servicesRes, shopConfig, shopConfigFull] = await Promise.all([
+      const [barbersRes, servicesRes, shopConfig, shopConfigFull, preselectedBarberRes] = await Promise.all([
         barbersQuery,
         supabase.from('services').select('id, name_en, name_es, price, duration_minutes').eq('active', true).order('name_en'),
         getShopConfig(),
-        supabase.from('shop_config').select('shop_name, phone, enable_confirmations').single()
+        supabase.from('shop_config').select('shop_name, phone, enable_confirmations').single(),
+        preselectedBarberQuery || Promise.resolve({ data: null, error: null } as any)
       ]);
 
       console.log('📊 [ClientBook] Raw query results:', {
@@ -105,6 +126,8 @@ export default function ClientBook() {
         barbersStatus: barbersRes.status,
         barbersData: barbersRes.data,
         barbersCount: barbersRes.data?.length || 0,
+        preselectedBarberData: preselectedBarberRes?.data || null,
+        preselectedBarberError: preselectedBarberRes?.error || null,
         servicesError: servicesRes.error,
         servicesCount: servicesRes.data?.length || 0
       });
@@ -125,7 +148,25 @@ export default function ClientBook() {
         throw servicesRes.error;
       }
 
-      const loadedBarbers = barbersRes.data || [];
+      let loadedBarbers = barbersRes.data || [];
+
+      // If we fetched a preselected barber and it's valid but not in the main list, add it
+      if (preselectedBarberRes?.data) {
+        const preselectedBarber = preselectedBarberRes.data;
+        const alreadyInList = loadedBarbers.find(b => b.id === preselectedBarber.id);
+
+        if (!alreadyInList) {
+          console.log('✅ [ClientBook] Adding preselected barber to list (direct link):', {
+            id: preselectedBarber.id,
+            name: preselectedBarber.name,
+            accept_online_bookings: preselectedBarber.accept_online_bookings
+          });
+          loadedBarbers = [preselectedBarber, ...loadedBarbers];
+        }
+      } else if (preselectedBarberId && !preselectedBarberRes?.data) {
+        console.warn('⚠️ [ClientBook] Preselected barber not found or inactive:', preselectedBarberId);
+      }
+
       const loadedServices = servicesRes.data || [];
 
       console.log('✅ [ClientBook] Data processed:', {
@@ -134,7 +175,8 @@ export default function ClientBook() {
           id: b.id,
           name: b.name,
           public_display_name: b.public_display_name,
-          has_photo: !!b.photo_url
+          has_photo: !!b.photo_url,
+          accept_online_bookings: b.accept_online_bookings
         })),
         servicesCount: loadedServices.length,
         hasShopConfig: !!shopConfig
