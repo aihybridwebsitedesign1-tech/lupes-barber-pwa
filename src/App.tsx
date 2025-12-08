@@ -1,6 +1,7 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LanguageProvider } from './contexts/LanguageContext';
+import { useEffect } from 'react';
 import Login from './pages/Login';
 import OwnerToday from './pages/OwnerToday';
 import OwnerAppointments from './pages/OwnerAppointments';
@@ -32,6 +33,61 @@ import ClientBookSuccess from './pages/ClientBookSuccess';
 import ClientProducts from './pages/ClientProducts';
 import ClientAppointments from './pages/ClientAppointments';
 import AccountSettings from './pages/AccountSettings';
+
+// Hostname detection utilities
+const getHostname = () => window.location.hostname;
+const isAdminDomain = () => {
+  const hostname = getHostname();
+  return hostname.startsWith('admin.') || hostname === 'localhost' || hostname === '127.0.0.1';
+};
+const isClientDomain = () => !isAdminDomain();
+
+const getAdminUrl = () => {
+  const adminUrl = import.meta.env.VITE_ADMIN_URL;
+  return adminUrl || 'https://admin.lupesbarbershop.com';
+};
+
+// Component to redirect admin routes to admin subdomain
+function AdminRouteGuard({ children }: { children: JSX.Element }) {
+  const location = useLocation();
+
+  useEffect(() => {
+    // If we're on the client domain and trying to access admin routes, redirect to admin domain
+    if (isClientDomain()) {
+      const adminUrl = getAdminUrl();
+      const fullAdminUrl = `${adminUrl}${location.pathname}${location.search}${location.hash}`;
+      window.location.href = fullAdminUrl;
+    }
+  }, [location]);
+
+  // If on client domain, show loading while redirect happens
+  if (isClientDomain()) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#f5f5f5'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: '48px',
+            height: '48px',
+            border: '4px solid #e5e7eb',
+            borderTopColor: '#000',
+            borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite',
+            margin: '0 auto 1rem'
+          }} />
+          <p style={{ color: '#666', fontSize: '16px' }}>Redirecting to admin panel...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return children;
+}
 
 function ProtectedRoute({ children, allowedRole }: { children: JSX.Element; allowedRole?: 'OWNER' | 'BARBER' }) {
   const { user, userData, loading, error } = useAuth();
@@ -114,9 +170,17 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/login" element={user ? <Navigate to={userData?.role === 'OWNER' ? '/owner/today' : '/barber/today'} /> : <Login />} />
+      {/* Admin routes - redirect to admin subdomain if accessed from client domain */}
+      <Route path="/login" element={
+        <AdminRouteGuard>
+          {user ? <Navigate to={userData?.role === 'OWNER' ? '/owner/today' : '/barber/today'} /> : <Login />}
+        </AdminRouteGuard>
+      } />
+
+      {/* Legacy booking route - can be accessed from both domains */}
       <Route path="/book" element={<Book />} />
 
+      {/* Client-facing routes - always accessible */}
       <Route path="/client" element={<Navigate to="/client/home" />} />
       <Route path="/client/home" element={<ClientHome />} />
       <Route path="/client/services" element={<ClientServices />} />
@@ -126,34 +190,39 @@ function AppRoutes() {
       <Route path="/client/book/success" element={<ClientBookSuccess />} />
       <Route path="/client/appointments" element={<ClientAppointments />} />
 
-      <Route path="/owner/today" element={<ProtectedRoute allowedRole="OWNER"><OwnerToday /></ProtectedRoute>} />
-      <Route path="/owner/appointments" element={<ProtectedRoute allowedRole="OWNER"><OwnerAppointments /></ProtectedRoute>} />
-      <Route path="/owner/clients" element={<ProtectedRoute allowedRole="OWNER"><OwnerClients /></ProtectedRoute>} />
-      <Route path="/owner/barbers" element={<ProtectedRoute allowedRole="OWNER"><OwnerBarbers /></ProtectedRoute>} />
-      <Route path="/owner/services" element={<ProtectedRoute allowedRole="OWNER"><OwnerServices /></ProtectedRoute>} />
-      <Route path="/owner/products" element={<ProtectedRoute allowedRole="OWNER"><OwnerProducts /></ProtectedRoute>} />
-      <Route path="/owner/settings" element={<ProtectedRoute allowedRole="OWNER"><OwnerSettings /></ProtectedRoute>} />
-      <Route path="/owner/reports" element={<ProtectedRoute allowedRole="OWNER"><OwnerReports /></ProtectedRoute>} />
-      <Route path="/owner/payouts" element={<ProtectedRoute allowedRole="OWNER"><OwnerPayouts /></ProtectedRoute>} />
-      <Route path="/owner/clients-report" element={<ProtectedRoute allowedRole="OWNER"><OwnerClientsReport /></ProtectedRoute>} />
-      <Route path="/owner/barbers-time-tracking" element={<ProtectedRoute allowedRole="OWNER"><OwnerBarbersTimeTracking /></ProtectedRoute>} />
-      <Route path="/owner/inventory" element={<ProtectedRoute allowedRole="OWNER"><OwnerInventory /></ProtectedRoute>} />
-      <Route path="/owner/inventory-reports" element={<ProtectedRoute allowedRole="OWNER"><OwnerInventoryReports /></ProtectedRoute>} />
-      <Route path="/owner/engage" element={<ProtectedRoute allowedRole="OWNER"><OwnerEngage /></ProtectedRoute>} />
-      <Route path="/owner/sms-settings" element={<ProtectedRoute allowedRole="OWNER"><OwnerSmsSettings /></ProtectedRoute>} />
-      <Route path="/owner/calendar" element={<ProtectedRoute allowedRole="OWNER"><OwnerCalendar /></ProtectedRoute>} />
-      <Route path="/owner/clients/:clientId" element={<ProtectedRoute allowedRole="OWNER"><ClientDetail /></ProtectedRoute>} />
-      <Route path="/owner/appointments/:appointmentId" element={<ProtectedRoute allowedRole="OWNER"><AppointmentDetail /></ProtectedRoute>} />
-      <Route path="/owner/account" element={<ProtectedRoute allowedRole="OWNER"><AccountSettings /></ProtectedRoute>} />
+      {/* Owner routes - admin subdomain only */}
+      <Route path="/owner/today" element={<AdminRouteGuard><ProtectedRoute allowedRole="OWNER"><OwnerToday /></ProtectedRoute></AdminRouteGuard>} />
+      <Route path="/owner/appointments" element={<AdminRouteGuard><ProtectedRoute allowedRole="OWNER"><OwnerAppointments /></ProtectedRoute></AdminRouteGuard>} />
+      <Route path="/owner/clients" element={<AdminRouteGuard><ProtectedRoute allowedRole="OWNER"><OwnerClients /></ProtectedRoute></AdminRouteGuard>} />
+      <Route path="/owner/barbers" element={<AdminRouteGuard><ProtectedRoute allowedRole="OWNER"><OwnerBarbers /></ProtectedRoute></AdminRouteGuard>} />
+      <Route path="/owner/services" element={<AdminRouteGuard><ProtectedRoute allowedRole="OWNER"><OwnerServices /></ProtectedRoute></AdminRouteGuard>} />
+      <Route path="/owner/products" element={<AdminRouteGuard><ProtectedRoute allowedRole="OWNER"><OwnerProducts /></ProtectedRoute></AdminRouteGuard>} />
+      <Route path="/owner/settings" element={<AdminRouteGuard><ProtectedRoute allowedRole="OWNER"><OwnerSettings /></ProtectedRoute></AdminRouteGuard>} />
+      <Route path="/owner/reports" element={<AdminRouteGuard><ProtectedRoute allowedRole="OWNER"><OwnerReports /></ProtectedRoute></AdminRouteGuard>} />
+      <Route path="/owner/payouts" element={<AdminRouteGuard><ProtectedRoute allowedRole="OWNER"><OwnerPayouts /></ProtectedRoute></AdminRouteGuard>} />
+      <Route path="/owner/clients-report" element={<AdminRouteGuard><ProtectedRoute allowedRole="OWNER"><OwnerClientsReport /></ProtectedRoute></AdminRouteGuard>} />
+      <Route path="/owner/barbers-time-tracking" element={<AdminRouteGuard><ProtectedRoute allowedRole="OWNER"><OwnerBarbersTimeTracking /></ProtectedRoute></AdminRouteGuard>} />
+      <Route path="/owner/inventory" element={<AdminRouteGuard><ProtectedRoute allowedRole="OWNER"><OwnerInventory /></ProtectedRoute></AdminRouteGuard>} />
+      <Route path="/owner/inventory-reports" element={<AdminRouteGuard><ProtectedRoute allowedRole="OWNER"><OwnerInventoryReports /></ProtectedRoute></AdminRouteGuard>} />
+      <Route path="/owner/engage" element={<AdminRouteGuard><ProtectedRoute allowedRole="OWNER"><OwnerEngage /></ProtectedRoute></AdminRouteGuard>} />
+      <Route path="/owner/sms-settings" element={<AdminRouteGuard><ProtectedRoute allowedRole="OWNER"><OwnerSmsSettings /></ProtectedRoute></AdminRouteGuard>} />
+      <Route path="/owner/calendar" element={<AdminRouteGuard><ProtectedRoute allowedRole="OWNER"><OwnerCalendar /></ProtectedRoute></AdminRouteGuard>} />
+      <Route path="/owner/clients/:clientId" element={<AdminRouteGuard><ProtectedRoute allowedRole="OWNER"><ClientDetail /></ProtectedRoute></AdminRouteGuard>} />
+      <Route path="/owner/appointments/:appointmentId" element={<AdminRouteGuard><ProtectedRoute allowedRole="OWNER"><AppointmentDetail /></ProtectedRoute></AdminRouteGuard>} />
+      <Route path="/owner/account" element={<AdminRouteGuard><ProtectedRoute allowedRole="OWNER"><AccountSettings /></ProtectedRoute></AdminRouteGuard>} />
 
-      <Route path="/barber/today" element={<ProtectedRoute allowedRole="BARBER"><BarberToday /></ProtectedRoute>} />
-      <Route path="/barber/calendar" element={<ProtectedRoute allowedRole="BARBER"><BarberCalendar /></ProtectedRoute>} />
-      <Route path="/barber/stats" element={<ProtectedRoute allowedRole="BARBER"><BarberStats /></ProtectedRoute>} />
-      <Route path="/barber/appointments/:appointmentId" element={<ProtectedRoute allowedRole="BARBER"><AppointmentDetail /></ProtectedRoute>} />
-      <Route path="/barber/account" element={<ProtectedRoute allowedRole="BARBER"><AccountSettings /></ProtectedRoute>} />
+      {/* Barber routes - admin subdomain only */}
+      <Route path="/barber/today" element={<AdminRouteGuard><ProtectedRoute allowedRole="BARBER"><BarberToday /></ProtectedRoute></AdminRouteGuard>} />
+      <Route path="/barber/calendar" element={<AdminRouteGuard><ProtectedRoute allowedRole="BARBER"><BarberCalendar /></ProtectedRoute></AdminRouteGuard>} />
+      <Route path="/barber/stats" element={<AdminRouteGuard><ProtectedRoute allowedRole="BARBER"><BarberStats /></ProtectedRoute></AdminRouteGuard>} />
+      <Route path="/barber/appointments/:appointmentId" element={<AdminRouteGuard><ProtectedRoute allowedRole="BARBER"><AppointmentDetail /></ProtectedRoute></AdminRouteGuard>} />
+      <Route path="/barber/account" element={<AdminRouteGuard><ProtectedRoute allowedRole="BARBER"><AccountSettings /></ProtectedRoute></AdminRouteGuard>} />
 
+      {/* Root route - different behavior based on domain */}
       <Route path="/" element={
-        user
+        isClientDomain()
+          ? <Navigate to="/client/home" />
+          : user
           ? <Navigate to={userData?.role === 'OWNER' ? '/owner/today' : '/barber/today'} />
           : <Navigate to="/login" />
       } />
