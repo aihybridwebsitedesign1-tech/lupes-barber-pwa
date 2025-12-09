@@ -70,6 +70,18 @@ export default function OwnerSettings() {
   const [tipPercentagePresets, setTipPercentagePresets] = useState('15, 18, 20, 25');
   const [tipFlatPresets, setTipFlatPresets] = useState('5, 10, 15');
 
+  const [businessHours, setBusinessHours] = useState<{
+    [key: string]: { open: string; close: string } | null;
+  }>({
+    '0': null,
+    '1': { open: '09:00', close: '18:00' },
+    '2': { open: '09:00', close: '18:00' },
+    '3': { open: '09:00', close: '18:00' },
+    '4': { open: '09:00', close: '18:00' },
+    '5': { open: '09:00', close: '18:00' },
+    '6': { open: '09:00', close: '18:00' },
+  });
+
   const [testModeEnabled, setTestModeEnabled] = useState(false);
   const [showDeleteTestModal, setShowDeleteTestModal] = useState(false);
   const [deletingTestData, setDeletingTestData] = useState(false);
@@ -124,6 +136,10 @@ export default function OwnerSettings() {
         const tipFlats = data.tip_flat_presets || [5, 10, 15];
         setTipFlatPresets(Array.isArray(tipFlats) ? tipFlats.join(', ') : '5, 10, 15');
 
+        if (data.shop_hours) {
+          setBusinessHours(data.shop_hours);
+        }
+
         setTestModeEnabled(data.test_mode_enabled ?? false);
       }
 
@@ -158,6 +174,7 @@ export default function OwnerSettings() {
           phone: phone,
           tax_rate: parseFloat(taxRate) / 100,
           card_processing_fee_rate: parseFloat(cardFeeRate) / 100,
+          shop_hours: businessHours,
           shop_instagram_url: shopInstagramUrl.trim() || null,
           shop_facebook_url: shopFacebookUrl.trim() || null,
           shop_tiktok_url: shopTiktokUrl.trim() || null,
@@ -753,6 +770,105 @@ export default function OwnerSettings() {
                           ? 'Fee charged for card transactions'
                           : 'Tarifa aplicada a transacciones con tarjeta'}
                       </p>
+                    </div>
+
+                    <div style={{ marginTop: '2rem', paddingTop: '2rem', borderTop: '2px solid #eee' }}>
+                      <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '1rem' }}>
+                        {language === 'en' ? 'Business Hours' : 'Horario de Atención'}
+                      </h4>
+                      <p style={{ fontSize: '13px', color: '#666', marginBottom: '1rem' }}>
+                        {language === 'en'
+                          ? 'Set your opening and closing times for each day of the week. These hours will be displayed on your client-facing website.'
+                          : 'Establece tus horarios de apertura y cierre para cada día de la semana. Estos horarios se mostrarán en tu sitio web de cara al cliente.'}
+                      </p>
+
+                      <div style={{ display: 'grid', gap: '1rem' }}>
+                        {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((day, index) => {
+                          const dayEs = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][index];
+                          const dayKey = String(index);
+                          const hours = businessHours[dayKey];
+
+                          return (
+                            <div
+                              key={dayKey}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '1rem',
+                                padding: '1rem',
+                                backgroundColor: '#f9f9f9',
+                                borderRadius: '6px',
+                              }}
+                            >
+                              <div style={{ minWidth: '120px', fontWeight: '500', fontSize: '14px' }}>
+                                {language === 'en' ? day : dayEs}
+                              </div>
+
+                              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={hours !== null}
+                                  onChange={(e) => {
+                                    const newHours = { ...businessHours };
+                                    newHours[dayKey] = e.target.checked
+                                      ? { open: '09:00', close: '18:00' }
+                                      : null;
+                                    setBusinessHours(newHours);
+                                  }}
+                                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                />
+                                <span style={{ fontSize: '14px' }}>
+                                  {language === 'en' ? 'Open' : 'Abierto'}
+                                </span>
+                              </label>
+
+                              {hours && (
+                                <>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <input
+                                      type="time"
+                                      value={hours.open}
+                                      onChange={(e) => {
+                                        const newHours = { ...businessHours };
+                                        newHours[dayKey] = { ...hours, open: e.target.value };
+                                        setBusinessHours(newHours);
+                                      }}
+                                      style={{
+                                        padding: '0.5rem',
+                                        border: '1px solid #ddd',
+                                        borderRadius: '4px',
+                                        fontSize: '14px',
+                                      }}
+                                    />
+                                    <span style={{ color: '#666' }}>-</span>
+                                    <input
+                                      type="time"
+                                      value={hours.close}
+                                      onChange={(e) => {
+                                        const newHours = { ...businessHours };
+                                        newHours[dayKey] = { ...hours, close: e.target.value };
+                                        setBusinessHours(newHours);
+                                      }}
+                                      style={{
+                                        padding: '0.5rem',
+                                        border: '1px solid #ddd',
+                                        borderRadius: '4px',
+                                        fontSize: '14px',
+                                      }}
+                                    />
+                                  </div>
+                                </>
+                              )}
+
+                              {!hours && (
+                                <span style={{ color: '#999', fontSize: '14px', fontStyle: 'italic' }}>
+                                  {language === 'en' ? 'Closed' : 'Cerrado'}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     <div style={{ marginTop: '2rem', paddingTop: '2rem', borderTop: '2px solid #eee' }}>

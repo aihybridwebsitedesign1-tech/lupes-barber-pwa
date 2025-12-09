@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../lib/supabase';
+import { convertTo12Hour } from '../lib/timeFormat';
 import ClientHeader from '../components/ClientHeader';
 import BarberPole from '../components/BarberPole';
 import Footer from '../components/Footer';
@@ -44,8 +45,8 @@ export default function ClientHome() {
   const formatHours = () => {
     if (!shopConfig?.shop_hours) {
       return language === 'en'
-        ? 'Mon-Sat: 10am - 7pm\nSun: Closed'
-        : 'Lun-Sáb: 10am - 7pm\nDom: Cerrado';
+        ? 'Mon-Sat: 10:00 AM - 7:00 PM\nSun: Closed'
+        : 'Lun-Sáb: 10:00 AM - 7:00 PM\nDom: Cerrado';
     }
 
     const hours = shopConfig.shop_hours;
@@ -61,7 +62,7 @@ export default function ClientHome() {
     for (let i = 0; i <= 6; i++) {
       const dayHours = hours[String(i)];
       const hoursStr = dayHours
-        ? `${dayHours.open} - ${dayHours.close}`
+        ? `${convertTo12Hour(dayHours.open)} - ${convertTo12Hour(dayHours.close)}`
         : language === 'en'
         ? 'Closed'
         : 'Cerrado';
