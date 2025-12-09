@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
-import BarberPole from './BarberPole';
 import PWAInstallBanner from './PWAInstallBanner';
 import IOSSafariInstallGuide from './IOSSafariInstallGuide';
 
@@ -33,14 +32,12 @@ export default function ClientHeader() {
     <>
       <header style={{ backgroundColor: '#000', color: 'white', padding: '1rem', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', width: '100%', boxSizing: 'border-box', position: 'relative' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', maxWidth: '1400px', margin: '0 auto', gap: '1rem', width: '100%' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <BarberPole variant="icon" height={40} />
-            <Link to="/client/home" style={{ textDecoration: 'none' }}>
-              <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: 'white', margin: 0 }}>
-                Lupe's Barber Shop
-              </h1>
-            </Link>
-          </div>
+          <Link to="/client/home" style={{ display: 'flex', alignItems: 'center', gap: '1rem', textDecoration: 'none' }}>
+            <img src="/lupeslogo.png" alt="Lupe's Barber Shop Logo" style={{ height: '40px', width: 'auto' }} />
+            <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: 'white', margin: 0 }}>
+              Lupe's Barber Shop
+            </h1>
+          </Link>
 
           {!isMobile && (
             <>
