@@ -260,7 +260,7 @@ export default function Book() {
       <div style={{ maxWidth: '600px', margin: '0 auto' }}>
         <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
           <h1 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '2rem', textAlign: 'center' }}>
-            Lupe's Barber
+            Lupe's Barber Shop
           </h1>
 
           {step === 1 && (

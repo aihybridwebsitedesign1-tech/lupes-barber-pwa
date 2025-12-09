@@ -37,7 +37,7 @@ export default function ClientHeader() {
             <BarberPole variant="icon" height={40} />
             <Link to="/client/home" style={{ textDecoration: 'none' }}>
               <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: 'white', margin: 0 }}>
-                Lupe's Barber
+                Lupe's Barber Shop
               </h1>
             </Link>
           </div>

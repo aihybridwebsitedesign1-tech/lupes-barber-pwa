@@ -224,7 +224,7 @@ export default function NewAppointmentModal({ onClose, onSuccess }: Props) {
             scheduledStart: startDateTime.toISOString(),
             barberName: barber?.name || barberRes.data?.name || 'our barber',
             serviceName: serviceName,
-            shopName: shopConfigRes.data?.shop_name || "Lupe's Barber",
+            shopName: shopConfigRes.data?.shop_name || "Lupe's Barber Shop",
             shopPhone: shopConfigRes.data?.phone || undefined,
             language: clientLanguage,
           }).catch(err => {

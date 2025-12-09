@@ -43,8 +43,8 @@ export default function IOSSafariInstallGuide() {
 
   const text = {
     banner: {
-      en: "Add Lupe's Barber to your home screen for quick access.",
-      es: "Agrega Lupe's Barber a tu pantalla de inicio para acceso rápido.",
+      en: "Add Lupe's Barber Shop to your home screen for quick access.",
+      es: "Agrega Lupe's Barber Shop a tu pantalla de inicio para acceso rápido.",
     },
     cta: {
       en: 'How to add',

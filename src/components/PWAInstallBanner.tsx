@@ -10,8 +10,8 @@ export default function PWAInstallBanner() {
   }
 
   const text = {
-    en: "Add Lupe's Barber to your home screen for faster booking.",
-    es: "Agrega Lupe's Barber a tu pantalla de inicio para reservar más rápido.",
+    en: "Add Lupe's Barber Shop to your home screen for faster booking.",
+    es: "Agrega Lupe's Barber Shop a tu pantalla de inicio para reservar más rápido.",
   };
 
   const buttonText = {

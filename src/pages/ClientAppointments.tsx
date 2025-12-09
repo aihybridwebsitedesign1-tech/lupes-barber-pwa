@@ -53,7 +53,7 @@ export default function ClientAppointments() {
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
   const [rescheduling, setRescheduling] = useState(false);
   const [rescheduleError, setRescheduleError] = useState('');
-  const [shopInfo, setShopInfo] = useState<{ shop_name: string; phone: string | null }>({ shop_name: "Lupe's Barber", phone: null });
+  const [shopInfo, setShopInfo] = useState<{ shop_name: string; phone: string | null }>({ shop_name: "Lupe's Barber Shop", phone: null });
 
   // Handle phone submission and OTP request
   const handleRequestOTP = async () => {
@@ -170,7 +170,7 @@ export default function ClientAppointments() {
       // Store shop info for notifications
       if (shopConfigRes.data) {
         setShopInfo({
-          shop_name: shopConfigRes.data.shop_name || "Lupe's Barber",
+          shop_name: shopConfigRes.data.shop_name || "Lupe's Barber Shop",
           phone: shopConfigRes.data.phone || null
         });
       }

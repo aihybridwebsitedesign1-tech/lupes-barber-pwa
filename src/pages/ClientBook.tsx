@@ -62,7 +62,7 @@ export default function ClientBook() {
 
   const [timeSlots, setTimeSlots] = useState<{ start: string; end: string }[]>([]);
   const [config, setConfig] = useState<{ days_bookable_in_advance: number; min_book_ahead_hours: number; min_cancel_ahead_hours: number; client_booking_interval_minutes: number } | null>(null);
-  const [shopInfo, setShopInfo] = useState<{ shop_name: string; phone: string | null }>({ shop_name: "Lupe's Barber", phone: null });
+  const [shopInfo, setShopInfo] = useState<{ shop_name: string; phone: string | null }>({ shop_name: "Lupe's Barber Shop", phone: null });
 
   // TEST MODE: When true, bookings are marked as test data, SMS not sent, payments forced to "pay in shop"
   const [testMode, setTestMode] = useState(false);
@@ -251,7 +251,7 @@ export default function ClientBook() {
 
       if (shopConfigFull.data) {
         setShopInfo({
-          shop_name: shopConfigFull.data.shop_name || "Lupe's Barber",
+          shop_name: shopConfigFull.data.shop_name || "Lupe's Barber Shop",
           phone: shopConfigFull.data.phone || null
         });
 
