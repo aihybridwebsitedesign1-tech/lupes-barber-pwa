@@ -94,6 +94,28 @@ export async function resetAllNonCoreData(): Promise<ResetResult> {
   }
 }
 
+export async function generateDemoData(): Promise<ResetResult> {
+  try {
+    const { data, error } = await supabase.rpc('generate_demo_data');
+
+    if (error) {
+      console.error('Error generating demo data:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to generate demo data',
+      };
+    }
+
+    return data as ResetResult;
+  } catch (err: any) {
+    console.error('Error calling generate_demo_data:', err);
+    return {
+      success: false,
+      error: err.message || 'An unexpected error occurred',
+    };
+  }
+}
+
 export function formatResetResult(result: ResetResult, language: 'en' | 'es'): string {
   if (!result.success) {
     return result.error || (language === 'en' ? 'Unknown error' : 'Error desconocido');
@@ -170,6 +192,47 @@ export function formatResetResult(result: ResetResult, language: 'en' | 'es'): s
       language === 'en'
         ? `${result.messages_deleted} message(s) deleted`
         : `${result.messages_deleted} mensaje(s) eliminado(s)`
+    );
+  }
+
+  // Handle demo data generation results
+  if (result.barbers_created !== undefined) {
+    parts.push(
+      language === 'en'
+        ? `${result.barbers_created} barber(s) created`
+        : `${result.barbers_created} barbero(s) creado(s)`
+    );
+  }
+
+  if (result.clients_created !== undefined) {
+    parts.push(
+      language === 'en'
+        ? `${result.clients_created} client(s) created`
+        : `${result.clients_created} cliente(s) creado(s)`
+    );
+  }
+
+  if (result.services_created !== undefined) {
+    parts.push(
+      language === 'en'
+        ? `${result.services_created} service(s) created`
+        : `${result.services_created} servicio(s) creado(s)`
+    );
+  }
+
+  if (result.products_created !== undefined) {
+    parts.push(
+      language === 'en'
+        ? `${result.products_created} product(s) created`
+        : `${result.products_created} producto(s) creado(s)`
+    );
+  }
+
+  if (result.appointments_created !== undefined) {
+    parts.push(
+      language === 'en'
+        ? `${result.appointments_created} appointment(s) created`
+        : `${result.appointments_created} cita(s) creada(s)`
     );
   }
 

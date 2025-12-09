@@ -10,6 +10,7 @@ import {
   resetTestPayouts,
   resetTimeTracking,
   resetAllNonCoreData,
+  generateDemoData,
   formatResetResult,
 } from '../lib/resetTools';
 
@@ -87,7 +88,7 @@ export default function OwnerSettings() {
   const [deletingTestData, setDeletingTestData] = useState(false);
 
   const [showResetModal, setShowResetModal] = useState(false);
-  const [resetType, setResetType] = useState<'test_appointments' | 'test_payouts' | 'time_tracking' | 'all_data' | null>(null);
+  const [resetType, setResetType] = useState<'test_appointments' | 'test_payouts' | 'time_tracking' | 'all_data' | 'generate_demo' | null>(null);
   const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
@@ -457,26 +458,33 @@ export default function OwnerSettings() {
         case 'all_data':
           result = await resetAllNonCoreData();
           break;
+        case 'generate_demo':
+          result = await generateDemoData();
+          break;
         default:
           throw new Error('Invalid reset type');
       }
 
       if (!result.success) {
-        setError(result.error || (language === 'en' ? 'Reset operation failed' : 'Operación de reinicio falló'));
+        setError(result.error || (language === 'en' ? 'Operation failed' : 'Operación falló'));
         return;
       }
 
       const details = formatResetResult(result, language);
       setSuccess(
-        language === 'en'
-          ? `Reset completed successfully! ${details}`
-          : `¡Reinicio completado con éxito! ${details}`
+        resetType === 'generate_demo'
+          ? (language === 'en'
+              ? `Demo data generated successfully! ${details}`
+              : `¡Datos de demostración generados con éxito! ${details}`)
+          : (language === 'en'
+              ? `Reset completed successfully! ${details}`
+              : `¡Reinicio completado con éxito! ${details}`)
       );
       setShowResetModal(false);
       setResetType(null);
     } catch (err: any) {
-      console.error('Error resetting data:', err);
-      setError(language === 'en' ? 'Failed to reset data' : 'Error al reiniciar datos');
+      console.error('Error performing operation:', err);
+      setError(language === 'en' ? 'Operation failed' : 'Operación falló');
     } finally {
       setResetting(false);
     }
@@ -538,6 +546,18 @@ export default function OwnerSettings() {
             language === 'en'
               ? 'CRITICAL WARNING: This action cannot be undone. ALL transactional data will be permanently deleted. Only use this before going live.'
               : 'ADVERTENCIA CRÍTICA: Esta acción no se puede deshacer. TODOS los datos transaccionales se eliminarán permanentemente. Solo use esto antes del lanzamiento.',
+        };
+      case 'generate_demo':
+        return {
+          title: language === 'en' ? 'Generate Demo Data' : 'Generar Datos de Demostración',
+          description:
+            language === 'en'
+              ? 'This will create demo barbers, clients, services, products, and appointments. All demo data will be marked as test data for easy cleanup later. Perfect for testing and demonstrations.'
+              : 'Esto creará barberos, clientes, servicios, productos y citas de demostración. Todos los datos de demostración se marcarán como datos de prueba para facilitar la limpieza posterior. Perfecto para pruebas y demostraciones.',
+          warningText:
+            language === 'en'
+              ? 'NOTE: This will add new data to your system. All demo appointments will be marked as test data and can be deleted later using "Reset Test Appointments".'
+              : 'NOTA: Esto agregará nuevos datos a su sistema. Todas las citas de demostración se marcarán como datos de prueba y se pueden eliminar más tarde usando "Reiniciar Citas de Prueba".',
         };
       default:
         return {
@@ -1797,6 +1817,39 @@ export default function OwnerSettings() {
                 </div>
 
                 <div style={{ display: 'grid', gap: '1.5rem' }}>
+                  <div
+                    style={{
+                      padding: '1.5rem',
+                      backgroundColor: '#e8f5e9',
+                      border: '2px solid #4caf50',
+                      borderRadius: '8px',
+                    }}
+                  >
+                    <h4 style={{ fontSize: '17px', fontWeight: '600', marginBottom: '0.75rem', color: '#2e7d32' }}>
+                      {language === 'en' ? '🎯 Generate Demo Data' : '🎯 Generar Datos de Demostración'}
+                    </h4>
+                    <p style={{ fontSize: '14px', color: '#666', marginBottom: '1rem', lineHeight: '1.5' }}>
+                      {language === 'en'
+                        ? 'Creates realistic demo barbers, clients, services, products, and appointments for testing. All demo appointments are marked as test data and can be cleaned up easily.'
+                        : 'Crea barberos, clientes, servicios, productos y citas de demostración realistas para pruebas. Todas las citas de demostración se marcan como datos de prueba y se pueden limpiar fácilmente.'}
+                    </p>
+                    <button
+                      onClick={() => openResetModal('generate_demo')}
+                      style={{
+                        padding: '0.75rem 1.5rem',
+                        backgroundColor: '#4caf50',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {language === 'en' ? '✨ Generate Demo Data' : '✨ Generar Datos de Demostración'}
+                    </button>
+                  </div>
+
                   <div
                     style={{
                       padding: '1.5rem',
