@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import ClientHeader from '../components/ClientHeader';
+import Footer from '../components/Footer';
 
 export default function ClientBookSuccess() {
   const { language } = useLanguage();
@@ -136,7 +137,7 @@ export default function ClientBookSuccess() {
   const appointmentDate = new Date(appointment.scheduled_start);
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5', display: 'flex', flexDirection: 'column' }}>
       <ClientHeader />
 
       <main style={{ maxWidth: '600px', margin: '0 auto', padding: '2rem 1rem' }}>
@@ -261,6 +262,8 @@ export default function ClientBookSuccess() {
           </div>
         </div>
       </main>
+
+      <Footer />
     </div>
   );
 }

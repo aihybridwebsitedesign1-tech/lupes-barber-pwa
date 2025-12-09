@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import { getInventoryStatus } from '../lib/inventoryStatus';
 import ClientHeader from '../components/ClientHeader';
+import Footer from '../components/Footer';
 
 type Product = {
   id: string;
@@ -59,7 +60,7 @@ export default function ClientProducts() {
   }, {} as Record<string, Product[]>);
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5', display: 'flex', flexDirection: 'column' }}>
       <ClientHeader />
 
       <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem' }}>
@@ -168,6 +169,8 @@ export default function ClientProducts() {
           ))
         )}
       </main>
+
+      <Footer />
     </div>
   );
 }

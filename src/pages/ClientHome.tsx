@@ -4,6 +4,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../lib/supabase';
 import ClientHeader from '../components/ClientHeader';
 import BarberPole from '../components/BarberPole';
+import Footer from '../components/Footer';
 
 type ShopConfig = {
   shop_name: string;
@@ -99,7 +100,7 @@ export default function ClientHome() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5', display: 'flex', flexDirection: 'column' }}>
       <ClientHeader />
 
       <main>
@@ -287,6 +288,8 @@ export default function ClientHome() {
           </div>
         </section>
       </main>
+
+      <Footer />
     </div>
   );
 }

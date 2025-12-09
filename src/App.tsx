@@ -33,6 +33,8 @@ import ClientBookSuccess from './pages/ClientBookSuccess';
 import ClientProducts from './pages/ClientProducts';
 import ClientAppointments from './pages/ClientAppointments';
 import AccountSettings from './pages/AccountSettings';
+import Terms from './pages/Terms';
+import Privacy from './pages/Privacy';
 
 // Hostname detection utilities
 const getHostname = () => window.location.hostname;
@@ -179,6 +181,10 @@ function AppRoutes() {
 
       {/* Legacy booking route - can be accessed from both domains */}
       <Route path="/book" element={<Book />} />
+
+      {/* Public legal pages */}
+      <Route path="/terms" element={<Terms />} />
+      <Route path="/privacy" element={<Privacy />} />
 
       {/* Client-facing routes - always accessible */}
       <Route path="/client" element={<Navigate to="/client/home" />} />

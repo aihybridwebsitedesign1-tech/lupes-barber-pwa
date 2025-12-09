@@ -6,6 +6,7 @@ import { validateBookingRules, formatBookingRuleError, getShopConfig, generateAv
 import { sendConfirmation } from '../lib/notificationHelper';
 import { formatTime12h } from '../utils/dateTime';
 import ClientHeader from '../components/ClientHeader';
+import Footer from '../components/Footer';
 
 const debug = (...args: any[]) => {
   if (!import.meta.env.DEV) return;
@@ -595,7 +596,7 @@ export default function ClientBook() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5', display: 'flex', flexDirection: 'column' }}>
       <ClientHeader />
 
       <main style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem 1rem' }}>
@@ -993,6 +994,8 @@ export default function ClientBook() {
           </div>
         </div>
       </main>
+
+      <Footer />
     </div>
   );
 }

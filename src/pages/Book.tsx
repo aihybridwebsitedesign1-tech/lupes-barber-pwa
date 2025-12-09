@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import type { Language } from '../lib/translations';
+import Footer from '../components/Footer';
 
 type Service = {
   id: string;
@@ -218,47 +219,51 @@ export default function Book() {
 
   if (confirmed) {
     return (
-      <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
-        <div style={{ backgroundColor: 'white', padding: '3rem', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', maxWidth: '500px', textAlign: 'center' }}>
-          <div style={{ fontSize: '48px', marginBottom: '1rem' }}>✓</div>
-          <h2 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '1rem', color: '#28a745' }}>
-            {t.bookingConfirmed}
-          </h2>
-          <p style={{ fontSize: '16px', color: '#666', marginBottom: '2rem' }}>
-            {t.yourAppointment}
-          </p>
-          <div style={{ backgroundColor: '#f9f9f9', padding: '1.5rem', borderRadius: '8px', marginBottom: '2rem', textAlign: 'left' }}>
-            <p style={{ marginBottom: '0.5rem' }}>
-              <strong>{t.service}:</strong> {selectedService && (bookingLanguage === 'es' ? selectedService.name_es : selectedService.name_en)}
+      <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+          <div style={{ backgroundColor: 'white', padding: '3rem', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', maxWidth: '500px', textAlign: 'center' }}>
+            <div style={{ fontSize: '48px', marginBottom: '1rem' }}>✓</div>
+            <h2 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '1rem', color: '#28a745' }}>
+              {t.bookingConfirmed}
+            </h2>
+            <p style={{ fontSize: '16px', color: '#666', marginBottom: '2rem' }}>
+              {t.yourAppointment}
             </p>
-            <p style={{ marginBottom: '0.5rem' }}>
-              <strong>{t.date}:</strong> {formatDateTime()}
-            </p>
+            <div style={{ backgroundColor: '#f9f9f9', padding: '1.5rem', borderRadius: '8px', marginBottom: '2rem', textAlign: 'left' }}>
+              <p style={{ marginBottom: '0.5rem' }}>
+                <strong>{t.service}:</strong> {selectedService && (bookingLanguage === 'es' ? selectedService.name_es : selectedService.name_en)}
+              </p>
+              <p style={{ marginBottom: '0.5rem' }}>
+                <strong>{t.date}:</strong> {formatDateTime()}
+              </p>
+            </div>
+            <button
+              onClick={resetBooking}
+              style={{
+                padding: '12px 24px',
+                backgroundColor: '#000',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '16px',
+                fontWeight: '500'
+              }}
+            >
+              {t.bookAnother}
+            </button>
           </div>
-          <button
-            onClick={resetBooking}
-            style={{
-              padding: '12px 24px',
-              backgroundColor: '#000',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '16px',
-              fontWeight: '500'
-            }}
-          >
-            {t.bookAnother}
-          </button>
         </div>
+        <Footer />
       </div>
     );
   }
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5', padding: '2rem' }}>
-      <div style={{ maxWidth: '600px', margin: '0 auto' }}>
-        <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flex: 1, padding: '2rem' }}>
+        <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+          <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
           <h1 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '2rem', textAlign: 'center' }}>
             Lupe's Barber Shop
           </h1>
@@ -491,6 +496,8 @@ export default function Book() {
           )}
         </div>
       </div>
+      </div>
+      <Footer />
     </div>
   );
 }

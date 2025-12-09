@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import ClientHeader from '../components/ClientHeader';
+import Footer from '../components/Footer';
 
 type Service = {
   id: string;
@@ -69,7 +70,7 @@ export default function ClientServices() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5', display: 'flex', flexDirection: 'column' }}>
       <ClientHeader />
 
       <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem' }}>
@@ -188,6 +189,8 @@ export default function ClientServices() {
           ))
         )}
       </main>
+
+      <Footer />
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { validateBookingRules, formatBookingRuleError, getShopConfig } from '../
 import { sendCancellation, sendReschedule, formatAppointmentDate, formatAppointmentTime } from '../lib/notificationHelper';
 import ClientHeader from '../components/ClientHeader';
 import PaymentStatusBadge from '../components/PaymentStatusBadge';
+import Footer from '../components/Footer';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -630,7 +631,7 @@ export default function ClientAppointments() {
 
   // Authenticated - show appointments
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5', display: 'flex', flexDirection: 'column' }}>
       <ClientHeader />
 
       <main style={{ maxWidth: '1000px', margin: '0 auto', padding: '2rem 1rem' }}>
@@ -1145,6 +1146,8 @@ export default function ClientAppointments() {
           </div>
         </div>
       )}
+
+      <Footer />
     </div>
   );
 }
