@@ -113,7 +113,7 @@ export default function ClientHome() {
         >
           <div style={{ maxWidth: '800px', margin: '0 auto' }}>
             <h1 style={{ fontSize: '48px', fontWeight: 'bold', marginBottom: '1rem', lineHeight: '1.2' }}>
-              {language === 'en' ? 'Welcome to Lupe\'s Barber' : 'Bienvenido a Lupe\'s Barber'}
+              {language === 'en' ? 'Welcome to Lupe\'s Barber Shop' : 'Bienvenido a Lupe\'s Barber Shop'}
             </h1>
             <p style={{ fontSize: '20px', marginBottom: '2rem', color: '#ddd', lineHeight: '1.6' }}>
               {language === 'en'
