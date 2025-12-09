@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { supabase } from '../lib/supabase';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import type { Database } from '../lib/supabase';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 type UserData = Database['public']['Tables']['users']['Row'];
 
@@ -20,20 +21,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [initializing, setInitializing] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        loadUserData(session.user.id);
-      } else {
-        setLoading(false);
+    let mounted = true;
+
+    const initAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (!mounted) return;
+
+        setUser(session?.user ?? null);
+
+        if (session?.user) {
+          await loadUserData(session.user.id);
+        } else {
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error('Error initializing auth:', err);
+        if (mounted) {
+          setError('Failed to initialize authentication');
+          setLoading(false);
+        }
+      } finally {
+        if (mounted) {
+          setInitializing(false);
+        }
       }
-    });
+    };
+
+    initAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       (async () => {
+        if (!mounted) return;
+
         setUser(session?.user ?? null);
         if (session?.user) {
           await loadUserData(session.user.id);
@@ -44,7 +69,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })();
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const loadUserData = async (userId: string) => {
@@ -120,6 +148,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
   };
+
+  // Show loading spinner during initial auth state resolution
+  if (initializing) {
+    return <LoadingSpinner message="Initializing..." />;
+  }
 
   return (
     <AuthContext.Provider value={{ user, userData, loading, error, signIn, signOut }}>

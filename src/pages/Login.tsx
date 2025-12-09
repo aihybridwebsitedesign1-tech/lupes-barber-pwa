@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -10,7 +10,6 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const { signIn } = useAuth();
   const { t } = useLanguage();
-  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,14 +18,18 @@ export default function Login() {
 
     try {
       await signIn(email, password);
-      navigate('/');
+      // Don't navigate immediately - let auth context handle the redirect
+      // The loading state will remain visible while auth completes
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'An error occurred';
       setError(errorMessage);
-    } finally {
       setLoading(false);
     }
   };
+
+  if (loading) {
+    return <LoadingSpinner message="Signing in..." />;
+  }
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f5f5f5' }}>
@@ -70,7 +73,6 @@ export default function Login() {
 
           <button
             type="submit"
-            disabled={loading}
             style={{
               width: '100%',
               padding: '12px',
@@ -80,11 +82,10 @@ export default function Login() {
               borderRadius: '4px',
               fontSize: '16px',
               fontWeight: '500',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.6 : 1
+              cursor: 'pointer'
             }}
           >
-            {loading ? t.loading : t.login}
+            {t.login}
           </button>
         </form>
       </div>
