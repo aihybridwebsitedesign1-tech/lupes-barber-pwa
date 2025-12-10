@@ -51,8 +51,8 @@ Implemented a complete "Add to Home Screen" experience for client-facing pages i
 - **Responsive:** Wraps on small screens
 
 **Content (Bilingual):**
-- **English:** "Add Lupe's Barber to your home screen for faster booking."
-- **Spanish:** "Agrega Lupe's Barber a tu pantalla de inicio para reservar más rápido."
+- **English:** "Add Lupe's Barber Shop to your home screen for faster booking."
+- **Spanish:** "Agrega Lupe's Barber Shop a tu pantalla de inicio para reservar más rápido."
 
 **Actions:**
 - **"Install App" button** (Green #10b981)
@@ -104,8 +104,8 @@ function isIOSSafari(): boolean {
 #### Banner (Fixed Bottom)
 - **Background:** Dark gray (#1f2937)
 - **Message (Bilingual):**
-  - EN: "Add Lupe's Barber to your home screen for quick access."
-  - ES: "Agrega Lupe's Barber a tu pantalla de inicio para acceso rápido."
+  - EN: "Add Lupe's Barber Shop to your home screen for quick access."
+  - ES: "Agrega Lupe's Barber Shop a tu pantalla de inicio para acceso rápido."
 - **CTA Button:** "How to add" / "Cómo agregar" (Blue #3b82f6)
 - **Close button:** "×"
 
@@ -274,7 +274,7 @@ function isIOSSafari(): boolean {
 9. **Expected:** Runs in standalone mode, no banner
 
 **To Test Dismissal:**
-1. Clear site data (Chrome → Settings → Site settings → Lupe's Barber → Clear)
+1. Clear site data (Chrome → Settings → Site settings → Lupe's Barber Shop → Clear)
 2. Reload app
 3. **Expected:** Banner appears again
 4. Click "×" close button

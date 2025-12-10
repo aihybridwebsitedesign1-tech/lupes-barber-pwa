@@ -69,7 +69,7 @@ On mobile/tablet viewports:
 
 #### Mobile/Tablet (<1024px)
 **Header shows:**
-- Left: "Lupe's Barber" logo
+- Left: "Lupe's Barber Shop" logo
 - Right: 3-line hamburger icon (☰)
 
 **Tapping hamburger opens full-width dropdown menu:**

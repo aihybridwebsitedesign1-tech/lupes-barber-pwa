@@ -49,7 +49,7 @@ CREATE POLICY "Owners can update any user"
 
 **Mobile/Tablet (<1024px):**
 - Header shows only:
-  - Left: "Lupe's Barber" logo
+  - Left: "Lupe's Barber Shop" logo
   - Right: 3-line hamburger icon
 - Tapping hamburger opens/closes full-width vertical dropdown menu
 - Menu includes:

@@ -1996,7 +1996,7 @@ supabase.from('appointments').insert({
    ```typescript
    <BarberPole variant="icon" height={40} />
    ```
-   - Positioned next to "Lupe's Barber" logo
+   - Positioned next to "Lupe's Barber Shop" logo
    - Visible on all client pages
    - Part of brand identity
 
@@ -2017,7 +2017,7 @@ supabase.from('appointments').insert({
 
 **Features:**
 - Barber pole animation on left
-- Shop name ("Lupe's Barber") as clickable logo
+- Shop name ("Lupe's Barber Shop") as clickable logo
 - Horizontal navigation (desktop)
 - Hamburger menu (mobile, breakpoint: 768px)
 - Language toggle (EN/ES)
@@ -2334,7 +2334,7 @@ Client pages query these tables:
 All client pages fully support EN/ES:
 
 **ClientHome:**
-- "Welcome to Lupe's Barber" / "Bienvenido a Lupe's Barber"
+- "Welcome to Lupe's Barber Shop" / "Bienvenido a Lupe's Barber Shop"
 - "Book Appointment" / "Reservar Cita"
 - "Quick Info" / "Información Rápida"
 - All section headings and body text

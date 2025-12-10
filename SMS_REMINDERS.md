@@ -207,12 +207,12 @@ Reminders are sent in the client's preferred language (English or Spanish):
 
 ### English Example
 ```
-Lupe's Barber: Reminder - Your appointment is tomorrow Sun, Dec 10 at 2:00 PM with Carlos Martinez. See you soon! +15551234567
+Lupe's Barber Shop: Reminder - Your appointment is tomorrow Sun, Dec 10 at 2:00 PM with Carlos Martinez. See you soon! +15551234567
 ```
 
 ### Spanish Example
 ```
-Lupe's Barber: Recordatorio - Su cita es mañana Dom, Dic 10 a las 2:00 PM con Carlos Martinez. ¡Nos vemos pronto! +15551234567
+Lupe's Barber Shop: Recordatorio - Su cita es mañana Dom, Dic 10 a las 2:00 PM con Carlos Martinez. ¡Nos vemos pronto! +15551234567
 ```
 
 Messages include:
