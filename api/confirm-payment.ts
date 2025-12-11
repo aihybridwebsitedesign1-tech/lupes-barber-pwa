@@ -2,9 +2,9 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY!;
+const SUPABASE_URL = process.env.SUPABASE_URL!;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 interface ConfirmPaymentRequest {
     sessionId: string;
@@ -46,24 +46,31 @@ export default async function handler(
         const { sessionId, appointmentId }: ConfirmPaymentRequest = req.body;
 
         if (!sessionId || !appointmentId) {
-            return res.status(400).json({ error: 'sessionId and appointmentId are required' });
+            return res.status(400).json({ success: false, error: "Missing session or appointment ID" });
         }
 
         // 1. Retrieve session from Stripe
         const session = await stripe.checkout.sessions.retrieve(sessionId);
 
         if (!session) {
-            return res.status(404).json({ error: 'Session not found' });
+            return res.status(404).json({ success: false, error: 'Session not found' });
+        }
+
+        if (session.payment_status !== "paid") {
+            return res.status(400).json({ success: false, error: "Payment not completed" });
         }
 
         // 2. Update Supabase
-        const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+        const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+            auth: { persistSession: false }
+        });
 
         const { error: updateError } = await supabase
             .from('appointments')
             .update({
-                payment_status: session.payment_status === 'paid' ? 'paid' : 'unpaid',
-                stripe_payment_intent: typeof session.payment_intent === 'string' ? session.payment_intent : undefined,
+                payment_status: "paid",
+                amount_paid: (session.amount_total || 0) / 100,
+                stripe_payment_intent_id: typeof session.payment_intent === 'string' ? session.payment_intent : undefined,
                 stripe_session_id: session.id,
             })
             .eq('id', appointmentId);

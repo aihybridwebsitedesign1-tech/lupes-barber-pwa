@@ -2,9 +2,9 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY!;
+const SUPABASE_URL = process.env.SUPABASE_URL!;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const CLIENT_URL = process.env.VITE_CLIENT_URL || 'http://localhost:5173';
 
 interface CheckoutRequest {
@@ -31,12 +31,13 @@ export default async function handler(
   }
 
   try {
-    if (!STRIPE_SECRET_KEY) {
-      return res.status(500).json({ error: 'Stripe is not configured' });
-    }
-
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-      return res.status(500).json({ error: 'Supabase is not configured' });
+    if (!STRIPE_SECRET_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      console.error("Missing environment variables:", {
+        STRIPE_SECRET_KEY: !!STRIPE_SECRET_KEY,
+        SUPABASE_URL: !!SUPABASE_URL,
+        SUPABASE_SERVICE_ROLE_KEY: !!SUPABASE_SERVICE_ROLE_KEY
+      });
+      return res.status(500).json({ error: "Server configuration error" });
     }
 
     const stripe = new Stripe(STRIPE_SECRET_KEY, {
@@ -55,7 +56,9 @@ export default async function handler(
       return res.status(400).json({ error: 'appointment_id is required' });
     }
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { persistSession: false }
+    });
 
     let query = supabase
       .from('appointments')
@@ -89,15 +92,11 @@ export default async function handler(
       return res.status(404).json({ error: 'Appointment not found' });
     }
 
-    const client = Array.isArray(appointment.client)
-      ? appointment.client[0]
-      : appointment.client;
-    const service = Array.isArray(appointment.service)
-      ? appointment.service[0]
-      : appointment.service;
-    const barber = Array.isArray(appointment.barber)
-      ? appointment.barber[0]
-      : appointment.barber;
+    const unwrap = (v: any) => (Array.isArray(v) ? v[0] : v);
+
+    const client = unwrap(appointment.client);
+    const service = unwrap(appointment.service);
+    const barber = unwrap(appointment.barber);
 
     const amount = Math.round((appointment.amount_due || service?.base_price || 0) * 100);
 
@@ -145,20 +144,24 @@ export default async function handler(
       cancel_url: `${CLIENT_URL}/client/book?cancelled=true`,
       metadata: {
         appointment_id: appointment_id,
-        service_id: service_id || appointment.service_id || '',
-        barber_id: barber_id || appointment.barber_id || '',
+        service_id: service?.id || '',
+        barber_id: barber?.id || '',
         customer_name: customerName,
-        customer_phone: customerPhone || '',
+        customer_phone: customerPhone || ''
       },
     });
 
-    await supabase
-      .from('appointments')
-      .update({
-        stripe_session_id: session.id,
-        payment_provider: 'stripe',
-      })
-      .eq('id', appointment_id);
+    try {
+      await supabase
+        .from('appointments')
+        .update({
+          stripe_session_id: session.id,
+          payment_provider: 'stripe',
+        })
+        .eq('id', appointment_id);
+    } catch (dbError) {
+      console.error('Supabase update error (non-fatal):', dbError);
+    }
 
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Content-Type', 'application/json');

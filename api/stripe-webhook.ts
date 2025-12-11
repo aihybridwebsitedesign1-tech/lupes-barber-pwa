@@ -2,10 +2,10 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY!;
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET!;
+const SUPABASE_URL = process.env.SUPABASE_URL!;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export const config = {
   api: {
@@ -52,11 +52,11 @@ export default async function handler(
       apiVersion: '2023-10-16',
     });
 
-    const signature = req.headers['stripe-signature'];
+    const sig = req.headers['stripe-signature'];
 
-    if (!signature) {
-      console.error('[Stripe Webhook] No signature provided');
-      return res.status(400).json({ error: 'No signature provided' });
+    if (!sig) {
+      console.error('[Stripe Webhook] Missing signature');
+      return res.status(400).send('Missing signature');
     }
 
     const rawBody = await getRawBody(req);
@@ -66,7 +66,7 @@ export default async function handler(
     try {
       event = stripe.webhooks.constructEvent(
         rawBody,
-        signature as string,
+        sig as string,
         STRIPE_WEBHOOK_SECRET
       );
     } catch (err) {
@@ -78,38 +78,30 @@ export default async function handler(
 
     console.log(`[Stripe Webhook] Event received: ${event.type}`);
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { persistSession: false }
+    });
+
+    async function updateAppointment(session: any) {
+      const appointmentId = session.metadata?.appointment_id;
+      if (!appointmentId) return;
+
+      await supabase
+        .from("appointments")
+        .update({
+          payment_status: "paid",
+          amount_paid: (session.amount_total || 0) / 100,
+          stripe_payment_intent_id: typeof session.payment_intent === 'string' ? session.payment_intent : undefined,
+          stripe_session_id: session.id
+        })
+        .eq("id", appointmentId);
+    }
 
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
-        const appointmentId = session.metadata?.appointment_id;
-
-        if (appointmentId) {
-          console.log(`[Stripe Webhook] Checkout completed for appointment ${appointmentId}`);
-
-          const amountPaid = (session.amount_total || 0) / 100;
-
-          const { error: updateError } = await supabase
-            .from('appointments')
-            .update({
-              payment_status: 'paid',
-              payment_provider: 'stripe',
-              stripe_session_id: session.id,
-              stripe_payment_intent_id: session.payment_intent as string,
-              amount_paid: amountPaid,
-              paid_at: new Date().toISOString(),
-            })
-            .eq('id', appointmentId);
-
-          if (updateError) {
-            console.error('[Stripe Webhook] Error updating appointment:', updateError);
-          } else {
-            console.log(`[Stripe Webhook] Payment confirmed for appointment ${appointmentId}`);
-          }
-        } else {
-          console.warn('[Stripe Webhook] No appointment_id in session metadata');
-        }
+        console.log(`[Stripe Webhook] Checkout completed`);
+        await updateAppointment(session);
         break;
       }
 
