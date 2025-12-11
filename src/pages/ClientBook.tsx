@@ -114,156 +114,167 @@ export default function ClientBook() {
       const preselectedBarberId = searchParams.get('barber');
       debug('[ClientBook BARBERS] Preselected barber ID from URL:', preselectedBarberId || 'none');
 
-    // ========================================
-    // SECTION 1: BARBERS (CRITICAL - MUST SUCCEED FOR STEP 1)
-    // ========================================
-    let rawDbBarbers: Barber[] = [];
-    let loadedBarbers: Barber[] = [];
+      // ========================================
+      // SECTION 1: BARBERS (CRITICAL - MUST SUCCEED FOR STEP 1)
+      // ========================================
+      let rawDbBarbers: Barber[] = [];
+      let loadedBarbers: Barber[] = [];
 
-    try {
-      debug('[ClientBook BARBERS] Building query for eligible barbers...');
-      debug('[ClientBook BARBERS] Query filters: role=BARBER, active=true, show_on_client_site=true, accept_online_bookings=true');
+      try {
+        debug('[ClientBook BARBERS] Building query for eligible barbers...');
+        debug('[ClientBook BARBERS] Query filters: role=BARBER, active=true, show_on_client_site=true, accept_online_bookings=true');
 
-      // Main query: Get all barbers available for general booking
-      const barbersQuery = supabase
-        .from('users')
-        .select('id, name, public_display_name, photo_url, active, show_on_client_site, accept_online_bookings')
-        .eq('role', 'BARBER')
-        .eq('active', true)
-        .eq('show_on_client_site', true)
-        .eq('accept_online_bookings', true)
-        .order('name');
-
-      // If there's a preselected barber, also fetch that specific barber
-      // This allows direct booking links to work even if accept_online_bookings=false
-      let preselectedBarberQuery = null;
-      if (preselectedBarberId) {
-        preselectedBarberQuery = supabase
+        // Main query: Get all barbers available for general booking
+        const barbersQuery = supabase
           .from('users')
           .select('id, name, public_display_name, photo_url, active, show_on_client_site, accept_online_bookings')
-          .eq('id', preselectedBarberId)
           .eq('role', 'BARBER')
           .eq('active', true)
-          .maybeSingle();
-      }
+          .eq('show_on_client_site', true)
+          .eq('accept_online_bookings', true)
+          .order('name');
 
-      debug('[ClientBook BARBERS] Executing barbers queries...');
-      const [barbersRes, preselectedBarberRes] = await Promise.all([
-        barbersQuery,
-        preselectedBarberQuery || Promise.resolve({ data: null, error: null } as any)
-      ]);
+        // If there's a preselected barber, also fetch that specific barber
+        // This allows direct booking links to work even if accept_online_bookings=false
+        let preselectedBarberQuery = null;
+        if (preselectedBarberId) {
+          preselectedBarberQuery = supabase
+            .from('users')
+            .select('id, name, public_display_name, photo_url, active, show_on_client_site, accept_online_bookings')
+            .eq('id', preselectedBarberId)
+            .eq('role', 'BARBER')
+            .eq('active', true)
+            .maybeSingle();
+        }
 
-      debug('[ClientBook BARBERS] === QUERY RESULTS ===');
-      if (barbersRes.error) {
-        debugError('[ClientBook BARBERS] ❌ ERROR loading barbers:', barbersRes.error);
-        debugError('[ClientBook BARBERS] Error details:', JSON.stringify(barbersRes.error, null, 2));
-        // Set empty barbers but DO NOT crash the component
-        rawDbBarbers = [];
-        loadedBarbers = [];
-      } else {
-        rawDbBarbers = barbersRes.data || [];
-        debug('[ClientBook BARBERS] ✅ Query successful!');
-        debug('[ClientBook BARBERS] Rows returned from DB:', rawDbBarbers.length);
+        debug('[ClientBook BARBERS] Executing barbers queries...');
+        const [barbersRes, preselectedBarberRes] = await Promise.all([
+          barbersQuery,
+          preselectedBarberQuery || Promise.resolve({ data: null, error: null } as any)
+        ]);
 
-        if (rawDbBarbers.length > 0) {
-          debug('[ClientBook BARBERS] Barbers found:', rawDbBarbers.map(b => ({
-            name: b.name,
-            display_name: b.public_display_name,
-            active: b.active,
-            show_on_client_site: b.show_on_client_site,
-            accept_online_bookings: b.accept_online_bookings
-          })));
+        debug('[ClientBook BARBERS] === QUERY RESULTS ===');
+        if (barbersRes.error) {
+          debugError('[ClientBook BARBERS] ❌ ERROR loading barbers:', barbersRes.error);
+          debugError('[ClientBook BARBERS] Error details:', JSON.stringify(barbersRes.error, null, 2));
+          // Set empty barbers but DO NOT crash the component
+          rawDbBarbers = [];
+          loadedBarbers = [];
         } else {
-          console.warn('[ClientBook BARBERS] ⚠️ ZERO barbers returned from query!');
-          console.warn('[ClientBook BARBERS] This should not happen if Carlos Martinez exists in DB with correct flags.');
-        }
+          rawDbBarbers = barbersRes.data || [];
+          debug('[ClientBook BARBERS] ✅ Query successful!');
+          debug('[ClientBook BARBERS] Rows returned from DB:', rawDbBarbers.length);
 
-        loadedBarbers = [...rawDbBarbers];
-
-        // If we fetched a preselected barber and it's valid but not in the main list, add it
-        if (preselectedBarberRes?.data) {
-          const preselectedBarber = preselectedBarberRes.data;
-          const alreadyInList = loadedBarbers.find(b => b.id === preselectedBarber.id);
-
-          if (!alreadyInList) {
-            debug('[ClientBook BARBERS] Adding preselected barber (direct link):', preselectedBarber.name);
-            loadedBarbers = [preselectedBarber, ...loadedBarbers];
+          if (rawDbBarbers.length > 0) {
+            debug('[ClientBook BARBERS] Barbers found:', rawDbBarbers.map(b => ({
+              name: b.name,
+              display_name: b.public_display_name,
+              active: b.active,
+              show_on_client_site: b.show_on_client_site,
+              accept_online_bookings: b.accept_online_bookings
+            })));
+          } else {
+            console.warn('[ClientBook BARBERS] ⚠️ ZERO barbers returned from query!');
+            console.warn('[ClientBook BARBERS] This should not happen if Carlos Martinez exists in DB with correct flags.');
           }
-        } else if (preselectedBarberId && !preselectedBarberRes?.data) {
-          console.warn('[ClientBook BARBERS] ⚠️ Preselected barber not found:', preselectedBarberId);
+
+          loadedBarbers = [...rawDbBarbers];
+
+          // If we fetched a preselected barber and it's valid but not in the main list, add it
+          if (preselectedBarberRes?.data) {
+            const preselectedBarber = preselectedBarberRes.data;
+            const alreadyInList = loadedBarbers.find(b => b.id === preselectedBarber.id);
+
+            if (!alreadyInList) {
+              debug('[ClientBook BARBERS] Adding preselected barber (direct link):', preselectedBarber.name);
+              loadedBarbers = [preselectedBarber, ...loadedBarbers];
+            }
+          } else if (preselectedBarberId && !preselectedBarberRes?.data) {
+            console.warn('[ClientBook BARBERS] ⚠️ Preselected barber not found:', preselectedBarberId);
+          }
         }
+
+        // Store the raw DB result and commit to state
+        debug('[ClientBook BARBERS] Storing rawBarbersFromDb:', rawDbBarbers.length, 'barbers');
+        setRawBarbersFromDb(rawDbBarbers);
+
+        debug('[ClientBook BARBERS] === FINAL BARBERS LIST ===');
+        debug('[ClientBook BARBERS] Final barbers count:', loadedBarbers.length);
+        if (loadedBarbers.length > 0) {
+          debug('[ClientBook BARBERS] Will render these barbers:', loadedBarbers.map(b => b.name).join(', '));
+        }
+
+        debug('[ClientBook BARBERS] Calling setBarbers() with', loadedBarbers.length, 'barbers');
+        setBarbers(loadedBarbers);
+      } catch (error) {
+        debugError('[ClientBook BARBERS] ❌ UNEXPECTED ERROR in barbers section:', error);
+        // Even on unexpected error, commit empty arrays to state so UI can render
+        setRawBarbersFromDb([]);
+        setBarbers([]);
       }
 
-      // Store the raw DB result and commit to state
-      debug('[ClientBook BARBERS] Storing rawBarbersFromDb:', rawDbBarbers.length, 'barbers');
-      setRawBarbersFromDb(rawDbBarbers);
+      // ========================================
+      // SECTION 2: SERVICES (NON-CRITICAL - FAILURE IS OK)
+      // ========================================
+      try {
+        debug('[ClientBook BARBERS] Loading services...');
+        const servicesRes = await supabase
+          .from('services')
+          .select('id, name_en, name_es, base_price, duration_minutes')
+          .eq('active', true)
+          .order('name_en', { ascending: true });
 
-      debug('[ClientBook BARBERS] === FINAL BARBERS LIST ===');
-      debug('[ClientBook BARBERS] Final barbers count:', loadedBarbers.length);
-      if (loadedBarbers.length > 0) {
-        debug('[ClientBook BARBERS] Will render these barbers:', loadedBarbers.map(b => b.name).join(', '));
-      }
-
-      debug('[ClientBook BARBERS] Calling setBarbers() with', loadedBarbers.length, 'barbers');
-      setBarbers(loadedBarbers);
-    } catch (error) {
-      debugError('[ClientBook BARBERS] ❌ UNEXPECTED ERROR in barbers section:', error);
-      // Even on unexpected error, commit empty arrays to state so UI can render
-      setRawBarbersFromDb([]);
-      setBarbers([]);
-    }
-
-    // ========================================
-    // SECTION 2: SERVICES (NON-CRITICAL - FAILURE IS OK)
-    // ========================================
-    try {
-      debug('[ClientBook BARBERS] Loading services...');
-      const servicesRes = await supabase
-        .from('services')
-        .select('id, name_en, name_es, base_price, duration_minutes')
-        .eq('active', true)
-        .order('name_en', { ascending: true });
-
-      if (servicesRes.error) {
-        debugError('[ClientBook BARBERS] ❌ ERROR loading services:', servicesRes.error);
-        debugError('[ClientBook BARBERS] Services error details:', JSON.stringify(servicesRes.error, null, 2));
+        if (servicesRes.error) {
+          debugError('[ClientBook BARBERS] ❌ ERROR loading services:', servicesRes.error);
+          debugError('[ClientBook BARBERS] Services error details:', JSON.stringify(servicesRes.error, null, 2));
+          // DO NOT rethrow - just set empty services
+          setServices([]);
+        } else {
+          const loadedServices = servicesRes.data || [];
+          debug('[ClientBook BARBERS] ✅ Services loaded:', loadedServices.length);
+          setServices(loadedServices);
+        }
+      } catch (error) {
+        debugError('[ClientBook BARBERS] ❌ UNEXPECTED ERROR loading services:', error);
         // DO NOT rethrow - just set empty services
         setServices([]);
-      } else {
-        const loadedServices = servicesRes.data || [];
-        debug('[ClientBook BARBERS] ✅ Services loaded:', loadedServices.length);
-        setServices(loadedServices);
-      }
-    } catch (error) {
-      debugError('[ClientBook BARBERS] ❌ UNEXPECTED ERROR loading services:', error);
-      // DO NOT rethrow - just set empty services
-      setServices([]);
-    }
-
-    // ========================================
-    // SECTION 3: SHOP CONFIG (NON-CRITICAL - FAILURE IS OK)
-    // ========================================
-    try {
-      debug('[ClientBook BARBERS] Loading shop config...');
-      const [shopConfig, shopConfigFull] = await Promise.all([
-        getShopConfig(),
-        supabase.from('shop_config').select('shop_name, phone, enable_confirmations, test_mode_enabled').single()
-      ]);
-
-      if (shopConfigFull.data) {
-        setShopInfo({
-          shop_name: shopConfigFull.data.shop_name || "Lupe's Barber Shop",
-          phone: shopConfigFull.data.phone || null
-        });
-
-        // TEST MODE: Load test mode setting from database
-        setTestMode(shopConfigFull.data.test_mode_enabled ?? false);
       }
 
-      if (shopConfig) {
-        setConfig(shopConfig);
-      } else {
-        console.warn('[ClientBook BARBERS] No shop config, using defaults');
+      // ========================================
+      // SECTION 3: SHOP CONFIG (NON-CRITICAL - FAILURE IS OK)
+      // ========================================
+      try {
+        debug('[ClientBook BARBERS] Loading shop config...');
+        const [shopConfig, shopConfigFull] = await Promise.all([
+          getShopConfig(),
+          supabase.from('shop_config').select('shop_name, phone, enable_confirmations, test_mode_enabled').single()
+        ]);
+
+        if (shopConfigFull.data) {
+          setShopInfo({
+            shop_name: shopConfigFull.data.shop_name || "Lupe's Barber Shop",
+            phone: shopConfigFull.data.phone || null
+          });
+
+          // TEST MODE: Load test mode setting from database
+          setTestMode(shopConfigFull.data.test_mode_enabled ?? false);
+        }
+
+        if (shopConfig) {
+          setConfig(shopConfig);
+        } else {
+          console.warn('[ClientBook BARBERS] No shop config, using defaults');
+          const fallbackConfig = {
+            days_bookable_in_advance: 30,
+            min_book_ahead_hours: 2,
+            min_cancel_ahead_hours: 24,
+            client_booking_interval_minutes: 15,
+          };
+          setConfig(fallbackConfig);
+        }
+      } catch (error) {
+        debugError('[ClientBook BARBERS] ❌ ERROR loading shop config:', error);
+        // Use fallback config
         const fallbackConfig = {
           days_bookable_in_advance: 30,
           min_book_ahead_hours: 2,
@@ -272,17 +283,6 @@ export default function ClientBook() {
         };
         setConfig(fallbackConfig);
       }
-    } catch (error) {
-      debugError('[ClientBook BARBERS] ❌ ERROR loading shop config:', error);
-      // Use fallback config
-      const fallbackConfig = {
-        days_bookable_in_advance: 30,
-        min_book_ahead_hours: 2,
-        min_cancel_ahead_hours: 24,
-        client_booking_interval_minutes: 15,
-      };
-      setConfig(fallbackConfig);
-    }
 
       // ========================================
       // DONE - Data load complete
@@ -477,7 +477,7 @@ export default function ClientBook() {
       const appointmentEnd = selectedSlot?.end || new Date(new Date(selectedTime).getTime() + (selectedServiceData?.duration_minutes || 30) * 60000).toISOString();
 
       // TEST MODE: Mark appointment as test data when test mode is enabled
-      const { data: newAppointment, error: appointmentError} = await supabase
+      const { data: newAppointment, error: appointmentError } = await supabase
         .from('appointments')
         .insert({
           barber_id: selectedBarber,
@@ -527,7 +527,7 @@ export default function ClientBook() {
         try {
           const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 
-          const response = await fetch(`${supabaseUrl}/functions/v1/create-checkout`, {
+          const response = await fetch(`/api/create-checkout-session`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

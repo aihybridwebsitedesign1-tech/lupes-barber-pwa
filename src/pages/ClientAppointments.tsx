@@ -747,7 +747,7 @@ export default function ClientAppointments() {
                           <button
                             onClick={async () => {
                               try {
-                                const response = await fetch(`${SUPABASE_URL}/functions/v1/create-checkout`, {
+                                const response = await fetch(`/api/create-checkout-session`, {
                                   method: 'POST',
                                   headers: {
                                     'Content-Type': 'application/json',

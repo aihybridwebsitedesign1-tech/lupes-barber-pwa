@@ -30,7 +30,7 @@ export default function ClientBookSuccess() {
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 
-      const response = await fetch(`${supabaseUrl}/functions/v1/confirm-payment`, {
+      const response = await fetch(`/api/confirm-payment`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
