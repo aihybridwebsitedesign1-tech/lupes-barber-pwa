@@ -1,4 +1,4 @@
-# Lupe's Barber – Control Panel (Phase 1)
+# Lupe's Barber Shop – Control Panel (Phase 1)
 
 PWA booking and management system for Lupe's Barber Shop.
 

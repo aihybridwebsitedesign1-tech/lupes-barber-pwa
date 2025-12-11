@@ -75,7 +75,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const shopName = config.shop_name || "Lupe's Barber";
+    const shopName = config.shop_name || "Lupe's Barber Shop";
     const shopPhone = config.phone;
 
     // TEST MODE: Check if test mode is enabled
