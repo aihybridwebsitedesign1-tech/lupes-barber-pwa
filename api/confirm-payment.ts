@@ -8,6 +8,7 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 interface ConfirmPaymentRequest {
     sessionId: string;
+    appointmentId: string;
 }
 
 export default async function handler(
@@ -39,13 +40,13 @@ export default async function handler(
         }
 
         const stripe = new Stripe(STRIPE_SECRET_KEY, {
-            apiVersion: '2024-11-20.acacia',
+            apiVersion: '2023-10-16',
         });
 
-        const { sessionId }: ConfirmPaymentRequest = req.body;
+        const { sessionId, appointmentId }: ConfirmPaymentRequest = req.body;
 
-        if (!sessionId) {
-            return res.status(400).json({ error: 'sessionId is required' });
+        if (!sessionId || !appointmentId) {
+            return res.status(400).json({ error: 'sessionId and appointmentId are required' });
         }
 
         // 1. Retrieve session from Stripe
@@ -53,12 +54,6 @@ export default async function handler(
 
         if (!session) {
             return res.status(404).json({ error: 'Session not found' });
-        }
-
-        const appointment_id = session.metadata?.appointment_id;
-
-        if (!appointment_id) {
-            return res.status(400).json({ error: 'Session missing appointment_id in metadata' });
         }
 
         // 2. Update Supabase
@@ -71,7 +66,7 @@ export default async function handler(
                 stripe_payment_intent: typeof session.payment_intent === 'string' ? session.payment_intent : undefined,
                 stripe_session_id: session.id,
             })
-            .eq('id', appointment_id);
+            .eq('id', appointmentId);
 
         if (updateError) {
             console.error('Supabase update error:', updateError);

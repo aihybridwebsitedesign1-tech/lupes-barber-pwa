@@ -3,11 +3,9 @@ import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const CLIENT_URL = process.env.VITE_CLIENT_URL || 'http://localhost:5173';
-const ADMIN_URL = process.env.VITE_ADMIN_URL || 'http://localhost:5173';
 
 interface CheckoutRequest {
   appointment_id: string;
@@ -42,7 +40,7 @@ export default async function handler(
     }
 
     const stripe = new Stripe(STRIPE_SECRET_KEY, {
-      apiVersion: '2024-11-20.acacia',
+      apiVersion: '2023-10-16',
     });
 
     const {
