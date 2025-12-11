@@ -525,15 +525,12 @@ export default function ClientBook() {
       if (stripeEnabled) {
         // Create Stripe checkout session
         try {
-          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-
           const response = await fetch(`/api/create-checkout-session`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
             },
-            body: JSON.stringify({ appointmentId: newAppointment.id }),
+            body: JSON.stringify({ appointment_id: newAppointment.id }),
           });
 
           if (!response.ok) {

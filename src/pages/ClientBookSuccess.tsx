@@ -28,13 +28,10 @@ export default function ClientBookSuccess() {
     }
 
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-
       const response = await fetch(`/api/confirm-payment`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
         },
         body: JSON.stringify({ sessionId, appointmentId }),
       });
