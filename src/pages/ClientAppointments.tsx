@@ -751,9 +751,8 @@ export default function ClientAppointments() {
                                   method: 'POST',
                                   headers: {
                                     'Content-Type': 'application/json',
-                                    'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
                                   },
-                                  body: JSON.stringify({ appointmentId: apt.id }),
+                                  body: JSON.stringify({ appointment_id: apt.id }),
                                 });
                                 const { url } = await response.json();
                                 if (url) {
