@@ -45,42 +45,35 @@ export default function NewBarberModal({ onClose, onSave }: NewBarberModalProps)
     setError('');
 
     try {
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      const payload = {
         email: email.trim(),
-        password: Math.random().toString(36).slice(-12) + 'Aa1!',
-        options: {
-          data: {
-            name: `${firstName.trim()} ${lastName.trim()}`,
-            role: 'BARBER',
-          },
-        },
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        phone: phone.trim() || null,
+        language: preferredLanguage,
+        active,
+        canViewOwnStats,
+        canViewShopReports,
+        canManageServices,
+        canManageProducts,
+      };
+
+      const { data, error } = await supabase.functions.invoke('create-barber', {
+        body: payload,
       });
 
-      if (authError) throw authError;
-
-      if (authData.user) {
-        const { error: insertError } = await supabase.from('users').insert({
-          id: authData.user.id,
-          email: email.trim(),
-          name: `${firstName.trim()} ${lastName.trim()}`,
-          phone: phone.trim() || null,
-          role: 'BARBER',
-          active,
-          language: preferredLanguage,
-          can_view_own_stats: canViewOwnStats,
-          can_view_shop_reports: canViewShopReports,
-          can_manage_services: canManageServices,
-          can_manage_products: canManageProducts,
-          can_manage_appointments: false,
-          can_manage_clients: false,
-        });
-
-        if (insertError) throw insertError;
+      if (error) {
+        console.error('Error creating barber:', error);
+        setError(error.message || (language === 'en' ? 'Failed to create barber' : 'Error al crear barbero'));
+        return;
       }
+
+      console.log('Barber created successfully!');
+      console.log('Temporary Password:', data.temporaryPassword);
 
       onSave();
     } catch (err: any) {
-      console.error('Error creating barber:', err);
+      console.error('Unexpected error:', err);
       setError(err.message || (language === 'en' ? 'Failed to create barber' : 'Error al crear barbero'));
     } finally {
       setSaving(false);
