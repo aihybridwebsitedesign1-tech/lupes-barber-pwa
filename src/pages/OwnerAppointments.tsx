@@ -161,7 +161,9 @@ export default function OwnerAppointments() {
         .eq('id', appointmentToDelete.id);
       if (appointmentError) throw appointmentError;
 
-      setAppointments((prev) => prev.filter((a) => a.id !== appointmentToDelete.id));
+      // Refetch appointments to ensure UI reflects actual DB state
+      await loadAppointments();
+
       setShowDeleteConfirm(false);
       setAppointmentToDelete(null);
 
