@@ -45,6 +45,13 @@ export default function NewBarberModal({ onClose, onSave }: NewBarberModalProps)
     setError('');
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        setError(language === 'en' ? 'You must be logged in to create barbers' : 'Debes iniciar sesión para crear barberos');
+        return;
+      }
+
       const payload = {
         email: email.trim(),
         firstName: firstName.trim(),
@@ -60,6 +67,9 @@ export default function NewBarberModal({ onClose, onSave }: NewBarberModalProps)
 
       const { data, error } = await supabase.functions.invoke('create-barber', {
         body: payload,
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
       });
 
       if (error) {
