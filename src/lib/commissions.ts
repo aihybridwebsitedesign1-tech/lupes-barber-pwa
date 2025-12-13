@@ -110,7 +110,7 @@ export async function calculateCommissionForPeriod(
     .gte('appointment_date', startDate)
     .lte('appointment_date', endDateTime.toISOString())
     .eq('commission_paid', false)
-    .in('status', ['COMPLETED', 'NO_SHOW']);
+    .eq('status', 'COMPLETED');
 
   if (apptError) {
     console.error('Error fetching appointments:', apptError);

@@ -380,7 +380,10 @@ export default function BarberToday() {
                       {apt.status === 'booked' && (
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                           <button
-                            onClick={() => handleMarkCompleted(apt.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMarkCompleted(apt.id);
+                            }}
                             style={{
                               padding: '0.5rem 1rem',
                               backgroundColor: '#28a745',
@@ -394,7 +397,10 @@ export default function BarberToday() {
                             {t.markCompleted}
                           </button>
                           <button
-                            onClick={() => handleMarkNoShow(apt.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMarkNoShow(apt.id);
+                            }}
                             style={{
                               padding: '0.5rem 1rem',
                               backgroundColor: '#dc3545',
