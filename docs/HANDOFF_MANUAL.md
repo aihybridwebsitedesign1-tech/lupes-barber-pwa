@@ -6,12 +6,11 @@
 
 ### How to Log In
 
-1. Go to: **https://lupesbarbershop.com** (or your custom domain)
-2. Click **"Staff Login"** at the bottom of the page
-3. Enter your credentials:
+1. Go to: **https://admin.lupesbarbershop.com**
+2. Enter your credentials:
    - Email: `lupesbarbershop2025@gmail.com`
    - Password: (provided separately)
-4. Click **"Sign In"**
+3. Click **"Sign In"**
 
 ### Dashboard Overview
 
@@ -23,12 +22,13 @@ After logging in, you'll see:
 
 ### Creating a Walk-In Appointment
 
-1. Click **"+ New Appointment"** (or the + button)
-2. Select the **Client** (or create a new one)
-3. Choose the **Service** (Haircut, Beard Trim, etc.)
-4. Select the **Barber** who will perform the service
-5. Pick **Date & Time**
-6. Click **"Create Appointment"**
+1. Go to the **Calendar** page
+2. Click **"+ New Appointment"** (or the + button)
+3. Select the **Client** (or create a new one)
+4. Choose the **Service** (Haircut, Beard Trim, etc.)
+5. Select the **Barber** who will perform the service
+6. Pick **Date & Time**
+7. Click **"Create Appointment"**
 
 ### Marking Payment
 
@@ -42,11 +42,15 @@ When a customer pays:
    - **Card** - For card payments (processed through Stripe)
 5. Confirm the payment
 
-### Important Notes
+---
 
-- **SMS/Text messages will activate automatically once Twilio completes business verification.** Until then, appointment reminders will not be sent via text.
-- All data is automatically saved to the cloud
-- You can access the system from any device with internet
+### **CRITICAL NOTICE / AVISO CRITICO**
+
+> **SMS/Text messages are currently PAUSED.**
+>
+> The Twilio Account was incorrectly set up as a "Business" instead of "Sole Proprietor". This requires the Owner to submit a new registration with their SSN (Social Security Number).
+>
+> **The software is 100% ready. The Twilio account type needs correction.**
 
 ---
 
@@ -54,12 +58,11 @@ When a customer pays:
 
 ### Como Iniciar Sesion
 
-1. Vaya a: **https://lupesbarbershop.com** (o su dominio personalizado)
-2. Haga clic en **"Staff Login"** al final de la pagina
-3. Ingrese sus credenciales:
+1. Vaya a: **https://admin.lupesbarbershop.com**
+2. Ingrese sus credenciales:
    - Correo: `lupesbarbershop2025@gmail.com`
    - Contrasena: (proporcionada por separado)
-4. Haga clic en **"Sign In"** (Iniciar Sesion)
+3. Haga clic en **"Sign In"** (Iniciar Sesion)
 
 ### Vista General del Panel
 
@@ -71,12 +74,13 @@ Despues de iniciar sesion, vera:
 
 ### Crear una Cita para Cliente sin Cita Previa (Walk-In)
 
-1. Haga clic en **"+ New Appointment"** (o el boton +)
-2. Seleccione el **Cliente** (o cree uno nuevo)
-3. Elija el **Servicio** (Corte de Pelo, Recorte de Barba, etc.)
-4. Seleccione el **Barbero** que realizara el servicio
-5. Escoja **Fecha y Hora**
-6. Haga clic en **"Create Appointment"** (Crear Cita)
+1. Vaya a la pagina de **Calendario**
+2. Haga clic en **"+ New Appointment"** (o el boton +)
+3. Seleccione el **Cliente** (o cree uno nuevo)
+4. Elija el **Servicio** (Corte de Pelo, Recorte de Barba, etc.)
+5. Seleccione el **Barbero** que realizara el servicio
+6. Escoja **Fecha y Hora**
+7. Haga clic en **"Create Appointment"** (Crear Cita)
 
 ### Registrar Pago
 
@@ -90,11 +94,15 @@ Cuando un cliente paga:
    - **Card** - Para pagos con tarjeta (procesados por Stripe)
 5. Confirme el pago
 
-### Notas Importantes
+---
 
-- **Los mensajes SMS se activaran automaticamente cuando Twilio verifique el negocio.** Hasta entonces, los recordatorios de citas no se enviaran por mensaje de texto.
-- Todos los datos se guardan automaticamente en la nube
-- Puede acceder al sistema desde cualquier dispositivo con internet
+### **AVISO CRITICO / CRITICAL NOTICE**
+
+> **Los mensajes de texto (SMS) estan PAUSADOS.**
+>
+> La cuenta de Twilio se configuro incorrectamente como "Empresa" (Business) en lugar de "Propietario Unico" (Sole Proprietor). Esto requiere que la Duena envie un nuevo registro con su SSN (Numero de Seguro Social).
+>
+> **El software esta 100% listo. El tipo de cuenta de Twilio necesita correccion.**
 
 ---
 

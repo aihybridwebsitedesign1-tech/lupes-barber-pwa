@@ -22,34 +22,66 @@ El Cliente reconoce que el software es totalmente funcional.
 
 ---
 
-## SMS Activation Clause / Clausula de Activacion de SMS
+## INCLUDED SERVICES / SERVICIOS INCLUIDOS
 
-Any pending SMS activation is solely dependent on Client's legal verification with Twilio.
+### DELIVERED / ENTREGADO:
 
-Cualquier activacion pendiente de SMS depende unicamente de la verificacion legal del Cliente con Twilio.
+1. **Custom Booking Software & PWA**
+   Software de Reservas Personalizado y Aplicacion Web Progresiva (PWA)
+
+2. **Stripe Payment Integration (Code Installed)**
+   Integracion de Pagos Stripe (Codigo Instalado)
+
+3. **Owner Dashboard with full appointment management**
+   Panel de Dueno con gestion completa de citas
+
+4. **Barber Dashboard for daily operations**
+   Panel de Barbero para operaciones diarias
+
+5. **Client-facing booking website**
+   Sitio web de reservas para clientes
+
+6. **Calendar and scheduling system**
+   Sistema de calendario y programacion
+
+7. **Client management**
+   Gestion de clientes
+
+8. **Services and products catalog**
+   Catalogo de servicios y productos
+
+9. **Commission tracking**
+   Seguimiento de comisiones
+
+10. **Reports and analytics**
+    Reportes y analiticas
+
+11. **Bilingual support (English/Spanish)**
+    Soporte bilingue (Ingles/Espanol)
 
 ---
 
-## Support Period / Periodo de Soporte
+### PENDING (Client Account Configuration Required) / PENDIENTE (Requiere Configuracion de Cuenta del Cliente):
 
-The 3-Hour Support Period begins upon signature of this document.
+1. **SMS Activation**
+   Requires Client to correct Twilio Account Type from "Business" to "Sole Proprietor" using their SSN.
 
-El periodo de 3 horas de soporte comienza con la firma de este documento.
+   **Activacion de SMS**
+   Requiere que el Cliente corrija el Tipo de Cuenta de Twilio de "Empresa" a "Propietario Unico" usando su SSN.
+
+2. **Final Stripe Dashboard Webhook Activation**
+   Requires Client Identity Verification in Stripe Dashboard.
+
+   **Activacion Final de Webhook en Panel de Stripe**
+   Requiere Verificacion de Identidad del Cliente en el Panel de Stripe.
 
 ---
 
-## Features Delivered / Funciones Entregadas
+## Legal Statement / Declaracion Legal
 
-- Owner Dashboard with full appointment management / Panel de dueno con gestion completa de citas
-- Barber Dashboard for daily operations / Panel de barbero para operaciones diarias
-- Client-facing booking website / Sitio web de reservas para clientes
-- Calendar and scheduling system / Sistema de calendario y programacion
-- Payment processing (Cash & Card via Stripe) / Procesamiento de pagos (Efectivo y Tarjeta via Stripe)
-- Client management / Gestion de clientes
-- Services and products catalog / Catalogo de servicios y productos
-- Commission tracking / Seguimiento de comisiones
-- Reports and analytics / Reportes y analiticas
-- Bilingual support (English/Spanish) / Soporte bilingue (Ingles/Espanol)
+The 3-Hour Support Period begins upon signature of this document. Pending third-party account verifications (Twilio, Stripe) do not constitute incomplete delivery. The software code is complete and functional.
+
+El Periodo de Soporte de 3 Horas comienza con la firma de este documento. Las verificaciones pendientes de cuentas de terceros (Twilio, Stripe) no constituyen una entrega incompleta. El codigo del software esta completo y funcional.
 
 ---
 
