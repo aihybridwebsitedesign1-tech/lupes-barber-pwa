@@ -144,6 +144,43 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // Handle checkout.session.completed (gold standard for Stripe Checkout)
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object;
+      const appointmentId = session.metadata?.appointment_id;
+
+      if (appointmentId) {
+        const { data: existing } = await supabase
+          .from("appointments")
+          .select("payment_status")
+          .eq("id", appointmentId)
+          .maybeSingle();
+
+        if (existing?.payment_status === "paid") {
+          console.log(`[Stripe Webhook] Appointment ${appointmentId} already paid, skipping`);
+        } else {
+          const amountPaid = (session.amount_total || 0) / 100;
+
+          const { error: updateError } = await supabase
+            .from("appointments")
+            .update({
+              payment_status: "paid",
+              payment_provider: "stripe",
+              stripe_payment_intent_id: session.payment_intent,
+              amount_paid: amountPaid,
+              paid_at: new Date().toISOString(),
+            })
+            .eq("id", appointmentId);
+
+          if (updateError) {
+            console.error("[Stripe Webhook] Error updating appointment:", updateError);
+          } else {
+            console.log(`[Stripe Webhook] Checkout completed for appointment ${appointmentId}`);
+          }
+        }
+      }
+    }
+
     return new Response(
       JSON.stringify({ received: true }),
       {
