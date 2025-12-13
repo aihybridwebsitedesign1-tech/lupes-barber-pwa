@@ -21,6 +21,7 @@ export default function OwnerBarbers() {
   const [permissionsBarber, setPermissionsBarber] = useState<Barber | null>(null);
   const [permissionsModalKey, setPermissionsModalKey] = useState(0);
   const [showNewBarberModal, setShowNewBarberModal] = useState(false);
+  const [archiving, setArchiving] = useState<string | null>(null);
   const { language, t } = useLanguage();
 
   useEffect(() => {
@@ -42,6 +43,31 @@ export default function OwnerBarbers() {
       console.error('Error loading barbers:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleArchiveBarber = async (barberId: string, barberName: string) => {
+    const confirmMsg = language === 'en'
+      ? `Are you sure you want to archive ${barberName}? They will be moved to the inactive list.`
+      : `¿Estás seguro de que deseas archivar a ${barberName}? Será movido a la lista de inactivos.`;
+
+    if (!confirm(confirmMsg)) return;
+
+    setArchiving(barberId);
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ active: false })
+        .eq('id', barberId);
+
+      if (error) throw error;
+
+      loadBarbers();
+    } catch (error) {
+      console.error('Error archiving barber:', error);
+      alert(language === 'en' ? 'Error archiving barber' : 'Error al archivar barbero');
+    } finally {
+      setArchiving(null);
     }
   };
 
@@ -157,6 +183,23 @@ export default function OwnerBarbers() {
                                 }}
                               >
                                 {language === 'en' ? 'Time Off' : 'Tiempo Libre'}
+                              </button>
+                              <button
+                                onClick={() => handleArchiveBarber(barber.id, barber.name)}
+                                disabled={archiving === barber.id}
+                                style={{
+                                  padding: '6px 12px',
+                                  backgroundColor: archiving === barber.id ? '#ccc' : '#dc3545',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  cursor: archiving === barber.id ? 'default' : 'pointer',
+                                  fontSize: '12px',
+                                }}
+                              >
+                                {archiving === barber.id
+                                  ? (language === 'en' ? 'Archiving...' : 'Archivando...')
+                                  : (language === 'en' ? 'Archive' : 'Archivar')}
                               </button>
                             </div>
                           </td>

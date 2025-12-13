@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": Deno.env.get("CLIENT_URL") || "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
@@ -81,7 +81,7 @@ Deno.serve(async (req: Request) => {
     const { data: userData } = await supabase
       .from("users")
       .select("id, can_send_sms")
-      .eq("auth_user_id", user.id)
+      .eq("id", user.id)
       .single();
 
     if (!userData || !userData.can_send_sms) {
@@ -113,7 +113,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // TEST MODE: Check if test mode is enabled - if so, skip sending real SMS
     const { data: shopConfig } = await supabase
       .from("shop_config")
       .select("test_mode_enabled")
@@ -123,7 +122,6 @@ Deno.serve(async (req: Request) => {
       const maskedPhone = phoneNumber.substring(0, 5) + "...";
       console.log(`[SMS TEST MODE] Would send to ${maskedPhone}: "${message.substring(0, 50)}..."`);
 
-      // Record the message as "sent_test" in client_messages
       await supabase.from("client_messages").insert({
         client_id: clientId,
         phone_number: phoneNumber,
