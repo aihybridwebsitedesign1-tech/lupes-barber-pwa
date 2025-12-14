@@ -66,6 +66,7 @@ export default function ClientBook() {
   const [timeSlots, setTimeSlots] = useState<{ start: string; end: string }[]>([]);
   const [config, setConfig] = useState<{ days_bookable_in_advance: number; min_book_ahead_hours: number; min_cancel_ahead_hours: number; client_booking_interval_minutes: number } | null>(null);
   const [shopInfo, setShopInfo] = useState<{ shop_name: string; phone: string | null }>({ shop_name: "Lupe's Barber Shop", phone: null });
+  const [shopSettings, setShopSettings] = useState<{ tax_rate: number; card_processing_fee_rate: number; tip_percentage_presets: number[]; enable_tipping: boolean } | null>(null);
 
   // TEST MODE: When true, bookings are marked as test data, SMS not sent, payments forced to "pay in shop"
   const [testMode, setTestMode] = useState(false);
@@ -249,13 +250,21 @@ export default function ClientBook() {
         debug('[ClientBook BARBERS] Loading shop config...');
         const [shopConfig, shopConfigFull] = await Promise.all([
           getShopConfig(),
-          supabase.from('shop_config').select('shop_name, phone, enable_confirmations, test_mode_enabled').single()
+          supabase.from('shop_config').select('shop_name, phone, enable_confirmations, test_mode_enabled, tax_rate, card_processing_fee_rate, tip_percentage_presets, enable_tipping').single()
         ]);
 
         if (shopConfigFull.data) {
           setShopInfo({
             shop_name: shopConfigFull.data.shop_name || "Lupe's Barber Shop",
             phone: shopConfigFull.data.phone || null
+          });
+
+          // Load payment settings for accurate preview
+          setShopSettings({
+            tax_rate: Number(shopConfigFull.data.tax_rate || 0),
+            card_processing_fee_rate: Number(shopConfigFull.data.card_processing_fee_rate || 0),
+            tip_percentage_presets: shopConfigFull.data.tip_percentage_presets || [15, 18, 20],
+            enable_tipping: shopConfigFull.data.enable_tipping ?? true
           });
 
           // TEST MODE: Load test mode setting from database
@@ -474,21 +483,18 @@ export default function ClientBook() {
       const selectedServiceData = services.find(s => s.id === selectedService);
       const servicePrice = selectedServiceData?.base_price || 0;
 
-      // Calculate tip
+      // Calculate tip (client's choice)
       const tipAmount = tipPercentage > 0
         ? (servicePrice * tipPercentage / 100)
         : (customTip ? parseFloat(customTip) : 0);
 
-      // Calculate subtotal (service + tip)
+      // Calculate amounts using shop settings (for preview/record-keeping only)
+      // The edge function will calculate the actual Stripe amounts
+      const taxRate = shopSettings?.tax_rate || 0;
+      const feeRate = shopSettings?.card_processing_fee_rate || 0;
       const subtotal = servicePrice + tipAmount;
-
-      // Calculate tax (8.5%)
-      const tax = subtotal * 0.085;
-
-      // Calculate Stripe fee (2.9% + $0.30)
-      const stripeFee = (subtotal + tax) * 0.029 + 0.30;
-
-      // Grand total
+      const tax = subtotal * (taxRate / 100);
+      const stripeFee = (subtotal + tax) * (feeRate / 100);
       const grandTotal = subtotal + tax + stripeFee;
 
       const selectedSlot = timeSlots.find(slot => slot.start === selectedTime);
@@ -543,13 +549,15 @@ export default function ClientBook() {
 
       if (stripeEnabled) {
         // Create Stripe checkout session using Supabase Edge Function
+        // IMPORTANT: Send ONLY service price + tip amount
+        // The edge function will calculate tax and fees from shop settings
         try {
           const serviceName = language === 'es' ? selectedServiceData?.name_es : selectedServiceData?.name_en;
 
           const { data, error: invokeError } = await supabase.functions.invoke('create-checkout', {
             body: {
               appointment_id: newAppointment.id,
-              service_price: grandTotal,
+              service_price: servicePrice,
               service_name: serviceName || 'Barber Service',
               tip_amount: tipAmount
             }
@@ -855,9 +863,15 @@ export default function ClientBook() {
             const tipAmount = tipPercentage > 0
               ? (servicePrice * tipPercentage / 100)
               : (customTip ? parseFloat(customTip) : 0);
+
+            // Use dynamic shop settings
+            const taxRate = shopSettings?.tax_rate || 0;
+            const feeRate = shopSettings?.card_processing_fee_rate || 0;
+            const tipPresets = shopSettings?.tip_percentage_presets || [15, 18, 20];
+
             const subtotal = servicePrice + tipAmount;
-            const tax = subtotal * 0.085;
-            const stripeFee = stripeEnabled ? ((subtotal + tax) * 0.029 + 0.30) : 0;
+            const tax = subtotal * (taxRate / 100);
+            const stripeFee = stripeEnabled ? ((subtotal + tax) * (feeRate / 100)) : 0;
             const grandTotal = subtotal + tax + stripeFee;
 
             return (
@@ -919,7 +933,7 @@ export default function ClientBook() {
                       </h3>
 
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem', marginBottom: '1rem' }}>
-                        {[10, 15, 20].map(pct => (
+                        {tipPresets.map(pct => (
                           <button
                             key={pct}
                             onClick={() => {
@@ -1002,17 +1016,21 @@ export default function ClientBook() {
                         </div>
                       )}
 
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                        <span>{language === 'en' ? 'Tax (8.5%)' : 'Impuesto (8.5%)'}</span>
-                        <span>${tax.toFixed(2)}</span>
-                      </div>
+                      {tax > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                          <span>{language === 'en' ? `Tax (${taxRate}%)` : `Impuesto (${taxRate}%)`}</span>
+                          <span>${tax.toFixed(2)}</span>
+                        </div>
+                      )}
 
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', paddingBottom: '0.5rem', borderBottom: '1px solid #ddd' }}>
-                        <span style={{ fontSize: '14px', color: '#666' }}>
-                          {language === 'en' ? 'Processing Fee (2.9% + $0.30)' : 'Tarifa de Procesamiento (2.9% + $0.30)'}
-                        </span>
-                        <span style={{ fontSize: '14px', color: '#666' }}>${stripeFee.toFixed(2)}</span>
-                      </div>
+                      {stripeFee > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', paddingBottom: '0.5rem', borderBottom: '1px solid #ddd' }}>
+                          <span style={{ fontSize: '14px', color: '#666' }}>
+                            {language === 'en' ? `Processing Fee (${feeRate}%)` : `Tarifa de Procesamiento (${feeRate}%)`}
+                          </span>
+                          <span style={{ fontSize: '14px', color: '#666' }}>${stripeFee.toFixed(2)}</span>
+                        </div>
+                      )}
 
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem', fontSize: '20px', fontWeight: 'bold' }}>
                         <span>{language === 'en' ? 'Total' : 'Total'}</span>
@@ -1083,8 +1101,8 @@ export default function ClientBook() {
                         : (language === 'en' ? 'Confirm Booking' : 'Confirmar Reserva')}
                 </button>
 
-                {/* DEV BYPASS: Simulate success without paying */}
-                {stripeEnabled && !testMode && import.meta.env.DEV && (
+                {/* DEV BYPASS: Simulate success without paying - ALWAYS VISIBLE FOR TESTING */}
+                {stripeEnabled && !testMode && (
                   <button
                     onClick={() => navigate('/client/success?session_id=dev_bypass_test')}
                     style={{

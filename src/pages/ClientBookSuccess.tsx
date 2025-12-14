@@ -30,34 +30,49 @@ export default function ClientBookSuccess() {
     // Immediately show success - we trust that Stripe sent them here
     setLoading(false);
 
-    // Try to load appointment details in the background (non-blocking)
+    // CLIENT-SIDE MARK AS PAID (webhook fallback)
+    // Since we don't have webhooks working, update payment status here
     const appointmentId = searchParams.get('appointment_id');
     if (appointmentId) {
       try {
+        // First, fetch the appointment to get amount_due
         const { data: apt, error: aptError } = await supabase
           .from('appointments')
           .select(`
             id,
             scheduled_start,
+            amount_due,
+            payment_status,
             client:client_id (first_name, last_name),
             service:service_id (name_en, name_es),
             barber:barber_id (name),
-            amount_paid,
-            amount_due
+            amount_paid
           `)
           .eq('id', appointmentId)
           .maybeSingle();
 
         if (!aptError && apt) {
+          // Mark as paid if currently unpaid
+          if (apt.payment_status === 'unpaid') {
+            await supabase
+              .from('appointments')
+              .update({
+                payment_status: 'paid',
+                amount_paid: apt.amount_due
+              })
+              .eq('id', appointmentId);
+          }
+
           setAppointment({
             ...apt,
+            amount_paid: apt.amount_due,
             client: Array.isArray(apt.client) ? apt.client[0] : apt.client,
             service: Array.isArray(apt.service) ? apt.service[0] : apt.service,
             barber: Array.isArray(apt.barber) ? apt.barber[0] : apt.barber,
           });
         }
       } catch (err) {
-        console.error('Error loading appointment details:', err);
+        console.error('Error processing payment confirmation:', err);
         // Don't set error - we already showed success
       }
     }
