@@ -1,10 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
 
 const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY");
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-const CLIENT_URL = Deno.env.get("CLIENT_URL") || SUPABASE_URL?.replace(".supabase.co", ".netlify.app") || "http://localhost:5173";
 
 const ALLOWED_ORIGINS = [
   "https://lupesbarbershop.com",
@@ -22,108 +18,6 @@ function getCorsHeaders(origin: string | null): Record<string, string> {
   };
 }
 
-interface CheckoutRequest {
-  appointment_id: string;
-}
-
-async function createStripeCheckout(appointmentId: string) {
-  if (!STRIPE_SECRET_KEY) {
-    throw new Error("Stripe is not configured");
-  }
-
-  const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
-
-  const { data: appointment, error: aptError } = await supabase
-    .from("appointments")
-    .select(`
-      id,
-      amount_due,
-      scheduled_start,
-      client:client_id (
-        first_name,
-        last_name,
-        phone,
-        email
-      ),
-      service:service_id (
-        name_en
-      ),
-      barber:barber_id (
-        name
-      )
-    `)
-    .eq("id", appointmentId)
-    .single();
-
-  if (aptError || !appointment) {
-    throw new Error("Appointment not found");
-  }
-
-  const amount = Math.round((appointment.amount_due || 0) * 100);
-
-  if (amount <= 0) {
-    throw new Error("Invalid amount");
-  }
-
-  const client = Array.isArray(appointment.client) ? appointment.client[0] : appointment.client;
-  const service = Array.isArray(appointment.service) ? appointment.service[0] : appointment.service;
-  const barber = Array.isArray(appointment.barber) ? appointment.barber[0] : appointment.barber;
-
-  const checkoutData: any = {
-    mode: "payment",
-    payment_method_types: ["card"],
-    line_items: [
-      {
-        price_data: {
-          currency: "usd",
-          product_data: {
-            name: service?.name_en || "Haircut Service",
-            description: `Appointment on ${new Date(appointment.scheduled_start).toLocaleDateString()}${barber?.name ? ` with ${barber.name}` : ''}`,
-          },
-          unit_amount: amount,
-        },
-        quantity: 1,
-      },
-    ],
-    success_url: `${CLIENT_URL}/client/book/success?session_id={CHECKOUT_SESSION_ID}&appointment_id=${appointmentId}`,
-    cancel_url: `${CLIENT_URL}/client/book?cancelled=true`,
-    metadata: {
-      appointment_id: appointmentId,
-    },
-  };
-
-  if (client?.email && typeof client.email === "string" && client.email.trim().length > 0) {
-    checkoutData.customer_email = client.email;
-  }
-
-  const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${STRIPE_SECRET_KEY}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: new URLSearchParams(checkoutData as any).toString(),
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    console.error("Stripe error:", error);
-    throw new Error("Failed to create Stripe checkout session");
-  }
-
-  const session = await response.json();
-
-  await supabase
-    .from("appointments")
-    .update({
-      stripe_session_id: session.id,
-      payment_provider: "stripe",
-    })
-    .eq("id", appointmentId);
-
-  return session;
-}
-
 Deno.serve(async (req: Request) => {
   const origin = req.headers.get("origin");
   const corsHeaders = getCorsHeaders(origin);
@@ -136,11 +30,15 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { appointment_id }: CheckoutRequest = await req.json();
+    if (!STRIPE_SECRET_KEY) {
+      throw new Error("Stripe is not configured");
+    }
 
-    if (!appointment_id) {
+    const { appointment_id, service_name, service_price } = await req.json();
+
+    if (!appointment_id || !service_name || !service_price) {
       return new Response(
-        JSON.stringify({ error: "appointment_id is required" }),
+        JSON.stringify({ error: "appointment_id, service_name, and service_price are required" }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -148,7 +46,59 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const session = await createStripeCheckout(appointment_id);
+    const amount = Math.round(Number(service_price) * 100);
+
+    if (amount <= 0 || isNaN(amount)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid price" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const successUrl = `${origin || ALLOWED_ORIGINS[0]}/client/success?session_id={CHECKOUT_SESSION_ID}&appointment_id=${appointment_id}`;
+    const cancelUrl = `${origin || ALLOWED_ORIGINS[0]}/client/book`;
+
+    const checkoutData: any = {
+      mode: "payment",
+      payment_method_types: ["card"],
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name: service_name,
+            },
+            unit_amount: amount,
+          },
+          quantity: 1,
+        },
+      ],
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      metadata: {
+        appointment_id: appointment_id,
+      },
+    };
+
+    const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${STRIPE_SECRET_KEY}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams(checkoutData).toString(),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error("Stripe error:", error);
+      throw new Error("Failed to create Stripe checkout session");
+    }
+
+    const session = await response.json();
 
     return new Response(
       JSON.stringify({
