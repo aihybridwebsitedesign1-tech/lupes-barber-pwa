@@ -44,14 +44,18 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     const body = await req.json();
-    const { service_price, service_name, tip_amount } = body;
+    console.log('FULL REQUEST BODY:', JSON.stringify(body));
 
-    let numericPrice = typeof service_price === 'number'
-      ? service_price
-      : parseFloat(String(service_price).replace(/[^0-9.]/g, ''));
+    const { service_name, tip_amount } = body;
+
+    const rawPrice = body.service_price || body.price || body.amount || body.cost || body.servicePrice;
+
+    let numericPrice = typeof rawPrice === 'number'
+      ? rawPrice
+      : parseFloat(String(rawPrice).replace(/[^0-9.]/g, ''));
 
     if (isNaN(numericPrice) || numericPrice <= 0) {
-      throw new Error(`Invalid Price Received: ${service_price}`);
+      throw new Error(`Price is MISSING or INVALID. Received Body: ${JSON.stringify(body)}`);
     }
 
     const { data: shopConfig } = await supabase
