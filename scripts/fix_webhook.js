@@ -1,13 +1,15 @@
-const stripe = require('stripe')('SK_PLACEHOLDER');
+import Stripe from 'stripe';
 
+// 1. PASTE YOUR KEY HERE (Inside the quotes)
+const STRIPE_KEY = 'SK_PLACEHOLDER';
+
+const stripe = new Stripe(STRIPE_KEY);
 const NEW_WEBHOOK_URL = 'https://jkmpbrneddgvekjoglhj.supabase.co/functions/v1/stripe-webhook';
 
 async function updateWebhookEndpoints() {
   try {
     console.log('Fetching existing webhook endpoints...');
-
     const endpoints = await stripe.webhookEndpoints.list();
-
     console.log(`Found ${endpoints.data.length} webhook endpoint(s)\n`);
 
     if (endpoints.data.length === 0) {
@@ -25,13 +27,11 @@ async function updateWebhookEndpoints() {
 
       if (needsUpdate) {
         console.log('  Status: NEEDS UPDATE');
-
         try {
           await stripe.webhookEndpoints.update(endpoint.id, {
             url: NEW_WEBHOOK_URL,
-            enabled_events: endpoint.enabled_events
+            // We do NOT change enabled_events, we just update the URL
           });
-
           console.log(`  ✅ Success: Updated webhook ${endpoint.id} to ${NEW_WEBHOOK_URL}\n`);
         } catch (updateError) {
           console.error(`  ❌ Error updating webhook ${endpoint.id}:`, updateError.message, '\n');
@@ -40,9 +40,7 @@ async function updateWebhookEndpoints() {
         console.log('  Status: OK (already correct or different endpoint)\n');
       }
     }
-
     console.log('Webhook update process completed!');
-
   } catch (error) {
     console.error('Error:', error.message);
     process.exit(1);
