@@ -777,16 +777,23 @@ export default function ClientAppointments() {
                           <button
                             onClick={async () => {
                               try {
-                                const response = await fetch(`/api/create-checkout-session`, {
-                                  method: 'POST',
-                                  headers: {
-                                    'Content-Type': 'application/json',
-                                  },
-                                  body: JSON.stringify({ appointment_id: apt.id }),
+                                const serviceName = language === 'es' ? apt.service_name_es : apt.service_name_en;
+
+                                const { data, error: invokeError } = await supabase.functions.invoke('create-checkout', {
+                                  body: {
+                                    appointment_id: apt.id,
+                                    service_price: apt.amount_due,
+                                    service_name: serviceName || 'Barber Service',
+                                    tip_amount: 0
+                                  }
                                 });
-                                const { url } = await response.json();
-                                if (url) {
-                                  window.location.href = url;
+
+                                if (invokeError) {
+                                  throw invokeError;
+                                }
+
+                                if (data && data.url) {
+                                  window.location.href = data.url;
                                 }
                               } catch (err) {
                                 console.error('Error creating checkout:', err);

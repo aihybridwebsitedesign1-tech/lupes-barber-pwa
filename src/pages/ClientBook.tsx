@@ -525,9 +525,14 @@ export default function ClientBook() {
       if (stripeEnabled) {
         // Create Stripe checkout session using Supabase Edge Function
         try {
+          const serviceName = language === 'es' ? selectedServiceData?.name_es : selectedServiceData?.name_en;
+
           const { data, error: invokeError } = await supabase.functions.invoke('create-checkout', {
             body: {
-              appointment_id: newAppointment.id
+              appointment_id: newAppointment.id,
+              service_price: amountDue,
+              service_name: serviceName || 'Barber Service',
+              tip_amount: 0
             }
           });
 
