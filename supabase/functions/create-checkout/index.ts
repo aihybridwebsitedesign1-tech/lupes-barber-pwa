@@ -46,6 +46,14 @@ Deno.serve(async (req: Request) => {
     const body = await req.json();
     const { service_price, service_name, tip_amount } = body;
 
+    let numericPrice = typeof service_price === 'number'
+      ? service_price
+      : parseFloat(String(service_price).replace(/[^0-9.]/g, ''));
+
+    if (isNaN(numericPrice) || numericPrice <= 0) {
+      throw new Error(`Invalid Price Received: ${service_price}`);
+    }
+
     const { data: shopConfig } = await supabase
       .from("shop_config")
       .select("tax_rate, card_processing_fee_rate")
@@ -54,28 +62,20 @@ Deno.serve(async (req: Request) => {
     const taxRate = Number(shopConfig?.tax_rate || 0);
     const cardFeeRate = Number(shopConfig?.card_processing_fee_rate || 0);
 
-    const numericServicePrice = Number(service_price);
-    const safeServicePrice = (isNaN(numericServicePrice) || numericServicePrice <= 0) ? 10.00 : numericServicePrice;
-    const servicePriceCents = Math.round(safeServicePrice * 100);
-
-    const taxAmountDollars = safeServicePrice * (taxRate / 100);
-    const taxAmountCents = Math.round(taxAmountDollars * 100);
-
-    const subtotal = safeServicePrice + taxAmountDollars;
-    const cardFeeAmountDollars = subtotal * (cardFeeRate / 100);
-    const cardFeeAmountCents = Math.round(cardFeeAmountDollars * 100);
+    const baseCents = Math.round(numericPrice * 100);
+    const taxCents = Math.round(baseCents * (taxRate / 100));
+    const feeCents = Math.round((baseCents + taxCents) * (cardFeeRate / 100));
 
     const tipAmountNum = Number(tip_amount || 0);
-    const tipAmountCents = Math.round(tipAmountNum * 100);
+    const tipCents = Math.round(tipAmountNum * 100);
 
-    console.log("Pricing breakdown:", {
-      service_price: safeServicePrice,
-      servicePriceCents,
+    console.log("Final calculated line items (cents):", {
+      service: baseCents,
+      tax: taxCents,
+      processingFee: feeCents,
+      tip: tipCents,
       taxRate,
-      taxAmountCents,
       cardFeeRate,
-      cardFeeAmountCents,
-      tipAmountCents,
     });
 
     const successUrl = `${origin || ALLOWED_ORIGINS[0]}/client/success?session_id={CHECKOUT_SESSION_ID}`;
@@ -89,30 +89,30 @@ Deno.serve(async (req: Request) => {
 
     formData.append(`line_items[${lineItemIndex}][price_data][currency]`, "usd");
     formData.append(`line_items[${lineItemIndex}][price_data][product_data][name]`, service_name || "Barber Service");
-    formData.append(`line_items[${lineItemIndex}][price_data][unit_amount]`, servicePriceCents.toString());
+    formData.append(`line_items[${lineItemIndex}][price_data][unit_amount]`, baseCents.toString());
     formData.append(`line_items[${lineItemIndex}][quantity]`, "1");
     lineItemIndex++;
 
-    if (taxAmountCents > 0) {
+    if (taxCents > 0) {
       formData.append(`line_items[${lineItemIndex}][price_data][currency]`, "usd");
-      formData.append(`line_items[${lineItemIndex}][price_data][product_data][name]`, "Sales Tax");
-      formData.append(`line_items[${lineItemIndex}][price_data][unit_amount]`, taxAmountCents.toString());
+      formData.append(`line_items[${lineItemIndex}][price_data][product_data][name]`, `Tax (${taxRate}%)`);
+      formData.append(`line_items[${lineItemIndex}][price_data][unit_amount]`, taxCents.toString());
       formData.append(`line_items[${lineItemIndex}][quantity]`, "1");
       lineItemIndex++;
     }
 
-    if (cardFeeAmountCents > 0) {
+    if (feeCents > 0) {
       formData.append(`line_items[${lineItemIndex}][price_data][currency]`, "usd");
-      formData.append(`line_items[${lineItemIndex}][price_data][product_data][name]`, "Card Processing Fee");
-      formData.append(`line_items[${lineItemIndex}][price_data][unit_amount]`, cardFeeAmountCents.toString());
+      formData.append(`line_items[${lineItemIndex}][price_data][product_data][name]`, `Processing Fee (${cardFeeRate}%)`);
+      formData.append(`line_items[${lineItemIndex}][price_data][unit_amount]`, feeCents.toString());
       formData.append(`line_items[${lineItemIndex}][quantity]`, "1");
       lineItemIndex++;
     }
 
-    if (tipAmountCents > 0) {
+    if (tipCents > 0) {
       formData.append(`line_items[${lineItemIndex}][price_data][currency]`, "usd");
       formData.append(`line_items[${lineItemIndex}][price_data][product_data][name]`, "Tip");
-      formData.append(`line_items[${lineItemIndex}][price_data][unit_amount]`, tipAmountCents.toString());
+      formData.append(`line_items[${lineItemIndex}][price_data][unit_amount]`, tipCents.toString());
       formData.append(`line_items[${lineItemIndex}][quantity]`, "1");
     }
 
