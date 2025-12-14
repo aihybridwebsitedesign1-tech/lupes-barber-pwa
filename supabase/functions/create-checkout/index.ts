@@ -69,7 +69,7 @@ async function createStripeCheckout(appointmentId: string) {
   const service = Array.isArray(appointment.service) ? appointment.service[0] : appointment.service;
   const barber = Array.isArray(appointment.barber) ? appointment.barber[0] : appointment.barber;
 
-  const checkoutData = {
+  const checkoutData: any = {
     mode: "payment",
     payment_method_types: ["card"],
     line_items: [
@@ -85,13 +85,16 @@ async function createStripeCheckout(appointmentId: string) {
         quantity: 1,
       },
     ],
-    customer_email: client?.email || undefined,
     success_url: `${CLIENT_URL}/client/book/success?session_id={CHECKOUT_SESSION_ID}&appointment_id=${appointmentId}`,
     cancel_url: `${CLIENT_URL}/client/book?cancelled=true`,
     metadata: {
       appointment_id: appointmentId,
     },
   };
+
+  if (client?.email && typeof client.email === "string" && client.email.trim().length > 0) {
+    checkoutData.customer_email = client.email;
+  }
 
   const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
     method: "POST",
