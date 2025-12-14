@@ -6,11 +6,21 @@ const STRIPE_WEBHOOK_SECRET = Deno.env.get("STRIPE_WEBHOOK_SECRET");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Stripe-Signature",
-};
+const ALLOWED_ORIGINS = [
+  "https://lupesbarbershop.com",
+  "https://www.lupesbarbershop.com",
+  "http://localhost:5173",
+];
+
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : "*";
+
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Stripe-Signature",
+  };
+}
 
 async function verifyStripeSignature(body: string, signature: string): Promise<any> {
   if (!STRIPE_WEBHOOK_SECRET) {
@@ -50,6 +60,9 @@ async function verifyStripeSignature(body: string, signature: string): Promise<a
 }
 
 Deno.serve(async (req: Request) => {
+  const origin = req.headers.get("origin");
+  const corsHeaders = getCorsHeaders(origin);
+
   if (req.method === "OPTIONS") {
     return new Response(null, {
       status: 200,
@@ -86,7 +99,6 @@ Deno.serve(async (req: Request) => {
 
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
-    // Handle payment_intent.succeeded
     if (event.type === "payment_intent.succeeded") {
       const paymentIntent = event.data.object;
       const appointmentId = paymentIntent.metadata?.appointment_id;
@@ -113,7 +125,6 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Handle payment_intent.payment_failed
     if (event.type === "payment_intent.payment_failed") {
       const paymentIntent = event.data.object;
       const appointmentId = paymentIntent.metadata?.appointment_id;
@@ -123,7 +134,6 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Handle charge.refunded
     if (event.type === "charge.refunded") {
       const charge = event.data.object;
       const paymentIntentId = charge.payment_intent;
@@ -144,7 +154,6 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Handle checkout.session.completed (gold standard for Stripe Checkout)
     if (event.type === "checkout.session.completed") {
       const session = event.data.object;
       const appointmentId = session.metadata?.appointment_id;
