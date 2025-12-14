@@ -59,8 +59,13 @@ Deno.serve(async (req: Request) => {
       .select("tax_rate, card_processing_fee_rate")
       .single();
 
-    const taxRate = Number(shopConfig?.tax_rate || 0);
-    const cardFeeRate = Number(shopConfig?.card_processing_fee_rate || 0);
+    let taxRate = 0;
+    let cardFeeRate = 0;
+
+    if (shopConfig) {
+      taxRate = Number(shopConfig.tax_rate || 0);
+      cardFeeRate = Number(shopConfig.card_processing_fee_rate || 0);
+    }
 
     const baseCents = Math.round(numericPrice * 100);
     const taxCents = Math.round(baseCents * (taxRate / 100));
@@ -147,11 +152,11 @@ Deno.serve(async (req: Request) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
-  } catch (err) {
-    console.error("Checkout error:", err);
+  } catch (error) {
+    console.error("Checkout Error:", error.message);
     return new Response(
       JSON.stringify({
-        error: err instanceof Error ? err.message : "Internal server error",
+        error: error.message,
       }),
       {
         status: 500,
