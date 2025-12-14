@@ -13,7 +13,7 @@ const corsHeaders = {
 };
 
 interface CheckoutRequest {
-  appointmentId: string;
+  appointment_id: string;
 }
 
 async function createStripeCheckout(appointmentId: string) {
@@ -120,36 +120,11 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "Missing authorization header" }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
+    const { appointment_id }: CheckoutRequest = await req.json();
 
-    const supabaseAuth = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: { user }, error: userError } = await supabaseAuth.auth.getUser();
-    if (userError || !user) {
+    if (!appointment_id) {
       return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    const { appointmentId }: CheckoutRequest = await req.json();
-
-    if (!appointmentId) {
-      return new Response(
-        JSON.stringify({ error: "appointmentId is required" }),
+        JSON.stringify({ error: "appointment_id is required" }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -157,7 +132,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const session = await createStripeCheckout(appointmentId);
+    const session = await createStripeCheckout(appointment_id);
 
     return new Response(
       JSON.stringify({

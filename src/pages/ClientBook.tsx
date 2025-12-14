@@ -523,27 +523,23 @@ export default function ClientBook() {
       const stripeEnabled = Boolean(import.meta.env.VITE_STRIPE_PUBLIC_KEY) && !testMode;
 
       if (stripeEnabled) {
-        // Create Stripe checkout session
+        // Create Stripe checkout session using Supabase Edge Function
         try {
-          const response = await fetch(`/api/create-checkout-session`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ appointment_id: newAppointment.id }),
+          const { data, error: invokeError } = await supabase.functions.invoke('create-checkout', {
+            body: {
+              appointment_id: newAppointment.id
+            }
           });
 
-          if (!response.ok) {
-            throw new Error('Failed to create checkout session');
+          if (invokeError) {
+            throw invokeError;
           }
 
-          const { url } = await response.json();
-
-          if (url) {
-            window.location.href = url;
-          } else {
+          if (!data || !data.url) {
             throw new Error('No checkout URL returned');
           }
+
+          window.location.href = data.url;
         } catch (stripeError) {
           debugError('Stripe checkout error:', stripeError);
           alert(language === 'en'
