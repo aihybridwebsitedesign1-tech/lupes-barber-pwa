@@ -27,6 +27,55 @@ export default function ClientBookSuccess() {
       return;
     }
 
+    // DEV BYPASS: Handle dev_bypass_test immediately - show success without any delay
+    if (sessionId === 'dev_bypass_test') {
+      setLoading(false);
+      // Mark appointment as paid for dev bypass (same as real payment)
+      const appointmentId = searchParams.get('appointment_id');
+      if (appointmentId) {
+        try {
+          const { data: apt } = await supabase
+            .from('appointments')
+            .select(`
+              id,
+              scheduled_start,
+              amount_due,
+              payment_status,
+              client:client_id (first_name, last_name),
+              service:service_id (name_en, name_es),
+              barber:barber_id (name),
+              amount_paid
+            `)
+            .eq('id', appointmentId)
+            .maybeSingle();
+
+          if (apt) {
+            // Mark as paid if currently unpaid (for dev bypass too)
+            if (apt.payment_status === 'unpaid') {
+              await supabase
+                .from('appointments')
+                .update({
+                  payment_status: 'paid',
+                  amount_paid: apt.amount_due
+                })
+                .eq('id', appointmentId);
+            }
+
+            setAppointment({
+              ...apt,
+              amount_paid: apt.amount_due,
+              client: Array.isArray(apt.client) ? apt.client[0] : apt.client,
+              service: Array.isArray(apt.service) ? apt.service[0] : apt.service,
+              barber: Array.isArray(apt.barber) ? apt.barber[0] : apt.barber,
+            });
+          }
+        } catch (err) {
+          console.error('Error loading dev bypass appointment:', err);
+        }
+      }
+      return;
+    }
+
     // Immediately show success - we trust that Stripe sent them here
     setLoading(false);
 

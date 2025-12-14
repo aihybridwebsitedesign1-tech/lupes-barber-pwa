@@ -69,7 +69,6 @@ export default function OwnerSettings() {
 
   const [enableTipping, setEnableTipping] = useState(true);
   const [tipPercentagePresets, setTipPercentagePresets] = useState('15, 18, 20, 25');
-  const [tipFlatPresets, setTipFlatPresets] = useState('5, 10, 15');
 
   const [businessHours, setBusinessHours] = useState<{
     [key: string]: { open: string; close: string } | null;
@@ -134,8 +133,6 @@ export default function OwnerSettings() {
         setEnableTipping(data.enable_tipping ?? true);
         const tipPercents = data.tip_percentage_presets || [15, 18, 20, 25];
         setTipPercentagePresets(Array.isArray(tipPercents) ? tipPercents.join(', ') : '15, 18, 20, 25');
-        const tipFlats = data.tip_flat_presets || [5, 10, 15];
-        setTipFlatPresets(Array.isArray(tipFlats) ? tipFlats.join(', ') : '5, 10, 15');
 
         if (data.shop_hours) {
           setBusinessHours(data.shop_hours);
@@ -286,18 +283,11 @@ export default function OwnerSettings() {
         .filter(p => !isNaN(p) && p > 0)
         .slice(0, 5);
 
-      const flats = tipFlatPresets
-        .split(',')
-        .map(f => parseFloat(f.trim()))
-        .filter(f => !isNaN(f) && f > 0)
-        .slice(0, 5);
-
       const { error: updateError } = await supabase
         .from('shop_config')
         .update({
           enable_tipping: enableTipping,
           tip_percentage_presets: JSON.stringify(percentages),
-          tip_flat_presets: JSON.stringify(flats),
         })
         .eq('id', config?.id || 1);
 
@@ -1416,24 +1406,6 @@ export default function OwnerSettings() {
                         {language === 'en'
                           ? 'Enter up to 5 percentage values, separated by commas'
                           : 'Ingresa hasta 5 valores de porcentaje, separados por comas'}
-                      </p>
-                    </div>
-
-                    <div style={{ marginBottom: '1.5rem' }}>
-                      <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '16px', fontWeight: '500' }}>
-                        {language === 'en' ? 'Tip Flat Amount Presets ($)' : 'Montos de Propina Fijos ($)'}
-                      </label>
-                      <input
-                        type="text"
-                        value={tipFlatPresets}
-                        onChange={(e) => setTipFlatPresets(e.target.value)}
-                        placeholder={language === 'en' ? 'e.g., 5, 10, 15' : 'ej., 5, 10, 15'}
-                        style={{ width: '100%', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '16px' }}
-                      />
-                      <p style={{ fontSize: '13px', color: '#666', marginTop: '0.25rem' }}>
-                        {language === 'en'
-                          ? 'Enter up to 5 dollar amounts, separated by commas'
-                          : 'Ingresa hasta 5 cantidades en dólares, separadas por comas'}
                       </p>
                     </div>
 

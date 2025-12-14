@@ -322,6 +322,11 @@ export default function ClientBook() {
 
       const dayOfWeek = new Date(selectedDate).getDay();
 
+      // Query for ALL appointments on the selected date for this barber
+      // Use date range that covers the entire day in shop timezone (America/Chicago)
+      const dateStart = new Date(`${selectedDate}T00:00:00-06:00`).toISOString();
+      const dateEnd = new Date(`${selectedDate}T23:59:59-06:00`).toISOString();
+
       const [scheduleRes, appointmentsRes, timeOffRes, barberOverridesRes] = await Promise.all([
         supabase
           .from('barber_schedules')
@@ -333,14 +338,16 @@ export default function ClientBook() {
           .from('appointments')
           .select('id, scheduled_start, scheduled_end, status')
           .eq('barber_id', selectedBarber)
-          .gte('scheduled_start', `${selectedDate}T00:00:00`)
-          .lte('scheduled_start', `${selectedDate}T23:59:59`),
+          .gte('scheduled_start', dateStart)
+          .lt('scheduled_start', dateEnd)
+          .neq('status', 'cancelled')
+          .neq('status', 'no_show'),
         supabase
           .from('barber_time_off')
           .select('id, start_time, end_time')
           .eq('barber_id', selectedBarber)
-          .lte('start_time', `${selectedDate}T23:59:59`)
-          .gte('end_time', `${selectedDate}T00:00:00`),
+          .lte('start_time', dateEnd)
+          .gte('end_time', dateStart),
         supabase
           .from('users')
           .select('min_hours_before_booking_override, min_hours_before_cancellation_override, booking_interval_minutes_override')
@@ -490,11 +497,12 @@ export default function ClientBook() {
 
       // Calculate amounts using shop settings (for preview/record-keeping only)
       // The edge function will calculate the actual Stripe amounts
+      // Note: taxRate is stored as integer (e.g., 8.5 = 8.5%), feeRate as decimal (e.g., 0.04 = 4%)
       const taxRate = shopSettings?.tax_rate || 0;
       const feeRate = shopSettings?.card_processing_fee_rate || 0;
       const subtotal = servicePrice + tipAmount;
       const tax = subtotal * (taxRate / 100);
-      const stripeFee = (subtotal + tax) * (feeRate / 100);
+      const stripeFee = (subtotal + tax) * feeRate;
       const grandTotal = subtotal + tax + stripeFee;
 
       const selectedSlot = timeSlots.find(slot => slot.start === selectedTime);
@@ -865,13 +873,15 @@ export default function ClientBook() {
               : (customTip ? parseFloat(customTip) : 0);
 
             // Use dynamic shop settings
+            // Note: taxRate is stored as integer (e.g., 8.5 = 8.5%)
+            // Note: feeRate is stored as decimal (e.g., 0.04 = 4%)
             const taxRate = shopSettings?.tax_rate || 0;
             const feeRate = shopSettings?.card_processing_fee_rate || 0;
             const tipPresets = shopSettings?.tip_percentage_presets || [15, 18, 20];
 
             const subtotal = servicePrice + tipAmount;
             const tax = subtotal * (taxRate / 100);
-            const stripeFee = stripeEnabled ? ((subtotal + tax) * (feeRate / 100)) : 0;
+            const stripeFee = stripeEnabled ? ((subtotal + tax) * feeRate) : 0;
             const grandTotal = subtotal + tax + stripeFee;
 
             return (
@@ -1026,7 +1036,7 @@ export default function ClientBook() {
                       {stripeFee > 0 && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', paddingBottom: '0.5rem', borderBottom: '1px solid #ddd' }}>
                           <span style={{ fontSize: '14px', color: '#666' }}>
-                            {language === 'en' ? `Processing Fee (${feeRate}%)` : `Tarifa de Procesamiento (${feeRate}%)`}
+                            {language === 'en' ? `Processing Fee (${(feeRate * 100).toFixed(2)}%)` : `Tarifa de Procesamiento (${(feeRate * 100).toFixed(2)}%)`}
                           </span>
                           <span style={{ fontSize: '14px', color: '#666' }}>${stripeFee.toFixed(2)}</span>
                         </div>

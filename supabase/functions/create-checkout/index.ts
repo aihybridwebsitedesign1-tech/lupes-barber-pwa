@@ -63,6 +63,8 @@ Deno.serve(async (req: Request) => {
       .select("tax_rate, card_processing_fee_rate")
       .single();
 
+    // Note: taxRate is stored as integer (e.g., 8.5 = 8.5%)
+    // Note: cardFeeRate is stored as decimal (e.g., 0.04 = 4%)
     let taxRate = 0;
     let cardFeeRate = 0;
 
@@ -73,7 +75,7 @@ Deno.serve(async (req: Request) => {
 
     const baseCents = Math.round(numericPrice * 100);
     const taxCents = Math.round(baseCents * (taxRate / 100));
-    const feeCents = Math.round((baseCents + taxCents) * (cardFeeRate / 100));
+    const feeCents = Math.round((baseCents + taxCents) * cardFeeRate);
 
     const tipAmountNum = Number(tip_amount || 0);
     const tipCents = Math.round(tipAmountNum * 100);
@@ -112,7 +114,7 @@ Deno.serve(async (req: Request) => {
 
     if (feeCents > 0) {
       formData.append(`line_items[${lineItemIndex}][price_data][currency]`, "usd");
-      formData.append(`line_items[${lineItemIndex}][price_data][product_data][name]`, `Processing Fee (${cardFeeRate}%)`);
+      formData.append(`line_items[${lineItemIndex}][price_data][product_data][name]`, `Processing Fee (${(cardFeeRate * 100).toFixed(2)}%)`);
       formData.append(`line_items[${lineItemIndex}][price_data][unit_amount]`, feeCents.toString());
       formData.append(`line_items[${lineItemIndex}][quantity]`, "1");
       lineItemIndex++;
