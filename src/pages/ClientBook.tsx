@@ -60,6 +60,8 @@ export default function ClientBook() {
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
   const [clientNotes, setClientNotes] = useState('');
+  const [tipPercentage, setTipPercentage] = useState<number>(0);
+  const [customTip, setCustomTip] = useState<string>('');
 
   const [timeSlots, setTimeSlots] = useState<{ start: string; end: string }[]>([]);
   const [config, setConfig] = useState<{ days_bookable_in_advance: number; min_book_ahead_hours: number; min_cancel_ahead_hours: number; client_booking_interval_minutes: number } | null>(null);
@@ -470,7 +472,24 @@ export default function ClientBook() {
       }
 
       const selectedServiceData = services.find(s => s.id === selectedService);
-      const amountDue = selectedServiceData?.base_price || 0;
+      const servicePrice = selectedServiceData?.base_price || 0;
+
+      // Calculate tip
+      const tipAmount = tipPercentage > 0
+        ? (servicePrice * tipPercentage / 100)
+        : (customTip ? parseFloat(customTip) : 0);
+
+      // Calculate subtotal (service + tip)
+      const subtotal = servicePrice + tipAmount;
+
+      // Calculate tax (8.5%)
+      const tax = subtotal * 0.085;
+
+      // Calculate Stripe fee (2.9% + $0.30)
+      const stripeFee = (subtotal + tax) * 0.029 + 0.30;
+
+      // Grand total
+      const grandTotal = subtotal + tax + stripeFee;
 
       const selectedSlot = timeSlots.find(slot => slot.start === selectedTime);
       const appointmentStart = selectedTime;
@@ -489,7 +508,7 @@ export default function ClientBook() {
           notes: clientNotes || null,
           source: 'client_web',
           payment_status: 'unpaid',
-          amount_due: amountDue,
+          amount_due: grandTotal,
           amount_paid: 0,
           is_test: testMode, // TEST MODE: Mark as test when test mode is enabled
         })
@@ -530,9 +549,9 @@ export default function ClientBook() {
           const { data, error: invokeError } = await supabase.functions.invoke('create-checkout', {
             body: {
               appointment_id: newAppointment.id,
-              service_price: amountDue,
+              service_price: grandTotal,
               service_name: serviceName || 'Barber Service',
-              tip_amount: 0
+              tip_amount: tipAmount
             }
           });
 
@@ -831,125 +850,261 @@ export default function ClientBook() {
             </div>
           )}
 
-          {step === 5 && (
-            <div>
-              <h2 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '1.5rem' }}>
-                {language === 'en' ? 'Confirm Booking' : 'Confirmar Reserva'}
-              </h2>
+          {step === 5 && (() => {
+            const servicePrice = selectedServiceObj?.base_price || 0;
+            const tipAmount = tipPercentage > 0
+              ? (servicePrice * tipPercentage / 100)
+              : (customTip ? parseFloat(customTip) : 0);
+            const subtotal = servicePrice + tipAmount;
+            const tax = subtotal * 0.085;
+            const stripeFee = stripeEnabled ? ((subtotal + tax) * 0.029 + 0.30) : 0;
+            const grandTotal = subtotal + tax + stripeFee;
 
-              <div style={{ backgroundColor: '#f9f9f9', padding: '1.5rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
-                <div style={{ marginBottom: '1rem' }}>
-                  <div style={{ fontSize: '14px', color: '#666', marginBottom: '0.25rem' }}>
-                    {language === 'en' ? 'Barber' : 'Barbero'}
+            return (
+              <div>
+                <h2 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '1.5rem' }}>
+                  {language === 'en' ? 'Review & Pay' : 'Revisar y Pagar'}
+                </h2>
+
+                <div style={{ backgroundColor: '#f9f9f9', padding: '1.5rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
+                  <div style={{ marginBottom: '1rem' }}>
+                    <div style={{ fontSize: '14px', color: '#666', marginBottom: '0.25rem' }}>
+                      {language === 'en' ? 'Barber' : 'Barbero'}
+                    </div>
+                    <div style={{ fontSize: '18px', fontWeight: '600' }}>
+                      {selectedBarberObj?.name}
+                    </div>
                   </div>
-                  <div style={{ fontSize: '18px', fontWeight: '600' }}>
-                    {selectedBarberObj?.name}
+
+                  <div style={{ marginBottom: '1rem' }}>
+                    <div style={{ fontSize: '14px', color: '#666', marginBottom: '0.25rem' }}>
+                      {language === 'en' ? 'Service' : 'Servicio'}
+                    </div>
+                    <div style={{ fontSize: '18px', fontWeight: '600' }}>
+                      {language === 'es' ? selectedServiceObj?.name_es : selectedServiceObj?.name_en}
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: '1rem' }}>
+                    <div style={{ fontSize: '14px', color: '#666', marginBottom: '0.25rem' }}>
+                      {language === 'en' ? 'Date & Time' : 'Fecha y Hora'}
+                    </div>
+                    <div style={{ fontSize: '18px', fontWeight: '600' }}>
+                      {new Date(selectedDate).toLocaleDateString(language === 'en' ? 'en-US' : 'es-ES', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </div>
+                    <div style={{ fontSize: '18px', fontWeight: '600' }}>
+                      {selectedTime ? formatTime12h(selectedTime) : ''}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: '14px', color: '#666', marginBottom: '0.25rem' }}>
+                      {language === 'en' ? 'Contact' : 'Contacto'}
+                    </div>
+                    <div style={{ fontSize: '16px' }}>{clientName}</div>
+                    <div style={{ fontSize: '16px' }}>{clientPhone}</div>
                   </div>
                 </div>
 
-                <div style={{ marginBottom: '1rem' }}>
-                  <div style={{ fontSize: '14px', color: '#666', marginBottom: '0.25rem' }}>
-                    {language === 'en' ? 'Service' : 'Servicio'}
-                  </div>
-                  <div style={{ fontSize: '18px', fontWeight: '600' }}>
-                    {language === 'es' ? selectedServiceObj?.name_es : selectedServiceObj?.name_en}
-                  </div>
-                  <div style={{ fontSize: '16px', color: '#e74c3c', fontWeight: 'bold', marginTop: '0.25rem' }}>
-                    ${selectedServiceObj?.base_price.toFixed(2)}
-                  </div>
-                </div>
+                {stripeEnabled && !testMode && (
+                  <>
+                    <div style={{ backgroundColor: 'white', border: '2px solid #e0e0e0', padding: '1.5rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
+                      <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '1rem' }}>
+                        {language === 'en' ? 'Add a Tip?' : '¿Agregar Propina?'}
+                      </h3>
 
-                <div style={{ marginBottom: '1rem' }}>
-                  <div style={{ fontSize: '14px', color: '#666', marginBottom: '0.25rem' }}>
-                    {language === 'en' ? 'Date & Time' : 'Fecha y Hora'}
-                  </div>
-                  <div style={{ fontSize: '18px', fontWeight: '600' }}>
-                    {new Date(selectedDate).toLocaleDateString(language === 'en' ? 'en-US' : 'es-ES', {
-                      weekday: 'long',
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
-                  </div>
-                  <div style={{ fontSize: '18px', fontWeight: '600' }}>
-                    {selectedTime ? formatTime12h(selectedTime) : ''}
-                  </div>
-                </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem', marginBottom: '1rem' }}>
+                        {[10, 15, 20].map(pct => (
+                          <button
+                            key={pct}
+                            onClick={() => {
+                              setTipPercentage(pct);
+                              setCustomTip('');
+                            }}
+                            style={{
+                              padding: '0.75rem',
+                              backgroundColor: tipPercentage === pct ? '#e74c3c' : 'white',
+                              color: tipPercentage === pct ? 'white' : '#000',
+                              border: `2px solid ${tipPercentage === pct ? '#e74c3c' : '#ddd'}`,
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              fontSize: '14px',
+                              fontWeight: '600',
+                            }}
+                          >
+                            {pct}%
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => {
+                            setTipPercentage(0);
+                            setCustomTip('');
+                          }}
+                          style={{
+                            padding: '0.75rem',
+                            backgroundColor: tipPercentage === 0 && !customTip ? '#e74c3c' : 'white',
+                            color: tipPercentage === 0 && !customTip ? 'white' : '#000',
+                            border: `2px solid ${tipPercentage === 0 && !customTip ? '#e74c3c' : '#ddd'}`,
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            fontWeight: '600',
+                          }}
+                        >
+                          {language === 'en' ? 'No Tip' : 'Sin Propina'}
+                        </button>
+                      </div>
 
-                <div>
-                  <div style={{ fontSize: '14px', color: '#666', marginBottom: '0.25rem' }}>
-                    {language === 'en' ? 'Contact' : 'Contacto'}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '14px', marginBottom: '0.5rem', color: '#666' }}>
+                          {language === 'en' ? 'Custom Tip ($)' : 'Propina Personalizada ($)'}
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={customTip}
+                          onChange={(e) => {
+                            setCustomTip(e.target.value);
+                            setTipPercentage(0);
+                          }}
+                          placeholder="0.00"
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            fontSize: '16px',
+                            border: '2px solid #ddd',
+                            borderRadius: '6px',
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ backgroundColor: '#f9f9f9', padding: '1.5rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
+                      <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '1rem' }}>
+                        {language === 'en' ? 'Payment Summary' : 'Resumen de Pago'}
+                      </h3>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <span>{language === 'en' ? 'Service' : 'Servicio'}</span>
+                        <span>${servicePrice.toFixed(2)}</span>
+                      </div>
+
+                      {tipAmount > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                          <span>{language === 'en' ? 'Tip' : 'Propina'}</span>
+                          <span>${tipAmount.toFixed(2)}</span>
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <span>{language === 'en' ? 'Tax (8.5%)' : 'Impuesto (8.5%)'}</span>
+                        <span>${tax.toFixed(2)}</span>
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', paddingBottom: '0.5rem', borderBottom: '1px solid #ddd' }}>
+                        <span style={{ fontSize: '14px', color: '#666' }}>
+                          {language === 'en' ? 'Processing Fee (2.9% + $0.30)' : 'Tarifa de Procesamiento (2.9% + $0.30)'}
+                        </span>
+                        <span style={{ fontSize: '14px', color: '#666' }}>${stripeFee.toFixed(2)}</span>
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem', fontSize: '20px', fontWeight: 'bold' }}>
+                        <span>{language === 'en' ? 'Total' : 'Total'}</span>
+                        <span style={{ color: '#e74c3c' }}>${grandTotal.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* TEST MODE: Show warning banner when test mode is enabled */}
+                {testMode && (
+                  <div style={{
+                    backgroundColor: '#fff3cd',
+                    border: '2px solid #ffc107',
+                    padding: '1.25rem',
+                    borderRadius: '8px',
+                    marginBottom: '1rem',
+                    fontSize: '14px',
+                    color: '#856404'
+                  }}>
+                    <div style={{ fontWeight: 'bold', marginBottom: '0.5rem' }}>
+                      {language === 'en' ? '⚠️ Test Mode Enabled' : '⚠️ Modo de Prueba Activado'}
+                    </div>
+                    {language === 'en'
+                      ? 'This booking is for testing only. No real payment will be processed and no SMS notifications will be sent.'
+                      : 'Esta reserva es solo para pruebas. No se procesará ningún pago real y no se enviarán notificaciones SMS.'}
                   </div>
-                  <div style={{ fontSize: '16px' }}>{clientName}</div>
-                  <div style={{ fontSize: '16px' }}>{clientPhone}</div>
-                </div>
+                )}
+
+                {!stripeEnabled && !testMode && (
+                  <div style={{
+                    backgroundColor: '#fff3cd',
+                    border: '1px solid #ffc107',
+                    padding: '1rem',
+                    borderRadius: '8px',
+                    marginBottom: '1rem',
+                    fontSize: '14px',
+                    color: '#856404'
+                  }}>
+                    {language === 'en'
+                      ? 'Payment will be collected at the shop. You can pay by cash or card when you arrive.'
+                      : 'El pago se recogerá en la tienda. Puedes pagar en efectivo o con tarjeta cuando llegues.'}
+                  </div>
+                )}
+
+                <button
+                  onClick={handleSubmit}
+                  disabled={submitting}
+                  style={{
+                    width: '100%',
+                    padding: '1rem',
+                    backgroundColor: submitting ? '#999' : '#e74c3c',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: submitting ? 'not-allowed' : 'pointer',
+                    fontSize: '18px',
+                    fontWeight: 'bold',
+                    marginBottom: '0.5rem',
+                  }}
+                >
+                  {submitting
+                    ? (language === 'en' ? 'Processing...' : 'Procesando...')
+                    : testMode
+                      ? (language === 'en' ? 'Confirm Test Booking' : 'Confirmar Reserva de Prueba')
+                      : stripeEnabled
+                        ? (language === 'en' ? `Pay $${grandTotal.toFixed(2)}` : `Pagar $${grandTotal.toFixed(2)}`)
+                        : (language === 'en' ? 'Confirm Booking' : 'Confirmar Reserva')}
+                </button>
+
+                {/* DEV BYPASS: Simulate success without paying */}
+                {stripeEnabled && !testMode && import.meta.env.DEV && (
+                  <button
+                    onClick={() => navigate('/client/success?session_id=dev_bypass_test')}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      backgroundColor: 'white',
+                      color: '#666',
+                      border: '2px dashed #999',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                    }}
+                  >
+                    [DEV] Simulate Success (No Payment)
+                  </button>
+                )}
               </div>
-
-              {/* TEST MODE: Show warning banner when test mode is enabled */}
-              {testMode && (
-                <div style={{
-                  backgroundColor: '#fff3cd',
-                  border: '2px solid #ffc107',
-                  padding: '1.25rem',
-                  borderRadius: '8px',
-                  marginBottom: '1rem',
-                  fontSize: '14px',
-                  color: '#856404'
-                }}>
-                  <div style={{ fontWeight: 'bold', marginBottom: '0.5rem' }}>
-                    {language === 'en' ? '⚠️ Test Mode Enabled' : '⚠️ Modo de Prueba Activado'}
-                  </div>
-                  {language === 'en'
-                    ? 'This booking is for testing only. No real payment will be processed and no SMS notifications will be sent.'
-                    : 'Esta reserva es solo para pruebas. No se procesará ningún pago real y no se enviarán notificaciones SMS.'}
-                </div>
-              )}
-
-              {!stripeEnabled && !testMode && (
-                <div style={{
-                  backgroundColor: '#fff3cd',
-                  border: '1px solid #ffc107',
-                  padding: '1rem',
-                  borderRadius: '8px',
-                  marginBottom: '1rem',
-                  fontSize: '14px',
-                  color: '#856404'
-                }}>
-                  {language === 'en'
-                    ? 'Payment will be collected at the shop. You can pay by cash or card when you arrive.'
-                    : 'El pago se recogerá en la tienda. Puedes pagar en efectivo o con tarjeta cuando llegues.'}
-                </div>
-              )}
-
-              {/* TODO (Phase 2): Use shop tip settings to show tip options when paying online
-                  - Tip percentage presets from shop_config.tip_percentage_presets
-                  - Tip flat presets from shop_config.tip_flat_presets */}
-
-              <button
-                onClick={handleSubmit}
-                disabled={submitting}
-                style={{
-                  width: '100%',
-                  padding: '1rem',
-                  backgroundColor: submitting ? '#999' : '#e74c3c',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: submitting ? 'not-allowed' : 'pointer',
-                  fontSize: '18px',
-                  fontWeight: 'bold',
-                }}
-              >
-                {submitting
-                  ? (language === 'en' ? 'Processing...' : 'Procesando...')
-                  : testMode
-                    ? (language === 'en' ? 'Confirm Test Booking' : 'Confirmar Reserva de Prueba')
-                    : stripeEnabled
-                      ? (language === 'en' ? 'Pay & Confirm' : 'Pagar y Confirmar')
-                      : (language === 'en' ? 'Confirm Booking' : 'Confirmar Reserva')}
-              </button>
-            </div>
-          )}
+            );
+          })()}
 
           <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
             {step > 1 && (

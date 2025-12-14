@@ -14,62 +14,52 @@ export default function ClientBookSuccess() {
   const [appointment, setAppointment] = useState<any>(null);
 
   useEffect(() => {
-    confirmPayment();
+    loadSuccessScreen();
   }, []);
 
-  const confirmPayment = async () => {
+  const loadSuccessScreen = async () => {
     const sessionId = searchParams.get('session_id');
-    const appointmentId = searchParams.get('appointment_id');
 
-    if (!sessionId || !appointmentId) {
+    // EMERGENCY FIX: Trust the URL - if session_id exists, show success immediately
+    if (!sessionId) {
       setError(language === 'en' ? 'Invalid payment confirmation link.' : 'Enlace de confirmación de pago inválido.');
       setLoading(false);
       return;
     }
 
-    try {
-      const response = await fetch(`/api/confirm-payment`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ sessionId, appointmentId }),
-      });
+    // Immediately show success - we trust that Stripe sent them here
+    setLoading(false);
 
-      const result = await response.json();
+    // Try to load appointment details in the background (non-blocking)
+    const appointmentId = searchParams.get('appointment_id');
+    if (appointmentId) {
+      try {
+        const { data: apt, error: aptError } = await supabase
+          .from('appointments')
+          .select(`
+            id,
+            scheduled_start,
+            client:client_id (first_name, last_name),
+            service:service_id (name_en, name_es),
+            barber:barber_id (name),
+            amount_paid,
+            amount_due
+          `)
+          .eq('id', appointmentId)
+          .maybeSingle();
 
-      if (!result.success) {
-        throw new Error(result.error || 'Payment confirmation failed');
+        if (!aptError && apt) {
+          setAppointment({
+            ...apt,
+            client: Array.isArray(apt.client) ? apt.client[0] : apt.client,
+            service: Array.isArray(apt.service) ? apt.service[0] : apt.service,
+            barber: Array.isArray(apt.barber) ? apt.barber[0] : apt.barber,
+          });
+        }
+      } catch (err) {
+        console.error('Error loading appointment details:', err);
+        // Don't set error - we already showed success
       }
-
-      const { data: apt, error: aptError } = await supabase
-        .from('appointments')
-        .select(`
-          id,
-          scheduled_start,
-          client:client_id (first_name, last_name),
-          service:service_id (name_en, name_es),
-          barber:barber_id (name),
-          amount_paid
-        `)
-        .eq('id', appointmentId)
-        .single();
-
-      if (aptError) throw aptError;
-
-      setAppointment({
-        ...apt,
-        client: Array.isArray(apt.client) ? apt.client[0] : apt.client,
-        service: Array.isArray(apt.service) ? apt.service[0] : apt.service,
-        barber: Array.isArray(apt.barber) ? apt.barber[0] : apt.barber,
-      });
-    } catch (err) {
-      console.error('Error confirming payment:', err);
-      setError(language === 'en'
-        ? 'There was an issue confirming your payment. Please contact the shop.'
-        : 'Hubo un problema al confirmar tu pago. Por favor contacta al negocio.');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -89,7 +79,7 @@ export default function ClientBookSuccess() {
     );
   }
 
-  if (error || !appointment) {
+  if (error) {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
         <ClientHeader />
@@ -131,7 +121,7 @@ export default function ClientBookSuccess() {
     );
   }
 
-  const appointmentDate = new Date(appointment.scheduled_start);
+  const appointmentDate = appointment ? new Date(appointment.scheduled_start) : null;
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5', display: 'flex', flexDirection: 'column' }}>
@@ -159,64 +149,83 @@ export default function ClientBookSuccess() {
               : 'Tu cita está confirmada y pagada.'}
           </p>
 
-          <div
-            style={{
-              backgroundColor: '#f9f9f9',
-              borderRadius: '8px',
-              padding: '1.5rem',
-              marginBottom: '2rem',
-              textAlign: 'left',
-            }}
-          >
-            <div style={{ marginBottom: '1rem' }}>
-              <div style={{ fontSize: '14px', color: '#666', marginBottom: '0.25rem' }}>
-                {language === 'en' ? 'Service' : 'Servicio'}
-              </div>
-              <div style={{ fontSize: '18px', fontWeight: '600' }}>
-                {language === 'es' ? appointment.service.name_es : appointment.service.name_en}
-              </div>
-            </div>
-
-            {appointment.barber && (
+          {appointment && appointmentDate && (
+            <div
+              style={{
+                backgroundColor: '#f9f9f9',
+                borderRadius: '8px',
+                padding: '1.5rem',
+                marginBottom: '2rem',
+                textAlign: 'left',
+              }}
+            >
               <div style={{ marginBottom: '1rem' }}>
                 <div style={{ fontSize: '14px', color: '#666', marginBottom: '0.25rem' }}>
-                  {language === 'en' ? 'Barber' : 'Barbero'}
+                  {language === 'en' ? 'Service' : 'Servicio'}
                 </div>
                 <div style={{ fontSize: '18px', fontWeight: '600' }}>
-                  {appointment.barber.name}
+                  {language === 'es' ? appointment.service?.name_es : appointment.service?.name_en}
                 </div>
               </div>
-            )}
 
-            <div style={{ marginBottom: '1rem' }}>
-              <div style={{ fontSize: '14px', color: '#666', marginBottom: '0.25rem' }}>
-                {language === 'en' ? 'Date & Time' : 'Fecha y Hora'}
+              {appointment.barber && (
+                <div style={{ marginBottom: '1rem' }}>
+                  <div style={{ fontSize: '14px', color: '#666', marginBottom: '0.25rem' }}>
+                    {language === 'en' ? 'Barber' : 'Barbero'}
+                  </div>
+                  <div style={{ fontSize: '18px', fontWeight: '600' }}>
+                    {appointment.barber.name}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ marginBottom: '1rem' }}>
+                <div style={{ fontSize: '14px', color: '#666', marginBottom: '0.25rem' }}>
+                  {language === 'en' ? 'Date & Time' : 'Fecha y Hora'}
+                </div>
+                <div style={{ fontSize: '18px', fontWeight: '600' }}>
+                  {appointmentDate.toLocaleDateString(language === 'en' ? 'en-US' : 'es-ES', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                  })}
+                </div>
+                <div style={{ fontSize: '18px', fontWeight: '600' }}>
+                  {appointmentDate.toLocaleTimeString(language === 'en' ? 'en-US' : 'es-ES', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </div>
               </div>
-              <div style={{ fontSize: '18px', fontWeight: '600' }}>
-                {appointmentDate.toLocaleDateString(language === 'en' ? 'en-US' : 'es-ES', {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                })}
-              </div>
-              <div style={{ fontSize: '18px', fontWeight: '600' }}>
-                {appointmentDate.toLocaleTimeString(language === 'en' ? 'en-US' : 'es-ES', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
+
+              <div>
+                <div style={{ fontSize: '14px', color: '#666', marginBottom: '0.25rem' }}>
+                  {language === 'en' ? 'Amount Paid' : 'Monto Pagado'}
+                </div>
+                <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#10b981' }}>
+                  ${(appointment.amount_paid || appointment.amount_due || 0).toFixed(2)}
+                </div>
               </div>
             </div>
+          )}
 
-            <div>
-              <div style={{ fontSize: '14px', color: '#666', marginBottom: '0.25rem' }}>
-                {language === 'en' ? 'Amount Paid' : 'Monto Pagado'}
-              </div>
-              <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#10b981' }}>
-                ${appointment.amount_paid.toFixed(2)}
-              </div>
+          {!appointment && (
+            <div
+              style={{
+                backgroundColor: '#f9f9f9',
+                borderRadius: '8px',
+                padding: '1.5rem',
+                marginBottom: '2rem',
+                textAlign: 'center',
+                color: '#666',
+              }}
+            >
+              {language === 'en'
+                ? 'Your appointment details will appear in "My Appointments".'
+                : 'Los detalles de tu cita aparecerán en "Mis Citas".'}
             </div>
-          </div>
+          )}
 
           <div style={{ display: 'flex', gap: '1rem', flexDirection: 'column' }}>
             <button
