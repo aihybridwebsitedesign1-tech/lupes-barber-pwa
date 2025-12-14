@@ -1,7 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY");
-
 const ALLOWED_ORIGINS = [
   "https://lupesbarbershop.com",
   "https://www.lupesbarbershop.com",
@@ -30,58 +28,38 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY");
+
     if (!STRIPE_SECRET_KEY) {
-      throw new Error("Stripe is not configured");
+      throw new Error("Missing STRIPE_SECRET_KEY env var");
     }
 
-    const { appointment_id, service_name, service_price } = await req.json();
+    const body = await req.json();
+    const { service_price, service_name } = body;
 
-    if (!appointment_id || !service_name || !service_price) {
-      return new Response(
-        JSON.stringify({ error: "appointment_id, service_name, and service_price are required" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
+    const numericPrice = Number(service_price);
+    const safePrice = (isNaN(numericPrice) || numericPrice <= 0) ? 1000 : numericPrice;
+    const amount = Math.round(safePrice * 100);
 
-    const amount = Math.round(Number(service_price) * 100);
+    console.log("Creating checkout session:", {
+      service_price,
+      numericPrice,
+      safePrice,
+      amount
+    });
 
-    if (amount <= 0 || isNaN(amount)) {
-      return new Response(
-        JSON.stringify({ error: "Invalid price" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    const successUrl = `${origin || ALLOWED_ORIGINS[0]}/client/success?session_id={CHECKOUT_SESSION_ID}&appointment_id=${appointment_id}`;
+    const successUrl = `${origin || ALLOWED_ORIGINS[0]}/client/success?session_id={CHECKOUT_SESSION_ID}`;
     const cancelUrl = `${origin || ALLOWED_ORIGINS[0]}/client/book`;
 
-    const checkoutData: any = {
-      mode: "payment",
-      payment_method_types: ["card"],
-      line_items: [
-        {
-          price_data: {
-            currency: "usd",
-            product_data: {
-              name: service_name,
-            },
-            unit_amount: amount,
-          },
-          quantity: 1,
-        },
-      ],
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-      metadata: {
-        appointment_id: appointment_id,
-      },
-    };
+    const formData = new URLSearchParams();
+    formData.append("mode", "payment");
+    formData.append("payment_method_types[0]", "card");
+    formData.append("line_items[0][price_data][currency]", "usd");
+    formData.append("line_items[0][price_data][product_data][name]", service_name || "Barber Service");
+    formData.append("line_items[0][price_data][unit_amount]", amount.toString());
+    formData.append("line_items[0][quantity]", "1");
+    formData.append("success_url", successUrl);
+    formData.append("cancel_url", cancelUrl);
 
     const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
       method: "POST",
@@ -89,16 +67,17 @@ Deno.serve(async (req: Request) => {
         "Authorization": `Bearer ${STRIPE_SECRET_KEY}`,
         "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: new URLSearchParams(checkoutData).toString(),
+      body: formData.toString(),
     });
 
+    const responseText = await response.text();
+
     if (!response.ok) {
-      const error = await response.text();
-      console.error("Stripe error:", error);
-      throw new Error("Failed to create Stripe checkout session");
+      console.error("Stripe API error:", responseText);
+      throw new Error(`Stripe API error: ${responseText}`);
     }
 
-    const session = await response.json();
+    const session = JSON.parse(responseText);
 
     return new Response(
       JSON.stringify({
@@ -110,11 +89,11 @@ Deno.serve(async (req: Request) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
-  } catch (error) {
-    console.error("Error creating checkout:", error);
+  } catch (err) {
+    console.error("Checkout error:", err);
     return new Response(
       JSON.stringify({
-        error: error instanceof Error ? error.message : "Internal server error",
+        error: err instanceof Error ? err.message : "Internal server error",
       }),
       {
         status: 500,
