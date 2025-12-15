@@ -1,3 +1,5 @@
+console.log('!!! FINAL ATTEMPT SCRIPT LOADED !!!');
+
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
