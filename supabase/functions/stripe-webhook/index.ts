@@ -34,7 +34,7 @@ async function verifyStripeSignature(body: string, signature: string): Promise<a
     encoder.encode(STRIPE_WEBHOOK_SECRET),
     { name: "HMAC", hash: "SHA-256" },
     false,
-    ["verify"]
+    ["sign"]
   );
 
   const parts = signature.split(",");
