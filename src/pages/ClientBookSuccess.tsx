@@ -13,6 +13,27 @@ export default function ClientBookSuccess() {
   const [debugError, setDebugError] = useState('');
   const [appointment, setAppointment] = useState<any>(null);
 
+  // DEBUG HEADER: Always-on-top visual proof of cache bust
+  const DebugHeader = () => (
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100%',
+        background: 'red',
+        color: 'white',
+        zIndex: 99999,
+        textAlign: 'center',
+        padding: '10px',
+        fontWeight: 'bold',
+        fontSize: '16px',
+      }}
+    >
+      DEBUG MODE: V150 - CACHE BUSTED
+    </div>
+  );
+
   useEffect(() => {
     console.log('SUCCESS PAGE: Component mounted, starting load...');
     loadSuccessScreen();
@@ -31,8 +52,12 @@ export default function ClientBookSuccess() {
 
   const loadSuccessScreen = async () => {
     console.log('STEP 0: loadSuccessScreen called');
-    const sessionId = searchParams.get('session_id');
+    // BILINGUAL PARAMETER: Check both 'sid' (cache-bust test) and 'session_id' (Stripe real)
+    const sessionId = searchParams.get('sid') || searchParams.get('session_id');
     const appointmentId = searchParams.get('appointment_id');
+
+    // TRUTH LOG: Show exactly which parameter was detected
+    console.log('Detected ID:', sessionId, '(via', searchParams.get('sid') ? 'sid' : 'session_id', ')');
     console.log('STEP 1: Starting Fetch for Session ID:', sessionId);
     console.log('STEP 1B: Appointment ID:', appointmentId);
 
@@ -108,8 +133,9 @@ export default function ClientBookSuccess() {
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
+        <DebugHeader />
         <ClientHeader />
-        <div style={{ textAlign: 'center', padding: '4rem' }}>
+        <div style={{ textAlign: 'center', padding: '4rem', marginTop: '50px' }}>
           <div style={{ fontSize: '24px', marginBottom: '1rem' }}>
             {language === 'en' ? 'Confirming payment...' : 'Confirmando pago...'}
           </div>
@@ -124,8 +150,9 @@ export default function ClientBookSuccess() {
   if (debugError) {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
+        <DebugHeader />
         <ClientHeader />
-        <div style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem 1rem' }}>
+        <div style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem 1rem', marginTop: '50px' }}>
           <div
             style={{
               backgroundColor: '#ff4444',
@@ -183,8 +210,9 @@ export default function ClientBookSuccess() {
   if (error) {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
+        <DebugHeader />
         <ClientHeader />
-        <div style={{ maxWidth: '600px', margin: '0 auto', padding: '2rem 1rem' }}>
+        <div style={{ maxWidth: '600px', margin: '0 auto', padding: '2rem 1rem', marginTop: '50px' }}>
           <div
             style={{
               backgroundColor: '#fee',
@@ -223,14 +251,15 @@ export default function ClientBookSuccess() {
   }
 
   const appointmentDate = appointment ? new Date(appointment.scheduled_start) : null;
-  const sessionId = searchParams.get('session_id');
+  const sessionId = searchParams.get('sid') || searchParams.get('session_id');
   const isDevBypass = sessionId === 'dev_bypass_test';
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5', display: 'flex', flexDirection: 'column' }}>
+      <DebugHeader />
       <ClientHeader />
 
-      <main style={{ maxWidth: '600px', margin: '0 auto', padding: '2rem 1rem' }}>
+      <main style={{ maxWidth: '600px', margin: '0 auto', padding: '2rem 1rem', marginTop: '50px' }}>
         <div
           style={{
             backgroundColor: 'white',

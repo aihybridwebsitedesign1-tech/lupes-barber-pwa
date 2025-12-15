@@ -519,8 +519,8 @@ export default function ClientBook() {
 
       const result = await response.json();
 
-      // Redirect to success page with dev bypass session
-      navigate(`/client/success?session_id=dev_bypass_test&appointment_id=${result.appointmentId}`);
+      // Redirect to success page with dev bypass session (using 'sid' for cache-bust)
+      navigate(`/client/success?sid=dev_bypass_test&appointment_id=${result.appointmentId}`);
     } catch (err: any) {
       console.error('Error creating dev bypass appointment:', err);
       setError(language === 'en' ? 'Failed to create appointment' : 'Error al crear la cita');
