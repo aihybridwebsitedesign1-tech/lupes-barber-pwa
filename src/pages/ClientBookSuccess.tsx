@@ -63,6 +63,39 @@ export default function ClientBookSuccess() {
     console.log('STEP 1: Starting Fetch for Session ID:', sessionId);
     console.log('STEP 1B: Appointment ID:', appointmentId);
 
+    // DEV BYPASS MODE: Immediate render with mock data (no async operations)
+    if (sessionId === 'dev_bypass_test') {
+      console.log('🟢 DEV BYPASS MODE ACTIVATED - Rendering immediately with mock data');
+
+      // Set mock appointment data
+      const mockAppointment = {
+        id: 'dev-test-123',
+        scheduled_start: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // Tomorrow
+        amount_paid: 25.00,
+        amount_due: 25.00,
+        service: {
+          name_en: 'Test Service (Dev Mode)',
+          name_es: 'Servicio de Prueba (Modo Dev)',
+        },
+        barber: {
+          name: 'Test Barber (Dev Mode)',
+        },
+        client: {
+          name: 'Test Client',
+          phone: '555-0000',
+        },
+      };
+
+      console.log('🟢 Setting mock appointment data:', mockAppointment);
+      setAppointment(mockAppointment);
+
+      console.log('🟢 Setting loading to FALSE');
+      setLoading(false);
+
+      console.log('🟢 DEV BYPASS COMPLETE - Success page should render now');
+      return; // Exit early, skip all async logic
+    }
+
     // EMERGENCY FIX: Trust the URL - if session_id exists, show success immediately
     if (!sessionId) {
       console.log('STEP 1C: No session ID found, showing error');
