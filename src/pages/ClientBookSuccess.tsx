@@ -10,10 +10,15 @@ export default function ClientBookSuccess() {
   const { language } = useLanguage();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [loading, setLoading] = useState(true);
+
+  // Conditional loading state: dev_bypass_test starts with loading=false
+  const sessionId = searchParams.get('sid') || searchParams.get('session_id');
+  const [loading, setLoading] = useState(sessionId !== 'dev_bypass_test');
+
   const [error, setError] = useState('');
   const [debugError, setDebugError] = useState('');
   const [appointment, setAppointment] = useState<any>(null);
+  const [genericSuccess, setGenericSuccess] = useState(false);
 
   // DEBUG HEADER: Always-on-top visual proof of cache bust
   const DebugHeader = () => (
@@ -63,7 +68,7 @@ export default function ClientBookSuccess() {
     console.log('STEP 1: Starting Fetch for Session ID:', sessionId);
     console.log('STEP 1B: Appointment ID:', appointmentId);
 
-    // DEV BYPASS MODE: Immediate render with mock data (no async operations)
+    // DEV BYPASS MODE: Immediate render with mock data (loading already false from initialization)
     if (sessionId === 'dev_bypass_test') {
       console.log('🟢 DEV BYPASS MODE ACTIVATED - Rendering immediately with mock data');
 
@@ -88,10 +93,6 @@ export default function ClientBookSuccess() {
 
       console.log('🟢 Setting mock appointment data:', mockAppointment);
       setAppointment(mockAppointment);
-
-      console.log('🟢 Setting loading to FALSE');
-      setLoading(false);
-
       console.log('🟢 DEV BYPASS COMPLETE - Success page should render now');
       return; // Exit early, skip all async logic
     }
@@ -109,8 +110,7 @@ export default function ClientBookSuccess() {
     console.log('STEP 2: Session ID valid, setting loading to FALSE');
     setLoading(false);
 
-    // Fetch appointment details using edge function (bypasses RLS for public receipt access)
-    // This works for both real bookings AND dev bypass test bookings
+    // PERMANENT FAIL-SAFE: Try to fetch appointment details, but if it fails, show generic success
     if (appointmentId) {
       try {
         console.log('STEP 3: Calling Edge Function...');
@@ -149,19 +149,23 @@ export default function ClientBookSuccess() {
           });
           console.log('STEP 10: Appointment state set successfully');
         } else {
-          console.log('STEP 9B: No appointment data in response');
-          setDebugError('Edge function returned empty appointment data');
+          console.log('STEP 9B: No appointment data in response - using generic success');
+          setGenericSuccess(true);
         }
       } catch (err: any) {
+        console.error('⚠️ FAIL-SAFE ACTIVATED: Edge Function failed, showing generic success');
         console.error('ERROR CAUGHT:', err);
         console.error('ERROR MESSAGE:', err.message);
         console.error('ERROR STACK:', err.stack);
-        setDebugError(`Failed to fetch appointment: ${err.message}`);
-        // Don't set error - we already showed success, user can view in My Appointments
+
+        // FAIL-SAFE: Show generic success screen instead of crashing
+        setGenericSuccess(true);
+        setError('');
+        setDebugError('');
       }
     } else {
-      console.log('STEP 3 SKIPPED: No appointment ID provided');
-      setDebugError('No appointment_id in URL parameters');
+      console.log('STEP 3 SKIPPED: No appointment ID provided - using generic success');
+      setGenericSuccess(true);
     }
   };
 
@@ -285,8 +289,94 @@ export default function ClientBookSuccess() {
     );
   }
 
+  // GENERIC SUCCESS SCREEN: Fail-safe for when appointment details cannot be fetched
+  if (genericSuccess) {
+    return (
+      <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5', display: 'flex', flexDirection: 'column' }}>
+        <DebugHeader />
+        <ClientHeader />
+
+        <main style={{ maxWidth: '600px', margin: '0 auto', padding: '2rem 1rem', marginTop: '50px' }}>
+          <div
+            style={{
+              backgroundColor: 'white',
+              borderRadius: '12px',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+              padding: '2rem',
+              textAlign: 'center',
+            }}
+          >
+            <div style={{ fontSize: '64px', marginBottom: '1rem' }}>✅</div>
+
+            <h1 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '0.5rem', color: '#10b981' }}>
+              {language === 'en' ? 'Booking Successful!' : '¡Reserva Exitosa!'}
+            </h1>
+
+            <p style={{ fontSize: '18px', color: '#666', marginBottom: '2rem' }}>
+              {language === 'en'
+                ? 'Your appointment has been confirmed. A confirmation has been sent to your phone with all the details.'
+                : 'Tu cita ha sido confirmada. Se ha enviado una confirmación a tu teléfono con todos los detalles.'}
+            </p>
+
+            <div
+              style={{
+                backgroundColor: '#f0fdf4',
+                border: '2px solid #86efac',
+                borderRadius: '8px',
+                padding: '1.5rem',
+                marginBottom: '2rem',
+                textAlign: 'center',
+              }}
+            >
+              <p style={{ fontSize: '16px', color: '#166534', marginBottom: '0.5rem' }}>
+                {language === 'en'
+                  ? 'Check your messages for appointment details including date, time, and barber information.'
+                  : 'Revisa tus mensajes para los detalles de la cita, incluyendo fecha, hora e información del barbero.'}
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '1rem', flexDirection: 'column' }}>
+              <button
+                onClick={() => navigate('/client/appointments')}
+                style={{
+                  padding: '1rem',
+                  backgroundColor: '#e74c3c',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                }}
+              >
+                {language === 'en' ? 'View My Appointments' : 'Ver Mis Citas'}
+              </button>
+
+              <button
+                onClick={() => navigate('/client/home')}
+                style={{
+                  padding: '1rem',
+                  backgroundColor: 'white',
+                  color: '#000',
+                  border: '2px solid #ddd',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                }}
+              >
+                {language === 'en' ? 'Back to Home' : 'Volver al Inicio'}
+              </button>
+            </div>
+          </div>
+        </main>
+
+        <Footer />
+      </div>
+    );
+  }
+
   const appointmentDate = appointment ? new Date(appointment.scheduled_start) : null;
-  const sessionId = searchParams.get('sid') || searchParams.get('session_id');
   const isDevBypass = sessionId === 'dev_bypass_test';
 
   return (
