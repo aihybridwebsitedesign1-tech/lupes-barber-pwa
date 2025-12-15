@@ -283,11 +283,12 @@ export default function OwnerSettings() {
         .filter(p => !isNaN(p) && p > 0)
         .slice(0, 5);
 
+      // For JSONB columns, pass the array directly (not JSON.stringify)
       const { error: updateError } = await supabase
         .from('shop_config')
         .update({
           enable_tipping: enableTipping,
-          tip_percentage_presets: JSON.stringify(percentages),
+          tip_percentage_presets: percentages,
         })
         .eq('id', config?.id || 1);
 

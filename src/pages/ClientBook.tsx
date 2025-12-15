@@ -260,10 +260,23 @@ export default function ClientBook() {
           });
 
           // Load payment settings for accurate preview
+          // Parse tip_percentage_presets if it's a JSON string, ensure it's always an array
+          let tipPresetsArray = [15, 18, 20];
+          try {
+            const rawPresets = shopConfigFull.data.tip_percentage_presets;
+            if (Array.isArray(rawPresets)) {
+              tipPresetsArray = rawPresets;
+            } else if (typeof rawPresets === 'string') {
+              tipPresetsArray = JSON.parse(rawPresets);
+            }
+          } catch (err) {
+            console.error('Error parsing tip presets:', err);
+          }
+
           setShopSettings({
             tax_rate: Number(shopConfigFull.data.tax_rate || 0),
             card_processing_fee_rate: Number(shopConfigFull.data.card_processing_fee_rate || 0),
-            tip_percentage_presets: shopConfigFull.data.tip_percentage_presets || [15, 18, 20],
+            tip_percentage_presets: Array.isArray(tipPresetsArray) ? tipPresetsArray : [15, 18, 20],
             enable_tipping: shopConfigFull.data.enable_tipping ?? true
           });
 
@@ -447,6 +460,95 @@ export default function ClientBook() {
   const handleBack = () => {
     setError('');
     setStep(step - 1);
+  };
+
+  const handleDevBypass = async () => {
+    // DEV BYPASS: Create appointment with 'paid' status, then redirect to success page
+    setSubmitting(true);
+    setError('');
+
+    try {
+      // Validate we have all required fields
+      if (!selectedBarber || !selectedService || !selectedDate || !selectedTime || !clientName || !clientPhone) {
+        throw new Error('Missing required booking information');
+      }
+
+      // Create or find client
+      let clientId = null;
+      const { data: existingClients } = await supabase
+        .from('clients')
+        .select('id')
+        .eq('phone', clientPhone)
+        .maybeSingle();
+
+      if (existingClients) {
+        clientId = existingClients.id;
+      } else {
+        const nameParts = clientName.trim().split(' ');
+        const firstName = nameParts[0];
+        const lastName = nameParts.slice(1).join(' ') || firstName;
+
+        const { data: newClient, error: clientError } = await supabase
+          .from('clients')
+          .insert({
+            first_name: firstName,
+            last_name: lastName,
+            phone: clientPhone,
+            notes: clientNotes || null,
+          })
+          .select('id')
+          .single();
+
+        if (clientError) throw clientError;
+        clientId = newClient.id;
+      }
+
+      const selectedServiceData = services.find(s => s.id === selectedService);
+      const servicePrice = selectedServiceData?.base_price || 0;
+      const tipAmount = tipPercentage > 0
+        ? (servicePrice * tipPercentage / 100)
+        : (customTip ? parseFloat(customTip) : 0);
+
+      const taxRate = shopSettings?.tax_rate || 0;
+      const feeRate = shopSettings?.card_processing_fee_rate || 0;
+      const subtotal = servicePrice + tipAmount;
+      const tax = subtotal * (taxRate / 100);
+      const stripeFee = (subtotal + tax) * feeRate;
+      const grandTotal = subtotal + tax + stripeFee;
+
+      const selectedSlot = timeSlots.find(slot => slot.start === selectedTime);
+      const appointmentStart = selectedTime;
+      const appointmentEnd = selectedSlot?.end || new Date(new Date(selectedTime).getTime() + (selectedServiceData?.duration_minutes || 30) * 60000).toISOString();
+
+      // Create appointment with 'paid' status for dev bypass
+      const { data: newAppointment, error: appointmentError } = await supabase
+        .from('appointments')
+        .insert({
+          barber_id: selectedBarber,
+          client_id: clientId,
+          service_id: selectedService,
+          scheduled_start: appointmentStart,
+          scheduled_end: appointmentEnd,
+          status: 'booked',
+          notes: clientNotes || null,
+          source: 'client_web',
+          payment_status: 'paid',
+          amount_due: grandTotal,
+          amount_paid: grandTotal,
+          is_test: true,
+        })
+        .select('id')
+        .single();
+
+      if (appointmentError) throw appointmentError;
+
+      // Redirect to success page with dev bypass session and appointment ID
+      navigate(`/client/success?session_id=dev_bypass_test&appointment_id=${newAppointment.id}`);
+    } catch (err: any) {
+      console.error('Error creating dev bypass appointment:', err);
+      setError(language === 'en' ? 'Failed to create appointment' : 'Error al crear la cita');
+      setSubmitting(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -877,7 +979,7 @@ export default function ClientBook() {
             // Note: feeRate is stored as decimal (e.g., 0.04 = 4%)
             const taxRate = shopSettings?.tax_rate || 0;
             const feeRate = shopSettings?.card_processing_fee_rate || 0;
-            const tipPresets = shopSettings?.tip_percentage_presets || [15, 18, 20];
+            const tipPresets = (Array.isArray(shopSettings?.tip_percentage_presets) ? shopSettings.tip_percentage_presets : [15, 18, 20]);
 
             const subtotal = servicePrice + tipAmount;
             const tax = subtotal * (taxRate / 100);
@@ -1114,7 +1216,8 @@ export default function ClientBook() {
                 {/* DEV BYPASS: Simulate success without paying - ALWAYS VISIBLE FOR TESTING */}
                 {stripeEnabled && !testMode && (
                   <button
-                    onClick={() => navigate('/client/success?session_id=dev_bypass_test')}
+                    onClick={handleDevBypass}
+                    disabled={submitting}
                     style={{
                       width: '100%',
                       padding: '0.75rem',
