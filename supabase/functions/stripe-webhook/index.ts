@@ -103,25 +103,38 @@ Deno.serve(async (req: Request) => {
       const paymentIntent = event.data.object;
       const appointmentId = paymentIntent.metadata?.appointment_id;
 
+      console.log(`[Stripe Webhook] ===== PAYMENT INTENT SUCCEEDED =====`);
+      console.log(`[Stripe Webhook] Payment Intent ID: ${paymentIntent.id}`);
+      console.log(`[Stripe Webhook] Appointment ID from metadata: ${appointmentId}`);
+      console.log(`[Stripe Webhook] Amount received: ${paymentIntent.amount_received}`);
+
       if (appointmentId) {
-        const amountPaid = paymentIntent.amount_received / 100;
+        try {
+          const amountPaid = paymentIntent.amount_received / 100;
 
-        const { error: updateError } = await supabase
-          .from("appointments")
-          .update({
-            payment_status: "paid",
-            payment_provider: "stripe",
-            stripe_payment_intent_id: paymentIntent.id,
-            amount_paid: amountPaid,
-            paid_at: new Date().toISOString(),
-          })
-          .eq("id", appointmentId);
+          console.log(`[Stripe Webhook] Updating appointment ${appointmentId} to paid...`);
 
-        if (updateError) {
-          console.error("[Stripe Webhook] Error updating appointment:", updateError);
-        } else {
-          console.log(`[Stripe Webhook] Payment confirmed for appointment ${appointmentId}`);
+          const { error: updateError } = await supabase
+            .from("appointments")
+            .update({
+              payment_status: "paid",
+              payment_provider: "stripe",
+              stripe_payment_intent_id: paymentIntent.id,
+              amount_paid: amountPaid,
+              paid_at: new Date().toISOString(),
+            })
+            .eq("id", appointmentId);
+
+          if (updateError) {
+            console.error(`[Stripe Webhook] ❌ ERROR updating appointment:`, JSON.stringify(updateError));
+          } else {
+            console.log(`[Stripe Webhook] ✅ Payment confirmed for appointment ${appointmentId}`);
+          }
+        } catch (error) {
+          console.error(`[Stripe Webhook] ❌ EXCEPTION in payment_intent.succeeded:`, error);
         }
+      } else {
+        console.log(`[Stripe Webhook] No appointment_id in payment intent metadata`);
       }
     }
 
@@ -129,8 +142,13 @@ Deno.serve(async (req: Request) => {
       const paymentIntent = event.data.object;
       const appointmentId = paymentIntent.metadata?.appointment_id;
 
+      console.log(`[Stripe Webhook] ===== PAYMENT INTENT FAILED =====`);
+      console.log(`[Stripe Webhook] Payment Intent ID: ${paymentIntent.id}`);
+      console.log(`[Stripe Webhook] Appointment ID: ${appointmentId}`);
+      console.log(`[Stripe Webhook] Failure reason:`, paymentIntent.last_payment_error);
+
       if (appointmentId) {
-        console.log(`[Stripe Webhook] Payment failed for appointment ${appointmentId}`);
+        console.log(`[Stripe Webhook] ⚠️ Payment failed for appointment ${appointmentId}`);
       }
     }
 
@@ -138,18 +156,29 @@ Deno.serve(async (req: Request) => {
       const charge = event.data.object;
       const paymentIntentId = charge.payment_intent;
 
-      if (paymentIntentId) {
-        const { error: updateError } = await supabase
-          .from("appointments")
-          .update({
-            payment_status: "refunded",
-          })
-          .eq("stripe_payment_intent_id", paymentIntentId);
+      console.log(`[Stripe Webhook] ===== CHARGE REFUNDED =====`);
+      console.log(`[Stripe Webhook] Charge ID: ${charge.id}`);
+      console.log(`[Stripe Webhook] Payment Intent ID: ${paymentIntentId}`);
+      console.log(`[Stripe Webhook] Refund amount: ${charge.amount_refunded}`);
 
-        if (updateError) {
-          console.error("[Stripe Webhook] Error updating refund:", updateError);
-        } else {
-          console.log(`[Stripe Webhook] Refund processed for payment intent ${paymentIntentId}`);
+      if (paymentIntentId) {
+        try {
+          console.log(`[Stripe Webhook] Updating appointment to refunded status...`);
+
+          const { error: updateError } = await supabase
+            .from("appointments")
+            .update({
+              payment_status: "refunded",
+            })
+            .eq("stripe_payment_intent_id", paymentIntentId);
+
+          if (updateError) {
+            console.error(`[Stripe Webhook] ❌ ERROR updating refund:`, JSON.stringify(updateError));
+          } else {
+            console.log(`[Stripe Webhook] ✅ Refund processed for payment intent ${paymentIntentId}`);
+          }
+        } catch (error) {
+          console.error(`[Stripe Webhook] ❌ EXCEPTION in charge.refunded:`, error);
         }
       }
     }
@@ -158,49 +187,91 @@ Deno.serve(async (req: Request) => {
       const session = event.data.object;
       const appointmentId = session.metadata?.appointment_id;
 
+      console.log(`[Stripe Webhook] ===== CHECKOUT SESSION COMPLETED =====`);
+      console.log(`[Stripe Webhook] Session ID: ${session.id}`);
+      console.log(`[Stripe Webhook] Appointment ID from metadata: ${appointmentId}`);
+      console.log(`[Stripe Webhook] Session metadata:`, JSON.stringify(session.metadata));
+      console.log(`[Stripe Webhook] Amount total: ${session.amount_total}`);
+      console.log(`[Stripe Webhook] Payment intent: ${session.payment_intent}`);
+
       if (appointmentId) {
-        const { data: existing } = await supabase
-          .from("appointments")
-          .select("payment_status, client_id")
-          .eq("id", appointmentId)
-          .maybeSingle();
+        try {
+          console.log(`[Stripe Webhook] STEP 1: Querying for existing appointment ${appointmentId}...`);
 
-        if (existing?.payment_status === "paid") {
-          console.log(`[Stripe Webhook] Appointment ${appointmentId} already paid, skipping`);
-        } else {
-          const amountPaid = (session.amount_total || 0) / 100;
-
-          const { error: updateError } = await supabase
+          const { data: existing, error: fetchError } = await supabase
             .from("appointments")
-            .update({
+            .select("payment_status, client_id")
+            .eq("id", appointmentId)
+            .maybeSingle();
+
+          if (fetchError) {
+            console.error(`[Stripe Webhook] ❌ ERROR fetching appointment:`, fetchError);
+            throw fetchError;
+          }
+
+          console.log(`[Stripe Webhook] STEP 2: Existing appointment data:`, JSON.stringify(existing));
+
+          if (existing?.payment_status === "paid") {
+            console.log(`[Stripe Webhook] ✅ Appointment ${appointmentId} already paid, skipping update`);
+          } else if (existing) {
+            const amountPaid = (session.amount_total || 0) / 100;
+
+            console.log(`[Stripe Webhook] STEP 3: Updating appointment to paid status...`);
+            console.log(`[Stripe Webhook] Update payload:`, {
               payment_status: "paid",
               payment_provider: "stripe",
               stripe_payment_intent_id: session.payment_intent,
               amount_paid: amountPaid,
               paid_at: new Date().toISOString(),
-            })
-            .eq("id", appointmentId);
+            });
 
-          if (updateError) {
-            console.error("[Stripe Webhook] Error updating appointment:", updateError);
-          } else {
-            console.log(`[Stripe Webhook] Checkout completed for appointment ${appointmentId}`);
+            const { error: updateError } = await supabase
+              .from("appointments")
+              .update({
+                payment_status: "paid",
+                payment_provider: "stripe",
+                stripe_payment_intent_id: session.payment_intent,
+                amount_paid: amountPaid,
+                paid_at: new Date().toISOString(),
+              })
+              .eq("id", appointmentId);
+
+            if (updateError) {
+              console.error(`[Stripe Webhook] ❌ ERROR updating appointment:`, JSON.stringify(updateError));
+              throw updateError;
+            }
+
+            console.log(`[Stripe Webhook] ✅ STEP 4: Appointment ${appointmentId} successfully updated to paid`);
 
             if (existing?.client_id) {
+              console.log(`[Stripe Webhook] STEP 5: Updating client analytics for client ${existing.client_id}...`);
+
               const { error: clientUpdateError } = await supabase.rpc(
                 "increment_client_visits",
                 { client_id_param: existing.client_id }
               );
 
               if (clientUpdateError) {
-                console.error("[Stripe Webhook] Error updating client analytics:", clientUpdateError);
+                console.error(`[Stripe Webhook] ⚠️ WARNING: Error updating client analytics:`, JSON.stringify(clientUpdateError));
               } else {
-                console.log(`[Stripe Webhook] Client analytics updated for client ${existing.client_id}`);
+                console.log(`[Stripe Webhook] ✅ STEP 6: Client analytics updated successfully`);
               }
+            } else {
+              console.log(`[Stripe Webhook] STEP 5: No client_id found, skipping analytics update`);
             }
+          } else {
+            console.error(`[Stripe Webhook] ❌ CRITICAL: Appointment ${appointmentId} NOT FOUND in database`);
+            console.error(`[Stripe Webhook] This means the appointment was never created before checkout!`);
           }
+        } catch (error) {
+          console.error(`[Stripe Webhook] ❌❌❌ FATAL ERROR in checkout.session.completed handler:`, error);
+          console.error(`[Stripe Webhook] Error details:`, JSON.stringify(error, null, 2));
         }
+      } else {
+        console.error(`[Stripe Webhook] ❌ No appointment_id in session metadata!`);
       }
+
+      console.log(`[Stripe Webhook] ===== CHECKOUT SESSION COMPLETED HANDLER FINISHED =====`);
     }
 
     return new Response(
