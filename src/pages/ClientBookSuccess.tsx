@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import ClientHeader from '../components/ClientHeader';
 import Footer from '../components/Footer';
@@ -19,6 +18,7 @@ export default function ClientBookSuccess() {
 
   const loadSuccessScreen = async () => {
     const sessionId = searchParams.get('session_id');
+    const appointmentId = searchParams.get('appointment_id');
 
     // EMERGENCY FIX: Trust the URL - if session_id exists, show success immediately
     if (!sessionId) {
@@ -27,61 +27,40 @@ export default function ClientBookSuccess() {
       return;
     }
 
-    // DEV BYPASS SAFE MODE: Show static success message without any DB queries
-    if (sessionId === 'dev_bypass_test') {
-      setLoading(false);
-      // Set a static success state without querying the database
-      setAppointment(null);
-      return;
-    }
-
     // Immediately show success - we trust that Stripe sent them here
     setLoading(false);
 
-    // CLIENT-SIDE MARK AS PAID (webhook fallback)
-    // Since we don't have webhooks working, update payment status here
-    const appointmentId = searchParams.get('appointment_id');
+    // Fetch appointment details using edge function (bypasses RLS for public receipt access)
+    // This works for both real bookings AND dev bypass test bookings
     if (appointmentId) {
       try {
-        // First, fetch the appointment to get amount_due
-        const { data: apt, error: aptError } = await supabase
-          .from('appointments')
-          .select(`
-            id,
-            scheduled_start,
-            amount_due,
-            payment_status,
-            client:client_id (first_name, last_name),
-            service:service_id (name_en, name_es),
-            barber:barber_id (name),
-            amount_paid
-          `)
-          .eq('id', appointmentId)
-          .maybeSingle();
+        const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-appointment-receipt?appointment_id=${appointmentId}`;
+        const headers = {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        };
 
-        if (!aptError && apt) {
-          // Mark as paid if currently unpaid
-          if (apt.payment_status === 'unpaid') {
-            await supabase
-              .from('appointments')
-              .update({
-                payment_status: 'paid',
-                amount_paid: apt.amount_due
-              })
-              .eq('id', appointmentId);
-          }
+        const response = await fetch(apiUrl, { headers });
 
+        if (!response.ok) {
+          throw new Error('Failed to fetch appointment details');
+        }
+
+        const result = await response.json();
+        const apt = result.appointment;
+
+        if (apt) {
           setAppointment({
             ...apt,
-            amount_paid: apt.amount_due,
+            amount_paid: apt.amount_paid || apt.amount_due,
             client: Array.isArray(apt.client) ? apt.client[0] : apt.client,
             service: Array.isArray(apt.service) ? apt.service[0] : apt.service,
             barber: Array.isArray(apt.barber) ? apt.barber[0] : apt.barber,
           });
         }
       } catch (err) {
-        console.error('Error processing payment confirmation:', err);
-        // Don't set error - we already showed success
+        console.error('Error fetching appointment receipt:', err);
+        // Don't set error - we already showed success, user can view in My Appointments
       }
     }
   };
