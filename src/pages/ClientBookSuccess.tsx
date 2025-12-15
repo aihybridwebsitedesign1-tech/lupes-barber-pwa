@@ -71,66 +71,65 @@ export default function ClientBookSuccess() {
       return;
     }
 
-    // Immediately show success - we trust that Stripe sent them here
-    console.log('STEP 2: Session ID valid, setting loading to FALSE');
-    setLoading(false);
-
-    // PERMANENT FAIL-SAFE: Try to fetch appointment details, but if it fails, show generic success
+    // SMART POLLING: Wait for Stripe webhook to complete
     if (appointmentId) {
-      try {
-        console.log('STEP 3: Calling Edge Function...');
-        const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-appointment-receipt?appointment_id=${appointmentId}`;
-        console.log('STEP 3B: API URL:', apiUrl);
-        const headers = {
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-        };
-        console.log('STEP 3C: Headers prepared (ANON_KEY present:', !!import.meta.env.VITE_SUPABASE_ANON_KEY, ')');
+      console.log('STEP 2: Starting smart polling for appointment:', appointmentId);
+      const maxAttempts = 15;
+      const pollInterval = 2000;
+      let attempts = 0;
 
-        console.log('STEP 4: Fetching...');
-        const response = await fetch(apiUrl, { headers });
-        console.log('STEP 5: Response received, status:', response.status);
+      while (attempts < maxAttempts) {
+        attempts++;
+        console.log(`POLL ATTEMPT ${attempts}/${maxAttempts}`);
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.log('STEP 5B: Response not OK, error text:', errorText);
-          throw new Error(`Failed to fetch appointment details: ${response.status} - ${errorText}`);
+        try {
+          const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-appointment-receipt?appointment_id=${appointmentId}`;
+          const headers = {
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+          };
+
+          const response = await fetch(apiUrl, { headers });
+
+          if (response.ok) {
+            const result = await response.json();
+            const apt = result.appointment;
+
+            if (apt && apt.payment_status === 'paid') {
+              console.log('✅ PAYMENT CONFIRMED - Appointment found and paid');
+              setAppointment({
+                ...apt,
+                amount_paid: apt.amount_paid || apt.amount_due,
+                client: Array.isArray(apt.client) ? apt.client[0] : apt.client,
+                service: Array.isArray(apt.service) ? apt.service[0] : apt.service,
+                barber: Array.isArray(apt.barber) ? apt.barber[0] : apt.barber,
+              });
+              setLoading(false);
+              return;
+            } else if (apt) {
+              console.log(`⏳ Appointment found but payment_status is: ${apt.payment_status} - continuing to poll...`);
+            } else {
+              console.log('⏳ Appointment not found yet - continuing to poll...');
+            }
+          } else {
+            console.log(`⏳ Response not OK (${response.status}) - continuing to poll...`);
+          }
+        } catch (err: any) {
+          console.log('⏳ Fetch error - continuing to poll...', err.message);
         }
 
-        console.log('STEP 6: Parsing JSON...');
-        const result = await response.json();
-        console.log('STEP 7: Edge Function returned:', result);
-        const apt = result.appointment;
-        console.log('STEP 8: Appointment data:', apt);
-
-        if (apt) {
-          console.log('STEP 9: Setting appointment state');
-          setAppointment({
-            ...apt,
-            amount_paid: apt.amount_paid || apt.amount_due,
-            client: Array.isArray(apt.client) ? apt.client[0] : apt.client,
-            service: Array.isArray(apt.service) ? apt.service[0] : apt.service,
-            barber: Array.isArray(apt.barber) ? apt.barber[0] : apt.barber,
-          });
-          console.log('STEP 10: Appointment state set successfully');
-        } else {
-          console.log('STEP 9B: No appointment data in response - using generic success');
-          setGenericSuccess(true);
+        if (attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, pollInterval));
         }
-      } catch (err: any) {
-        console.error('⚠️ FAIL-SAFE ACTIVATED: Edge Function failed, showing generic success');
-        console.error('ERROR CAUGHT:', err);
-        console.error('ERROR MESSAGE:', err.message);
-        console.error('ERROR STACK:', err.stack);
-
-        // FAIL-SAFE: Show generic success screen instead of crashing
-        setGenericSuccess(true);
-        setError('');
-        setDebugError('');
       }
-    } else {
-      console.log('STEP 3 SKIPPED: No appointment ID provided - using generic success');
+
+      console.log('⚠️ POLLING TIMEOUT - Showing generic success with processing message');
       setGenericSuccess(true);
+      setLoading(false);
+    } else {
+      console.log('STEP 2: No appointment ID provided - using generic success');
+      setGenericSuccess(true);
+      setLoading(false);
     }
   };
 
@@ -140,11 +139,12 @@ export default function ClientBookSuccess() {
         <DebugHeader />
         <ClientHeader />
         <div style={{ textAlign: 'center', padding: '4rem', marginTop: '50px' }}>
-          <div style={{ fontSize: '24px', marginBottom: '1rem' }}>
-            {language === 'en' ? 'Confirming payment...' : 'Confirmando pago...'}
+          <div style={{ fontSize: '48px', marginBottom: '1.5rem' }}>⏳</div>
+          <div style={{ fontSize: '24px', marginBottom: '1rem', fontWeight: '600' }}>
+            {language === 'en' ? 'Verifying Payment...' : 'Verificando Pago...'}
           </div>
           <div style={{ fontSize: '16px', color: '#666' }}>
-            {language === 'en' ? 'Please wait...' : 'Por favor espera...'}
+            {language === 'en' ? 'Please wait while we confirm your payment.' : 'Por favor espera mientras confirmamos tu pago.'}
           </div>
         </div>
       </div>

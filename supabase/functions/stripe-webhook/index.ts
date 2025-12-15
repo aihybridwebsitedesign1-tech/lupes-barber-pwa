@@ -161,7 +161,7 @@ Deno.serve(async (req: Request) => {
       if (appointmentId) {
         const { data: existing } = await supabase
           .from("appointments")
-          .select("payment_status")
+          .select("payment_status, client_id")
           .eq("id", appointmentId)
           .maybeSingle();
 
@@ -185,6 +185,19 @@ Deno.serve(async (req: Request) => {
             console.error("[Stripe Webhook] Error updating appointment:", updateError);
           } else {
             console.log(`[Stripe Webhook] Checkout completed for appointment ${appointmentId}`);
+
+            if (existing?.client_id) {
+              const { error: clientUpdateError } = await supabase.rpc(
+                "increment_client_visits",
+                { client_id_param: existing.client_id }
+              );
+
+              if (clientUpdateError) {
+                console.error("[Stripe Webhook] Error updating client analytics:", clientUpdateError);
+              } else {
+                console.log(`[Stripe Webhook] Client analytics updated for client ${existing.client_id}`);
+              }
+            }
           }
         }
       }
