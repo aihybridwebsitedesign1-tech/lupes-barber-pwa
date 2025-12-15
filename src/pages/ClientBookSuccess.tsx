@@ -10,46 +10,76 @@ export default function ClientBookSuccess() {
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [debugError, setDebugError] = useState('');
   const [appointment, setAppointment] = useState<any>(null);
 
   useEffect(() => {
+    console.log('SUCCESS PAGE: Component mounted, starting load...');
     loadSuccessScreen();
+
+    // 5-SECOND ESCAPE HATCH: Force stop loading after 5 seconds
+    const timeoutId = setTimeout(() => {
+      console.log('TIMEOUT: 5 seconds elapsed, forcing loading to stop');
+      setLoading(false);
+      setDebugError('TIMEOUT: Database or Edge Function took too long to respond (5 seconds).');
+    }, 5000);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
   }, []);
 
   const loadSuccessScreen = async () => {
+    console.log('STEP 0: loadSuccessScreen called');
     const sessionId = searchParams.get('session_id');
     const appointmentId = searchParams.get('appointment_id');
+    console.log('STEP 1: Starting Fetch for Session ID:', sessionId);
+    console.log('STEP 1B: Appointment ID:', appointmentId);
 
     // EMERGENCY FIX: Trust the URL - if session_id exists, show success immediately
     if (!sessionId) {
+      console.log('STEP 1C: No session ID found, showing error');
       setError(language === 'en' ? 'Invalid payment confirmation link.' : 'Enlace de confirmación de pago inválido.');
       setLoading(false);
+      setDebugError('No session_id in URL parameters');
       return;
     }
 
     // Immediately show success - we trust that Stripe sent them here
+    console.log('STEP 2: Session ID valid, setting loading to FALSE');
     setLoading(false);
 
     // Fetch appointment details using edge function (bypasses RLS for public receipt access)
     // This works for both real bookings AND dev bypass test bookings
     if (appointmentId) {
       try {
+        console.log('STEP 3: Calling Edge Function...');
         const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-appointment-receipt?appointment_id=${appointmentId}`;
+        console.log('STEP 3B: API URL:', apiUrl);
         const headers = {
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           'Content-Type': 'application/json',
         };
+        console.log('STEP 3C: Headers prepared (ANON_KEY present:', !!import.meta.env.VITE_SUPABASE_ANON_KEY, ')');
 
+        console.log('STEP 4: Fetching...');
         const response = await fetch(apiUrl, { headers });
+        console.log('STEP 5: Response received, status:', response.status);
 
         if (!response.ok) {
-          throw new Error('Failed to fetch appointment details');
+          const errorText = await response.text();
+          console.log('STEP 5B: Response not OK, error text:', errorText);
+          throw new Error(`Failed to fetch appointment details: ${response.status} - ${errorText}`);
         }
 
+        console.log('STEP 6: Parsing JSON...');
         const result = await response.json();
+        console.log('STEP 7: Edge Function returned:', result);
         const apt = result.appointment;
+        console.log('STEP 8: Appointment data:', apt);
 
         if (apt) {
+          console.log('STEP 9: Setting appointment state');
           setAppointment({
             ...apt,
             amount_paid: apt.amount_paid || apt.amount_due,
@@ -57,11 +87,21 @@ export default function ClientBookSuccess() {
             service: Array.isArray(apt.service) ? apt.service[0] : apt.service,
             barber: Array.isArray(apt.barber) ? apt.barber[0] : apt.barber,
           });
+          console.log('STEP 10: Appointment state set successfully');
+        } else {
+          console.log('STEP 9B: No appointment data in response');
+          setDebugError('Edge function returned empty appointment data');
         }
-      } catch (err) {
-        console.error('Error fetching appointment receipt:', err);
+      } catch (err: any) {
+        console.error('ERROR CAUGHT:', err);
+        console.error('ERROR MESSAGE:', err.message);
+        console.error('ERROR STACK:', err.stack);
+        setDebugError(`Failed to fetch appointment: ${err.message}`);
         // Don't set error - we already showed success, user can view in My Appointments
       }
+    } else {
+      console.log('STEP 3 SKIPPED: No appointment ID provided');
+      setDebugError('No appointment_id in URL parameters');
     }
   };
 
@@ -75,6 +115,65 @@ export default function ClientBookSuccess() {
           </div>
           <div style={{ fontSize: '16px', color: '#666' }}>
             {language === 'en' ? 'Please wait...' : 'Por favor espera...'}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (debugError) {
+    return (
+      <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
+        <ClientHeader />
+        <div style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem 1rem' }}>
+          <div
+            style={{
+              backgroundColor: '#ff4444',
+              border: '3px solid #cc0000',
+              borderRadius: '12px',
+              padding: '2rem',
+              textAlign: 'center',
+              color: 'white',
+            }}
+          >
+            <div style={{ fontSize: '64px', marginBottom: '1rem' }}>🔴</div>
+            <div style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '1rem' }}>
+              DEBUG ERROR
+            </div>
+            <div
+              style={{
+                fontSize: '16px',
+                marginBottom: '1.5rem',
+                backgroundColor: 'rgba(0,0,0,0.3)',
+                padding: '1rem',
+                borderRadius: '8px',
+                fontFamily: 'monospace',
+                wordBreak: 'break-word',
+                textAlign: 'left',
+              }}
+            >
+              {debugError}
+            </div>
+            <div style={{ fontSize: '14px', marginBottom: '1.5rem', opacity: 0.9 }}>
+              {language === 'en'
+                ? 'Check the browser console (F12) for detailed logs.'
+                : 'Revisa la consola del navegador (F12) para registros detallados.'}
+            </div>
+            <button
+              onClick={() => navigate('/client/home')}
+              style={{
+                padding: '0.75rem 1.5rem',
+                backgroundColor: 'white',
+                color: '#ff4444',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '16px',
+                fontWeight: 'bold',
+              }}
+            >
+              {language === 'en' ? 'Go Home' : 'Ir al Inicio'}
+            </button>
           </div>
         </div>
       </div>
