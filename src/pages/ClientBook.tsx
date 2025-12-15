@@ -463,7 +463,7 @@ export default function ClientBook() {
   };
 
   const handleDevBypass = async () => {
-    // DEV BYPASS: Create appointment with 'paid' status, then redirect to success page
+    // DEV BYPASS: Call edge function to create appointment with admin rights
     setSubmitting(true);
     setError('');
 
@@ -471,36 +471,6 @@ export default function ClientBook() {
       // Validate we have all required fields
       if (!selectedBarber || !selectedService || !selectedDate || !selectedTime || !clientName || !clientPhone) {
         throw new Error('Missing required booking information');
-      }
-
-      // Create or find client
-      let clientId = null;
-      const { data: existingClients } = await supabase
-        .from('clients')
-        .select('id')
-        .eq('phone', clientPhone)
-        .maybeSingle();
-
-      if (existingClients) {
-        clientId = existingClients.id;
-      } else {
-        const nameParts = clientName.trim().split(' ');
-        const firstName = nameParts[0];
-        const lastName = nameParts.slice(1).join(' ') || firstName;
-
-        const { data: newClient, error: clientError } = await supabase
-          .from('clients')
-          .insert({
-            first_name: firstName,
-            last_name: lastName,
-            phone: clientPhone,
-            notes: clientNotes || null,
-          })
-          .select('id')
-          .single();
-
-        if (clientError) throw clientError;
-        clientId = newClient.id;
       }
 
       const selectedServiceData = services.find(s => s.id === selectedService);
@@ -520,30 +490,37 @@ export default function ClientBook() {
       const appointmentStart = selectedTime;
       const appointmentEnd = selectedSlot?.end || new Date(new Date(selectedTime).getTime() + (selectedServiceData?.duration_minutes || 30) * 60000).toISOString();
 
-      // Create appointment with 'paid' status for dev bypass
-      const { data: newAppointment, error: appointmentError } = await supabase
-        .from('appointments')
-        .insert({
-          barber_id: selectedBarber,
-          client_id: clientId,
-          service_id: selectedService,
-          scheduled_start: appointmentStart,
-          scheduled_end: appointmentEnd,
-          status: 'booked',
-          notes: clientNotes || null,
-          source: 'client_web',
-          payment_status: 'paid',
-          amount_due: grandTotal,
-          amount_paid: grandTotal,
-          is_test: true,
-        })
-        .select('id')
-        .single();
+      // Call edge function to create appointment with admin rights
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-dev-appointment`;
+      const headers = {
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+      };
 
-      if (appointmentError) throw appointmentError;
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          clientName,
+          clientPhone,
+          clientNotes,
+          barberId: selectedBarber,
+          serviceId: selectedService,
+          appointmentStart,
+          appointmentEnd,
+          grandTotal,
+        }),
+      });
 
-      // Redirect to success page with dev bypass session and appointment ID
-      navigate(`/client/success?session_id=dev_bypass_test&appointment_id=${newAppointment.id}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create appointment');
+      }
+
+      const result = await response.json();
+
+      // Redirect to success page with dev bypass session
+      navigate(`/client/success?session_id=dev_bypass_test&appointment_id=${result.appointmentId}`);
     } catch (err: any) {
       console.error('Error creating dev bypass appointment:', err);
       setError(language === 'en' ? 'Failed to create appointment' : 'Error al crear la cita');

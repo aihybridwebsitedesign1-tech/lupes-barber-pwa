@@ -27,52 +27,11 @@ export default function ClientBookSuccess() {
       return;
     }
 
-    // DEV BYPASS: Handle dev_bypass_test immediately - show success without any delay
+    // DEV BYPASS SAFE MODE: Show static success message without any DB queries
     if (sessionId === 'dev_bypass_test') {
       setLoading(false);
-      // Mark appointment as paid for dev bypass (same as real payment)
-      const appointmentId = searchParams.get('appointment_id');
-      if (appointmentId) {
-        try {
-          const { data: apt } = await supabase
-            .from('appointments')
-            .select(`
-              id,
-              scheduled_start,
-              amount_due,
-              payment_status,
-              client:client_id (first_name, last_name),
-              service:service_id (name_en, name_es),
-              barber:barber_id (name),
-              amount_paid
-            `)
-            .eq('id', appointmentId)
-            .maybeSingle();
-
-          if (apt) {
-            // Mark as paid if currently unpaid (for dev bypass too)
-            if (apt.payment_status === 'unpaid') {
-              await supabase
-                .from('appointments')
-                .update({
-                  payment_status: 'paid',
-                  amount_paid: apt.amount_due
-                })
-                .eq('id', appointmentId);
-            }
-
-            setAppointment({
-              ...apt,
-              amount_paid: apt.amount_due,
-              client: Array.isArray(apt.client) ? apt.client[0] : apt.client,
-              service: Array.isArray(apt.service) ? apt.service[0] : apt.service,
-              barber: Array.isArray(apt.barber) ? apt.barber[0] : apt.barber,
-            });
-          }
-        } catch (err) {
-          console.error('Error loading dev bypass appointment:', err);
-        }
-      }
+      // Set a static success state without querying the database
+      setAppointment(null);
       return;
     }
 
@@ -186,6 +145,8 @@ export default function ClientBookSuccess() {
   }
 
   const appointmentDate = appointment ? new Date(appointment.scheduled_start) : null;
+  const sessionId = searchParams.get('session_id');
+  const isDevBypass = sessionId === 'dev_bypass_test';
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5', display: 'flex', flexDirection: 'column' }}>
@@ -204,13 +165,19 @@ export default function ClientBookSuccess() {
           <div style={{ fontSize: '64px', marginBottom: '1rem' }}>✅</div>
 
           <h1 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '0.5rem', color: '#10b981' }}>
-            {language === 'en' ? 'Payment Successful!' : '¡Pago Exitoso!'}
+            {isDevBypass
+              ? (language === 'en' ? 'Booking Successful (Simulation)' : 'Reserva Exitosa (Simulación)')
+              : (language === 'en' ? 'Payment Successful!' : '¡Pago Exitoso!')}
           </h1>
 
           <p style={{ fontSize: '18px', color: '#666', marginBottom: '2rem' }}>
-            {language === 'en'
-              ? 'Your appointment is confirmed and paid.'
-              : 'Tu cita está confirmada y pagada.'}
+            {isDevBypass
+              ? (language === 'en'
+                  ? 'Your test appointment has been created successfully.'
+                  : 'Tu cita de prueba ha sido creada exitosamente.')
+              : (language === 'en'
+                  ? 'Your appointment is confirmed and paid.'
+                  : 'Tu cita está confirmada y pagada.')}
           </p>
 
           {appointment && appointmentDate && (
