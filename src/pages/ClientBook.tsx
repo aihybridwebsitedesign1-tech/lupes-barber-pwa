@@ -462,72 +462,6 @@ export default function ClientBook() {
     setStep(step - 1);
   };
 
-  const handleDevBypass = async () => {
-    // DEV BYPASS: Call edge function to create appointment with admin rights
-    setSubmitting(true);
-    setError('');
-
-    try {
-      // Validate we have all required fields
-      if (!selectedBarber || !selectedService || !selectedDate || !selectedTime || !clientName || !clientPhone) {
-        throw new Error('Missing required booking information');
-      }
-
-      const selectedServiceData = services.find(s => s.id === selectedService);
-      const servicePrice = selectedServiceData?.base_price || 0;
-      const tipAmount = tipPercentage > 0
-        ? (servicePrice * tipPercentage / 100)
-        : (customTip ? parseFloat(customTip) : 0);
-
-      const taxRate = shopSettings?.tax_rate || 0;
-      const feeRate = shopSettings?.card_processing_fee_rate || 0;
-      const subtotal = servicePrice + tipAmount;
-      const tax = subtotal * (taxRate / 100);
-      const stripeFee = (subtotal + tax) * feeRate;
-      const grandTotal = subtotal + tax + stripeFee;
-
-      const selectedSlot = timeSlots.find(slot => slot.start === selectedTime);
-      const appointmentStart = selectedTime;
-      const appointmentEnd = selectedSlot?.end || new Date(new Date(selectedTime).getTime() + (selectedServiceData?.duration_minutes || 30) * 60000).toISOString();
-
-      // Call edge function to create appointment with admin rights
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-dev-appointment`;
-      const headers = {
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        'Content-Type': 'application/json',
-      };
-
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          clientName,
-          clientPhone,
-          clientNotes,
-          barberId: selectedBarber,
-          serviceId: selectedService,
-          appointmentStart,
-          appointmentEnd,
-          grandTotal,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create appointment');
-      }
-
-      const result = await response.json();
-
-      // Redirect to success page with dev bypass session (using 'sid' for cache-bust)
-      navigate(`/client/success?sid=dev_bypass_test&appointment_id=${result.appointmentId}`);
-    } catch (err: any) {
-      console.error('Error creating dev bypass appointment:', err);
-      setError(language === 'en' ? 'Failed to create appointment' : 'Error al crear la cita');
-      setSubmitting(false);
-    }
-  };
-
   const handleSubmit = async () => {
     const isValid = await validateStep(4);
     if (!isValid) return;
@@ -536,6 +470,8 @@ export default function ClientBook() {
     setError('');
 
     try {
+      // SECURE FLOW: For Stripe payments, create/get client first, then pass metadata to Stripe
+      // The Stripe webhook will create the appointment AFTER successful payment
       let clientId = null;
 
       const { data: existingClients } = await supabase
@@ -574,79 +510,36 @@ export default function ClientBook() {
         ? (servicePrice * tipPercentage / 100)
         : (customTip ? parseFloat(customTip) : 0);
 
-      // Calculate amounts using shop settings (for preview/record-keeping only)
-      // The edge function will calculate the actual Stripe amounts
-      // Note: taxRate is stored as integer (e.g., 8.5 = 8.5%), feeRate as decimal (e.g., 0.04 = 4%)
-      const taxRate = shopSettings?.tax_rate || 0;
-      const feeRate = shopSettings?.card_processing_fee_rate || 0;
-      const subtotal = servicePrice + tipAmount;
-      const tax = subtotal * (taxRate / 100);
-      const stripeFee = (subtotal + tax) * feeRate;
-      const grandTotal = subtotal + tax + stripeFee;
-
       const selectedSlot = timeSlots.find(slot => slot.start === selectedTime);
       const appointmentStart = selectedTime;
       const appointmentEnd = selectedSlot?.end || new Date(new Date(selectedTime).getTime() + (selectedServiceData?.duration_minutes || 30) * 60000).toISOString();
-
-      // TEST MODE: Mark appointment as test data when test mode is enabled
-      const { data: newAppointment, error: appointmentError } = await supabase
-        .from('appointments')
-        .insert({
-          barber_id: selectedBarber,
-          client_id: clientId,
-          service_id: selectedService,
-          scheduled_start: appointmentStart,
-          scheduled_end: appointmentEnd,
-          status: 'booked',
-          notes: clientNotes || null,
-          source: 'client_web',
-          payment_status: 'unpaid',
-          amount_due: grandTotal,
-          amount_paid: 0,
-          is_test: testMode, // TEST MODE: Mark as test when test mode is enabled
-        })
-        .select('id')
-        .single();
-
-      if (appointmentError) throw appointmentError;
-
-      // Send confirmation SMS (don't block on failure)
-      if (newAppointment && selectedBarberObj && selectedServiceData) {
-        const barberName = selectedBarberObj.name;
-        const serviceName = language === 'es' ? selectedServiceData.name_es : selectedServiceData.name_en;
-
-        sendConfirmation({
-          appointmentId: newAppointment.id,
-          clientId: clientId,
-          phoneNumber: clientPhone,
-          scheduledStart: appointmentStart,
-          barberName,
-          serviceName,
-          shopName: shopInfo.shop_name,
-          shopPhone: shopInfo.phone || undefined,
-          language,
-        }).catch(err => {
-          debugError('Failed to send confirmation:', err);
-        });
-      }
 
       // Check if Stripe is enabled
       // TEST MODE: Force "pay in shop" mode when test mode is enabled (no real payments)
       const stripeEnabled = Boolean(import.meta.env.VITE_STRIPE_PUBLIC_KEY) && !testMode;
 
       if (stripeEnabled) {
-        // Create Stripe checkout session using Supabase Edge Function
-        // IMPORTANT: Send ONLY service price + tip amount
-        // The edge function will calculate tax and fees from shop settings
+        // SECURE STRIPE FLOW: Pass all appointment metadata to Stripe
+        // The Stripe webhook will create the appointment after successful payment
         try {
           const serviceName = language === 'es' ? selectedServiceData?.name_es : selectedServiceData?.name_en;
 
           const { data, error: invokeError } = await supabase.functions.invoke('create-checkout', {
             body: {
-              appointment_id: newAppointment.id,
+              // Payment details
               service_price: servicePrice,
               service_name: serviceName || 'Barber Service',
-              tip_amount: tipAmount
+              tip_amount: tipAmount,
+
+              // Appointment metadata (webhook will use this to create appointment)
+              client_id: clientId,
+              barber_id: selectedBarber,
+              service_id: selectedService,
+              scheduled_start: appointmentStart,
+              scheduled_end: appointmentEnd,
+              notes: clientNotes || null,
+              source: 'client_web',
+              language: language,
             }
           });
 
@@ -658,17 +551,71 @@ export default function ClientBook() {
             throw new Error('No checkout URL returned');
           }
 
+          // Redirect to Stripe checkout
           window.location.href = data.url;
         } catch (stripeError) {
           debugError('Stripe checkout error:', stripeError);
-          alert(language === 'en'
-            ? 'Booking confirmed, but payment setup failed. You can pay when you arrive.'
-            : 'Reserva confirmada, pero falló la configuración de pago. Puedes pagar cuando llegues.');
-          navigate('/client/home');
+          setError(language === 'en'
+            ? 'Failed to initiate payment. Please try again.'
+            : 'Error al iniciar el pago. Por favor intenta de nuevo.');
         }
-      } else {
-        // Stripe not enabled - redirect to success page
+      } else if (testMode) {
+        // TEST MODE: Create appointment directly for testing (no payment)
+        const taxRate = shopSettings?.tax_rate || 0;
+        const feeRate = shopSettings?.card_processing_fee_rate || 0;
+        const subtotal = servicePrice + tipAmount;
+        const tax = subtotal * (taxRate / 100);
+        const stripeFee = (subtotal + tax) * feeRate;
+        const grandTotal = subtotal + tax + stripeFee;
+
+        const { data: newAppointment, error: appointmentError } = await supabase
+          .from('appointments')
+          .insert({
+            barber_id: selectedBarber,
+            client_id: clientId,
+            service_id: selectedService,
+            scheduled_start: appointmentStart,
+            scheduled_end: appointmentEnd,
+            status: 'booked',
+            notes: clientNotes || null,
+            source: 'client_web',
+            payment_status: 'unpaid',
+            amount_due: grandTotal,
+            amount_paid: 0,
+            is_test: true,
+          })
+          .select('id')
+          .single();
+
+        if (appointmentError) throw appointmentError;
+
+        // Send confirmation SMS (don't block on failure)
+        if (newAppointment && selectedBarberObj && selectedServiceData) {
+          const barberName = selectedBarberObj.name;
+          const serviceName = language === 'es' ? selectedServiceData.name_es : selectedServiceData.name_en;
+
+          sendConfirmation({
+            appointmentId: newAppointment.id,
+            clientId: clientId,
+            phoneNumber: clientPhone,
+            scheduledStart: appointmentStart,
+            barberName,
+            serviceName,
+            shopName: shopInfo.shop_name,
+            shopPhone: shopInfo.phone || undefined,
+            language,
+          }).catch(err => {
+            debugError('Failed to send confirmation:', err);
+          });
+        }
+
+        // Redirect to home
         navigate('/client/home');
+      } else {
+        // Stripe not enabled and not test mode - error
+        setError(language === 'en'
+          ? 'Online payments are not configured. Please contact the shop.'
+          : 'Los pagos en línea no están configurados. Por favor contacta a la tienda.');
       }
     } catch (error) {
       debugError('Error creating booking:', error);
@@ -1189,27 +1136,6 @@ export default function ClientBook() {
                         ? (language === 'en' ? `Pay $${grandTotal.toFixed(2)}` : `Pagar $${grandTotal.toFixed(2)}`)
                         : (language === 'en' ? 'Confirm Booking' : 'Confirmar Reserva')}
                 </button>
-
-                {/* DEV BYPASS: Simulate success without paying - ALWAYS VISIBLE FOR TESTING */}
-                {stripeEnabled && !testMode && (
-                  <button
-                    onClick={handleDevBypass}
-                    disabled={submitting}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      backgroundColor: 'white',
-                      color: '#666',
-                      border: '2px dashed #999',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      fontWeight: '600',
-                    }}
-                  >
-                    [DEV] Simulate Success (No Payment)
-                  </button>
-                )}
               </div>
             );
           })()}

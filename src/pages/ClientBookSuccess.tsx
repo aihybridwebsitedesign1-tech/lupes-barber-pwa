@@ -11,10 +11,7 @@ export default function ClientBookSuccess() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  // Conditional loading state: dev_bypass_test starts with loading=false
-  const sessionId = searchParams.get('sid') || searchParams.get('session_id');
-  const [loading, setLoading] = useState(sessionId !== 'dev_bypass_test');
-
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [debugError, setDebugError] = useState('');
   const [appointment, setAppointment] = useState<any>(null);
@@ -59,45 +56,13 @@ export default function ClientBookSuccess() {
 
   const loadSuccessScreen = async () => {
     console.log('STEP 0: loadSuccessScreen called');
-    // BILINGUAL PARAMETER: Check both 'sid' (cache-bust test) and 'session_id' (Stripe real)
     const sessionId = searchParams.get('sid') || searchParams.get('session_id');
     const appointmentId = searchParams.get('appointment_id');
 
-    // TRUTH LOG: Show exactly which parameter was detected
-    console.log('Detected ID:', sessionId, '(via', searchParams.get('sid') ? 'sid' : 'session_id', ')');
-    console.log('STEP 1: Starting Fetch for Session ID:', sessionId);
+    console.log('STEP 1: Session ID:', sessionId);
     console.log('STEP 1B: Appointment ID:', appointmentId);
 
-    // DEV BYPASS MODE: Immediate render with mock data (loading already false from initialization)
-    if (sessionId === 'dev_bypass_test') {
-      console.log('🟢 DEV BYPASS MODE ACTIVATED - Rendering immediately with mock data');
-
-      // Set mock appointment data
-      const mockAppointment = {
-        id: 'dev-test-123',
-        scheduled_start: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // Tomorrow
-        amount_paid: 25.00,
-        amount_due: 25.00,
-        service: {
-          name_en: 'Test Service (Dev Mode)',
-          name_es: 'Servicio de Prueba (Modo Dev)',
-        },
-        barber: {
-          name: 'Test Barber (Dev Mode)',
-        },
-        client: {
-          name: 'Test Client',
-          phone: '555-0000',
-        },
-      };
-
-      console.log('🟢 Setting mock appointment data:', mockAppointment);
-      setAppointment(mockAppointment);
-      console.log('🟢 DEV BYPASS COMPLETE - Success page should render now');
-      return; // Exit early, skip all async logic
-    }
-
-    // EMERGENCY FIX: Trust the URL - if session_id exists, show success immediately
+    // Validate session ID
     if (!sessionId) {
       console.log('STEP 1C: No session ID found, showing error');
       setError(language === 'en' ? 'Invalid payment confirmation link.' : 'Enlace de confirmación de pago inválido.');
@@ -377,7 +342,6 @@ export default function ClientBookSuccess() {
   }
 
   const appointmentDate = appointment ? new Date(appointment.scheduled_start) : null;
-  const isDevBypass = sessionId === 'dev_bypass_test';
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5', display: 'flex', flexDirection: 'column' }}>
@@ -397,19 +361,13 @@ export default function ClientBookSuccess() {
           <div style={{ fontSize: '64px', marginBottom: '1rem' }}>✅</div>
 
           <h1 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '0.5rem', color: '#10b981' }}>
-            {isDevBypass
-              ? (language === 'en' ? 'Booking Successful (Simulation)' : 'Reserva Exitosa (Simulación)')
-              : (language === 'en' ? 'Payment Successful!' : '¡Pago Exitoso!')}
+            {language === 'en' ? 'Payment Successful!' : '¡Pago Exitoso!'}
           </h1>
 
           <p style={{ fontSize: '18px', color: '#666', marginBottom: '2rem' }}>
-            {isDevBypass
-              ? (language === 'en'
-                  ? 'Your test appointment has been created successfully.'
-                  : 'Tu cita de prueba ha sido creada exitosamente.')
-              : (language === 'en'
-                  ? 'Your appointment is confirmed and paid.'
-                  : 'Tu cita está confirmada y pagada.')}
+            {language === 'en'
+              ? 'Your appointment is confirmed and paid.'
+              : 'Tu cita está confirmada y pagada.'}
           </p>
 
           {appointment && appointmentDate && (
