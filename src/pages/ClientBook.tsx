@@ -605,7 +605,7 @@ export default function ClientBook() {
         const taxRate = shopSettings?.tax_rate || 0;
         const feeRate = shopSettings?.card_processing_fee_rate || 0;
         const subtotal = servicePrice + tipAmount;
-        const tax = subtotal * (taxRate / 100);
+        const tax = subtotal * taxRate;
         const stripeFee = (subtotal + tax) * feeRate;
         const grandTotal = subtotal + tax + stripeFee;
 
@@ -940,14 +940,14 @@ export default function ClientBook() {
               : (customTip ? parseFloat(customTip) : 0);
 
             // Use dynamic shop settings
-            // Note: taxRate is stored as integer (e.g., 8.5 = 8.5%)
+            // Note: taxRate is stored as decimal (e.g., 0.04 = 4%)
             // Note: feeRate is stored as decimal (e.g., 0.04 = 4%)
             const taxRate = shopSettings?.tax_rate || 0;
             const feeRate = shopSettings?.card_processing_fee_rate || 0;
             const tipPresets = (Array.isArray(shopSettings?.tip_percentage_presets) ? shopSettings.tip_percentage_presets : [15, 18, 20]);
 
             const subtotal = servicePrice + tipAmount;
-            const tax = subtotal * (taxRate / 100);
+            const tax = subtotal * taxRate;
             const stripeFee = stripeEnabled ? ((subtotal + tax) * feeRate) : 0;
             const grandTotal = subtotal + tax + stripeFee;
 
@@ -1095,7 +1095,7 @@ export default function ClientBook() {
 
                       {tax > 0 && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                          <span>{language === 'en' ? `Tax (${taxRate}%)` : `Impuesto (${taxRate}%)`}</span>
+                          <span>{language === 'en' ? `Tax (${(taxRate * 100).toFixed(2)}%)` : `Impuesto (${(taxRate * 100).toFixed(2)}%)`}</span>
                           <span>${tax.toFixed(2)}</span>
                         </div>
                       )}
