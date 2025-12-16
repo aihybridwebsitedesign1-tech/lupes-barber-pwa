@@ -132,6 +132,7 @@ function AppRoutes() {
       <Route path="/client/products" element={<ClientProducts />} />
       <Route path="/client/book" element={<ClientBook />} />
       <Route path="/client/book/success" element={<ClientBookSuccess />} />
+      <Route path="/client/success" element={<ClientBookSuccess />} />
       <Route path="/client/appointments" element={<ClientAppointments />} />
 
       {/* Owner routes - admin subdomain only */}
