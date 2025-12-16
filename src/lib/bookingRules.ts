@@ -192,19 +192,45 @@ export function generateAvailableSlotsForBarber(args: {
   }
 
   if (!scheduleForDay || !scheduleForDay.active) {
+    console.log('[Slots] No active schedule for this day');
     return [];
   }
 
   const [startHour, startMin] = scheduleForDay.start_time.split(':').map(Number);
   const [endHour, endMin] = scheduleForDay.end_time.split(':').map(Number);
 
+  console.log('[Slots] Barber schedule:', {
+    date,
+    start_time: scheduleForDay.start_time,
+    end_time: scheduleForDay.end_time,
+    startHour,
+    startMin,
+    endHour,
+    endMin
+  });
+
   let currentSlot = selectedDate.hour(startHour).minute(startMin).second(0).millisecond(0);
   const dayEnd = selectedDate.hour(endHour).minute(endMin).second(0).millisecond(0);
   const lastPossibleStart = dayEnd.subtract(serviceDurationMinutes, 'minute');
 
+  console.log('[Slots] Time boundaries:', {
+    dayEnd: dayEnd.format('YYYY-MM-DD HH:mm:ss'),
+    lastPossibleStart: lastPossibleStart.format('YYYY-MM-DD HH:mm:ss'),
+    serviceDurationMinutes
+  });
+
   while (currentSlot.isBefore(lastPossibleStart) || currentSlot.isSame(lastPossibleStart)) {
     const slotStart = currentSlot;
     const slotEnd = slotStart.add(serviceDurationMinutes, 'minute');
+
+    // CRITICAL: Ensure slot end does NOT exceed barber's closing time
+    if (slotEnd.isAfter(dayEnd)) {
+      console.log('[Slots] Slot end exceeds barber closing time, stopping:', {
+        slotEnd: slotEnd.format('HH:mm'),
+        barberClose: dayEnd.format('HH:mm')
+      });
+      break;
+    }
 
     const nowWithBuffer = dayjs(now).add(minBookAheadHours, 'hour');
     if (slotStart.isBefore(nowWithBuffer)) {

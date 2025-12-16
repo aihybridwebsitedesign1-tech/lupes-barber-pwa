@@ -71,6 +71,13 @@ export default function ClientAppointments() {
     }
   }, [searchParams]);
 
+  // Generate time slots when reschedule date changes
+  useEffect(() => {
+    if (rescheduleDate && selectedAppointment) {
+      generateTimeSlotsForReschedule();
+    }
+  }, [rescheduleDate, selectedAppointment]);
+
   // Load single appointment for guest (no auth required)
   const loadGuestAppointment = async (appointmentId: string) => {
     setLoadingAppointments(true);
@@ -428,39 +435,101 @@ export default function ClientAppointments() {
 
   // Generate time slots for reschedule
   const generateTimeSlotsForReschedule = async () => {
-    if (!rescheduleDate) return;
+    if (!rescheduleDate || !selectedAppointment) return;
+
+    console.log('[Reschedule Slots] Generating for date:', rescheduleDate);
 
     const config = await getShopConfig();
     const intervalMinutes = config?.client_booking_interval_minutes || 15;
 
-    const { data: shopConfigData } = await supabase
-      .from('shop_config')
-      .select('shop_hours')
+    // Get the appointment's barber and service details
+    const { data: appointmentData } = await supabase
+      .from('appointments')
+      .select('barber_id, service_id, services(duration_minutes)')
+      .eq('id', selectedAppointment.id)
       .single();
 
+    if (!appointmentData || !appointmentData.barber_id) {
+      console.error('[Reschedule Slots] No barber found for appointment');
+      setTimeSlots([]);
+      return;
+    }
+
+    const barberId = appointmentData.barber_id;
+    const serviceDuration = (appointmentData.services as any)?.duration_minutes || 30;
+
+    console.log('[Reschedule Slots] Barber:', barberId, 'Service duration:', serviceDuration);
+
     const dayOfWeek = new Date(rescheduleDate).getDay();
-    const shopHours = shopConfigData?.shop_hours as Record<string, { open: string; close: string } | null> | undefined;
-    const dayHours = shopHours?.[dayOfWeek.toString()];
+
+    // Get barber's specific schedule for this day
+    const { data: barberSchedule } = await supabase
+      .from('barber_schedules')
+      .select('start_time, end_time, active')
+      .eq('barber_id', barberId)
+      .eq('day_of_week', dayOfWeek)
+      .maybeSingle();
 
     let openHour = 9;
     let openMinute = 0;
     let closeHour = 19;
     let closeMinute = 0;
 
-    if (dayHours && dayHours.open && dayHours.close) {
-      const [oH, oM] = dayHours.open.split(':').map(Number);
-      const [cH, cM] = dayHours.close.split(':').map(Number);
+    // Use barber's specific schedule if available
+    if (barberSchedule && barberSchedule.active) {
+      const [oH, oM] = barberSchedule.start_time.split(':').map(Number);
+      const [cH, cM] = barberSchedule.end_time.split(':').map(Number);
       openHour = oH;
       openMinute = oM;
       closeHour = cH;
       closeMinute = cM;
+      console.log('[Reschedule Slots] Using barber schedule:', {
+        start: barberSchedule.start_time,
+        end: barberSchedule.end_time
+      });
+    } else {
+      // Fallback to shop hours if no barber schedule
+      const { data: shopConfigData } = await supabase
+        .from('shop_config')
+        .select('shop_hours')
+        .single();
+
+      const shopHours = shopConfigData?.shop_hours as Record<string, { open: string; close: string } | null> | undefined;
+      const dayHours = shopHours?.[dayOfWeek.toString()];
+
+      if (dayHours && dayHours.open && dayHours.close) {
+        const [oH, oM] = dayHours.open.split(':').map(Number);
+        const [cH, cM] = dayHours.close.split(':').map(Number);
+        openHour = oH;
+        openMinute = oM;
+        closeHour = cH;
+        closeMinute = cM;
+      }
+      console.log('[Reschedule Slots] Using shop hours fallback:', { openHour, openMinute, closeHour, closeMinute });
     }
 
     const slots: string[] = [];
     let currentHour = openHour;
     let currentMinute = openMinute;
 
+    // Generate slots, ensuring last slot end doesn't exceed closing time
     while (currentHour < closeHour || (currentHour === closeHour && currentMinute < closeMinute)) {
+      // Calculate when this slot would end
+      let slotEndHour = currentHour;
+      let slotEndMinute = currentMinute + serviceDuration;
+
+      if (slotEndMinute >= 60) {
+        slotEndHour += Math.floor(slotEndMinute / 60);
+        slotEndMinute = slotEndMinute % 60;
+      }
+
+      // If slot end exceeds closing time, stop generating slots
+      if (slotEndHour > closeHour || (slotEndHour === closeHour && slotEndMinute > closeMinute)) {
+        console.log('[Reschedule Slots] Slot would end after closing time, stopping at:',
+          `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`);
+        break;
+      }
+
       const timeStr = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`;
       slots.push(timeStr);
 
@@ -471,6 +540,7 @@ export default function ClientAppointments() {
       }
     }
 
+    console.log('[Reschedule Slots] Generated', slots.length, 'slots');
     setTimeSlots(slots);
   };
 

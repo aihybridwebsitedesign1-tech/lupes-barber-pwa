@@ -144,23 +144,31 @@ Deno.serve(async (req: Request) => {
 
     console.log('[Create Cash Appointment] STEP 2: Getting service details');
 
-    const { data: service, error: serviceError } = await supabase
-      .from('services')
-      .select('duration_minutes, price')
-      .eq('id', service_id)
-      .single();
+    let duration = 60;
+    let servicePrice = 0;
 
-    if (serviceError) {
-      console.error('[Create Cash Appointment] Error fetching service:', serviceError);
-      throw serviceError;
+    try {
+      const { data: service, error: serviceError } = await supabase
+        .from('services')
+        .select('duration_minutes, price')
+        .eq('id', service_id)
+        .single();
+
+      if (serviceError) {
+        console.error('[Create Cash Appointment] ⚠️ Error fetching service, using defaults:', serviceError);
+      } else if (service) {
+        duration = service.duration_minutes || 60;
+        servicePrice = service.price || 0;
+        console.log('[Create Cash Appointment] ✅ Service details:', { duration, servicePrice });
+      } else {
+        console.error('[Create Cash Appointment] ⚠️ Service not found, using defaults');
+      }
+    } catch (error) {
+      console.error('[Create Cash Appointment] ⚠️ Exception fetching service, using defaults:', error);
     }
 
-    const duration = service?.duration_minutes || 60;
-    const servicePrice = service?.price || 0;
     const startDate = new Date(scheduled_start);
     const endDate = new Date(startDate.getTime() + duration * 60000);
-
-    console.log('[Create Cash Appointment] Service price:', servicePrice);
 
     console.log('[Create Cash Appointment] STEP 3: Creating appointment');
     console.log('[Create Cash Appointment] Appointment details:', {
