@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
 import { validateBookingRules, formatBookingRuleError, getShopConfig } from '../lib/bookingRules';
@@ -24,6 +25,12 @@ type Appointment = {
 
 export default function ClientAppointments() {
   const { language } = useLanguage();
+  const [searchParams] = useSearchParams();
+
+  // Guest mode state
+  const [guestMode, setGuestMode] = useState(false);
+  const [guestAppointment, setGuestAppointment] = useState<Appointment | null>(null);
+  const [guestClientPhone, setGuestClientPhone] = useState<string>('');
 
   // Authentication state
   const [authStep, setAuthStep] = useState<'phone' | 'verify' | 'authenticated'>('phone');
@@ -55,6 +62,90 @@ export default function ClientAppointments() {
   const [rescheduling, setRescheduling] = useState(false);
   const [rescheduleError, setRescheduleError] = useState('');
   const [shopInfo, setShopInfo] = useState<{ shop_name: string; phone: string | null }>({ shop_name: "Lupe's Barber Shop", phone: null });
+
+  // Check for guest appointment ID in URL on mount
+  useEffect(() => {
+    const appointmentId = searchParams.get('id');
+    if (appointmentId) {
+      loadGuestAppointment(appointmentId);
+    }
+  }, [searchParams]);
+
+  // Load single appointment for guest (no auth required)
+  const loadGuestAppointment = async (appointmentId: string) => {
+    setLoadingAppointments(true);
+    try {
+      // Fetch appointment with related data
+      const { data: appointment, error: aptError } = await supabase
+        .from('appointments')
+        .select(`
+          id,
+          scheduled_start,
+          scheduled_end,
+          status,
+          notes,
+          payment_status,
+          amount_due,
+          client_id,
+          users!appointments_barber_id_fkey (name),
+          services!inner (name_en, name_es),
+          clients!inner (phone, language)
+        `)
+        .eq('id', appointmentId)
+        .maybeSingle();
+
+      if (aptError) throw aptError;
+
+      if (!appointment) {
+        setError(language === 'en'
+          ? 'Appointment not found.'
+          : 'Cita no encontrada.');
+        return;
+      }
+
+      // Load shop config for notifications
+      const { data: shopConfigData } = await supabase
+        .from('shop_config')
+        .select('shop_name, phone')
+        .single();
+
+      if (shopConfigData) {
+        setShopInfo({
+          shop_name: shopConfigData.shop_name || "Lupe's Barber Shop",
+          phone: shopConfigData.phone || null
+        });
+      }
+
+      // Format appointment data
+      const barber = appointment.users as any;
+      const service = appointment.services as any;
+      const client = appointment.clients as any;
+
+      const formattedAppointment: Appointment = {
+        id: appointment.id,
+        scheduled_start: appointment.scheduled_start,
+        scheduled_end: appointment.scheduled_end,
+        status: appointment.status,
+        notes: appointment.notes,
+        barber_name: barber?.name || null,
+        service_name_en: service?.name_en || 'Service',
+        service_name_es: service?.name_es || 'Servicio',
+        payment_status: appointment.payment_status,
+        amount_due: appointment.amount_due || 0,
+      };
+
+      setGuestAppointment(formattedAppointment);
+      setGuestClientPhone(client?.phone || '');
+      setGuestMode(true);
+    } catch (error) {
+      console.error('[Guest Appointment] Load error:', error);
+      setError(language === 'en'
+        ? 'Failed to load appointment'
+        : 'Error al cargar cita');
+    } finally {
+      setLoadingAppointments(false);
+    }
+  };
 
   // Handle phone submission and OTP request
   const handleRequestOTP = async () => {
@@ -238,11 +329,14 @@ export default function ClientAppointments() {
 
     setCancelling(true);
     try {
+      // Determine which phone to use
+      const clientPhone = guestMode ? guestClientPhone : phoneNumber;
+
       // Find client
       const { data: client } = await supabase
         .from('clients')
         .select('id, language')
-        .eq('phone', phoneNumber)
+        .eq('phone', clientPhone)
         .maybeSingle();
 
       if (!client) throw new Error('Client not found');
@@ -269,7 +363,7 @@ export default function ClientAppointments() {
       sendCancellation({
         appointmentId: selectedAppointment.id,
         clientId: client.id,
-        phoneNumber: phoneNumber,
+        phoneNumber: clientPhone,
         scheduledStart: selectedAppointment.scheduled_start,
         shopName: shopInfo.shop_name,
         shopPhone: shopInfo.phone || undefined,
@@ -279,7 +373,11 @@ export default function ClientAppointments() {
       });
 
       // Reload appointments
-      await loadAppointments();
+      if (guestMode) {
+        await loadGuestAppointment(selectedAppointment.id);
+      } else {
+        await loadAppointments();
+      }
 
       // Show success message
       alert(language === 'en'
@@ -363,11 +461,14 @@ export default function ClientAppointments() {
     setRescheduleError('');
 
     try {
+      // Determine which phone to use
+      const clientPhone = guestMode ? guestClientPhone : phoneNumber;
+
       // Find client
       const { data: client } = await supabase
         .from('clients')
         .select('id, language')
-        .eq('phone', phoneNumber)
+        .eq('phone', clientPhone)
         .maybeSingle();
 
       if (!client) throw new Error('Client not found');
@@ -414,7 +515,7 @@ export default function ClientAppointments() {
       sendReschedule({
         appointmentId: selectedAppointment.id,
         clientId: client.id,
-        phoneNumber: phoneNumber,
+        phoneNumber: clientPhone,
         newScheduledStart: newDateTime.toISOString(),
         barberName: selectedAppointment.barber_name || 'our barber',
         shopName: shopInfo.shop_name,
@@ -425,7 +526,11 @@ export default function ClientAppointments() {
       });
 
       // Reload appointments
-      await loadAppointments();
+      if (guestMode) {
+        await loadGuestAppointment(selectedAppointment.id);
+      } else {
+        await loadAppointments();
+      }
 
       // Show success message
       const dateFormatted = formatAppointmentDate(newDateTime.toISOString(), language);
@@ -487,6 +592,254 @@ export default function ClientAppointments() {
       color: label.color,
     };
   };
+
+  // Guest mode - show single appointment
+  if (guestMode) {
+    if (loadingAppointments) {
+      return (
+        <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
+          <ClientHeader />
+          <main style={{ maxWidth: '600px', margin: '0 auto', padding: '3rem 1rem' }}>
+            <div style={{ textAlign: 'center', padding: '4rem', color: '#666' }}>
+              {language === 'en' ? 'Loading...' : 'Cargando...'}
+            </div>
+          </main>
+        </div>
+      );
+    }
+
+    if (!guestAppointment) {
+      return (
+        <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
+          <ClientHeader />
+          <main style={{ maxWidth: '600px', margin: '0 auto', padding: '3rem 1rem' }}>
+            <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '3rem', textAlign: 'center' }}>
+              <h2 style={{ fontSize: '24px', marginBottom: '1rem', color: '#d32f2f' }}>
+                {language === 'en' ? 'Appointment Not Found' : 'Cita No Encontrada'}
+              </h2>
+              <p style={{ color: '#666', marginBottom: '2rem' }}>
+                {language === 'en'
+                  ? 'The appointment you are looking for could not be found.'
+                  : 'No se pudo encontrar la cita que buscas.'}
+              </p>
+              <a
+                href="/client/book"
+                style={{
+                  display: 'inline-block',
+                  padding: '0.75rem 1.5rem',
+                  backgroundColor: '#000',
+                  color: 'white',
+                  textDecoration: 'none',
+                  borderRadius: '8px',
+                  fontWeight: '500',
+                }}
+              >
+                {language === 'en' ? 'Book New Appointment' : 'Reservar Nueva Cita'}
+              </a>
+            </div>
+          </main>
+          <Footer />
+        </div>
+      );
+    }
+
+    const apt = guestAppointment;
+    const isUpcoming = new Date(apt.scheduled_start) >= new Date() && apt.status === 'booked';
+
+    return (
+      <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5', display: 'flex', flexDirection: 'column' }}>
+        <ClientHeader />
+
+        <main style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem 1rem', flex: 1 }}>
+          <h1 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '2rem', textAlign: 'center' }}>
+            {language === 'en' ? 'Your Appointment' : 'Tu Cita'}
+          </h1>
+
+          <div
+            style={{
+              backgroundColor: 'white',
+              borderRadius: '12px',
+              padding: '2rem',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+              border: isUpcoming ? '2px solid #e3f2fd' : '1px solid #e0e0e0',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '0.5rem' }}>
+                  {language === 'es' ? apt.service_name_es : apt.service_name_en}
+                </div>
+                <div style={{ fontSize: '16px', color: '#666', marginBottom: '0.5rem' }}>
+                  {formatAppointmentDateTime(apt.scheduled_start)}
+                </div>
+                {apt.barber_name && (
+                  <div style={{ fontSize: '16px', color: '#666' }}>
+                    {language === 'en' ? 'with' : 'con'} <strong>{apt.barber_name}</strong>
+                  </div>
+                )}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
+                <span
+                  style={{
+                    display: 'inline-block',
+                    padding: '0.5rem 1rem',
+                    backgroundColor: isUpcoming ? '#e3f2fd' : '#f5f5f5',
+                    color: getStatusLabel(apt.status).color,
+                    borderRadius: '20px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                  }}
+                >
+                  {getStatusLabel(apt.status).text}
+                </span>
+                <PaymentStatusBadge status={apt.payment_status} size="small" />
+              </div>
+            </div>
+
+            {apt.notes && (
+              <div style={{ padding: '1rem', backgroundColor: '#f5f5f5', borderRadius: '8px', marginBottom: '1.5rem' }}>
+                <div style={{ fontSize: '12px', color: '#666', marginBottom: '0.25rem', textTransform: 'uppercase', fontWeight: '600' }}>
+                  {language === 'en' ? 'Notes' : 'Notas'}
+                </div>
+                <div style={{ fontSize: '14px', color: '#333' }}>{apt.notes}</div>
+              </div>
+            )}
+
+            {apt.payment_status === 'unpaid' && apt.amount_due > 0 && isUpcoming && (
+              <div style={{
+                marginBottom: '1.5rem',
+                padding: '1rem',
+                backgroundColor: '#fff3cd',
+                borderRadius: '8px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '1rem',
+              }}>
+                <div>
+                  <div style={{ fontSize: '12px', color: '#856404', textTransform: 'uppercase', fontWeight: '600' }}>
+                    {language === 'en' ? 'Amount Due' : 'Monto Pendiente'}
+                  </div>
+                  <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#856404' }}>
+                    ${apt.amount_due.toFixed(2)}
+                  </div>
+                </div>
+                <button
+                  onClick={async () => {
+                    try {
+                      const serviceName = language === 'es' ? apt.service_name_es : apt.service_name_en;
+
+                      const { data, error: invokeError } = await supabase.functions.invoke('create-checkout', {
+                        body: {
+                          appointment_id: apt.id,
+                          service_price: apt.amount_due,
+                          service_name: serviceName || 'Barber Service',
+                          tip_amount: 0
+                        }
+                      });
+
+                      if (invokeError) {
+                        throw invokeError;
+                      }
+
+                      if (data && data.url) {
+                        window.location.href = data.url;
+                      }
+                    } catch (err) {
+                      console.error('Error creating checkout:', err);
+                      alert(language === 'en' ? 'Payment setup failed. Please try again.' : 'Configuración de pago falló. Intenta de nuevo.');
+                    }
+                  }}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    backgroundColor: '#10b981',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '16px',
+                    fontWeight: '600',
+                  }}
+                >
+                  {language === 'en' ? 'Pay Now' : 'Pagar Ahora'}
+                </button>
+              </div>
+            )}
+
+            {isUpcoming && (
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => {
+                    setSelectedAppointment(apt);
+                    setShowRescheduleModal(true);
+                    setRescheduleDate('');
+                    setRescheduleTime('');
+                    setRescheduleError('');
+                  }}
+                  style={{
+                    flex: 1,
+                    minWidth: '200px',
+                    padding: '1rem',
+                    backgroundColor: '#000',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '16px',
+                    fontWeight: '600',
+                  }}
+                >
+                  {language === 'en' ? 'Reschedule' : 'Reprogramar'}
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedAppointment(apt);
+                    setShowCancelModal(true);
+                    setCancelReason('');
+                  }}
+                  style={{
+                    flex: 1,
+                    minWidth: '200px',
+                    padding: '1rem',
+                    backgroundColor: 'transparent',
+                    color: '#d32f2f',
+                    border: '2px solid #d32f2f',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '16px',
+                    fontWeight: '600',
+                  }}
+                >
+                  {language === 'en' ? 'Cancel Appointment' : 'Cancelar Cita'}
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div style={{ marginTop: '2rem', textAlign: 'center' }}>
+            <a
+              href="/client/book"
+              style={{
+                display: 'inline-block',
+                padding: '0.75rem 1.5rem',
+                backgroundColor: 'transparent',
+                color: '#666',
+                textDecoration: 'none',
+                border: '1px solid #ddd',
+                borderRadius: '8px',
+                fontSize: '14px',
+              }}
+            >
+              {language === 'en' ? 'Book Another Appointment' : 'Reservar Otra Cita'}
+            </a>
+          </div>
+        </main>
+
+        <Footer />
+      </div>
+    );
+  }
 
   // Phone input screen
   if (authStep === 'phone') {
