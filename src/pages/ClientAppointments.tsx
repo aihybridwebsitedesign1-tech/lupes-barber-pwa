@@ -427,16 +427,8 @@ export default function ClientAppointments() {
         ? 'Your appointment has been cancelled.'
         : 'Tu cita ha sido cancelada.');
 
-      // For guest mode, reload the page to show updated status
-      if (guestMode) {
-        window.location.reload();
-        return;
-      }
-
-      // Close modal
-      setShowCancelModal(false);
-      setSelectedAppointment(null);
-      setCancelReason('');
+      // Force reload to show updated status
+      window.location.reload();
     } catch (error) {
       console.error('Error cancelling appointment:', error);
       alert(language === 'en'
@@ -492,7 +484,14 @@ export default function ClientAppointments() {
     let closeHour = 19;
     let closeMinute = 0;
 
-    // Use barber's specific schedule if available
+    // Check if barber is explicitly not working this day
+    if (barberSchedule && barberSchedule.active === false) {
+      console.log('[Reschedule Slots] Barber not working this day (inactive)');
+      setTimeSlots([]);
+      return;
+    }
+
+    // Use barber's specific schedule if available and active
     if (barberSchedule && barberSchedule.active) {
       const [oH, oM] = barberSchedule.start_time.split(':').map(Number);
       const [cH, cM] = barberSchedule.end_time.split(':').map(Number);
@@ -514,15 +513,20 @@ export default function ClientAppointments() {
       const shopHours = shopConfigData?.shop_hours as Record<string, { open: string; close: string } | null> | undefined;
       const dayHours = shopHours?.[dayOfWeek.toString()];
 
-      if (dayHours && dayHours.open && dayHours.close) {
-        const [oH, oM] = dayHours.open.split(':').map(Number);
-        const [cH, cM] = dayHours.close.split(':').map(Number);
-        openHour = oH;
-        openMinute = oM;
-        closeHour = cH;
-        closeMinute = cM;
+      // If shop is closed this day (no hours defined or null), return 0 slots
+      if (!dayHours || !dayHours.open || !dayHours.close) {
+        console.log('[Reschedule Slots] Shop closed this day (no hours defined)');
+        setTimeSlots([]);
+        return;
       }
-      console.log('[Reschedule Slots] Using shop hours fallback:', { openHour, openMinute, closeHour, closeMinute });
+
+      const [oH, oM] = dayHours.open.split(':').map(Number);
+      const [cH, cM] = dayHours.close.split(':').map(Number);
+      openHour = oH;
+      openMinute = oM;
+      closeHour = cH;
+      closeMinute = cM;
+      console.log('[Reschedule Slots] Using shop hours:', { openHour, openMinute, closeHour, closeMinute });
     }
 
     const slots: string[] = [];
@@ -695,17 +699,8 @@ export default function ClientAppointments() {
         ? `Your appointment has been rescheduled to ${dateFormatted} at ${timeFormatted}.`
         : `Tu cita ha sido reprogramada para ${dateFormatted} a las ${timeFormatted}.`);
 
-      // For guest mode, reload the page to show updated status
-      if (guestMode) {
-        window.location.reload();
-        return;
-      }
-
-      // Close modal
-      setShowRescheduleModal(false);
-      setSelectedAppointment(null);
-      setRescheduleDate('');
-      setRescheduleTime('');
+      // Force reload to show updated status
+      window.location.reload();
     } catch (error) {
       console.error('Error rescheduling appointment:', error);
       setRescheduleError(language === 'en'
