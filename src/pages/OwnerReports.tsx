@@ -130,7 +130,7 @@ export default function OwnerReports() {
         .select(`
           *,
           barber:barber_id(name),
-          service:service_id(name_en, name_es, category)
+          service:service_id(name_en, name_es, category, base_price)
         `)
         .gte('scheduled_start', dateRange.start)
         .lte('scheduled_start', dateRange.end);
@@ -143,7 +143,14 @@ export default function OwnerReports() {
       const cancelled = (appointments || []).filter(a => a.status === 'cancelled');
       const totalCount = (appointments || []).length;
 
-      const servicesRevenue = completed.reduce((sum, a) => sum + Number(a.services_total || 0), 0);
+      // Calculate services revenue with fallback to service base_price if services_total is not set
+      const servicesRevenue = completed.reduce((sum, a) => {
+        const serviceTotal = Number(a.services_total || 0);
+        if (serviceTotal > 0) return sum + serviceTotal;
+        // Fallback: use service base_price if services_total is not set
+        const basePrice = Number((a.service as any)?.base_price || 0);
+        return sum + basePrice;
+      }, 0);
       const productsRevenue = completed.reduce((sum, a) => sum + Number(a.products_total || 0), 0);
       const totalTips = completed.reduce((sum, a) => sum + Number(a.tip_amount || 0), 0);
       const totalRevenue = servicesRevenue + productsRevenue;
@@ -160,6 +167,13 @@ export default function OwnerReports() {
         cancellationRate,
       });
 
+      // Helper to get service revenue for an appointment with fallback
+      const getAptServiceRevenue = (apt: any): number => {
+        const serviceTotal = Number(apt.services_total || 0);
+        if (serviceTotal > 0) return serviceTotal;
+        return Number(apt.service?.base_price || 0);
+      };
+
       const sourceMap = new Map<string, SourceBreakdown>();
       completed.forEach(apt => {
         const source = apt.source || 'unknown';
@@ -174,7 +188,7 @@ export default function OwnerReports() {
         }
         const stats = sourceMap.get(source)!;
         stats.appointments += 1;
-        stats.servicesRevenue += Number(apt.services_total || 0);
+        stats.servicesRevenue += getAptServiceRevenue(apt);
         stats.tips += Number(apt.tip_amount || 0);
       });
 
@@ -201,7 +215,7 @@ export default function OwnerReports() {
 
         const stats = barberMap.get(barberId)!;
         stats.completed += 1;
-        stats.servicesRevenue += Number(apt.services_total || 0);
+        stats.servicesRevenue += getAptServiceRevenue(apt);
         stats.tips += Number(apt.tip_amount || 0);
       });
 
@@ -230,7 +244,7 @@ export default function OwnerReports() {
         if (serviceName) {
           const stats = serviceMap.get(serviceId)!;
           stats.completed += 1;
-          stats.revenue += Number(apt.services_total || 0);
+          stats.revenue += getAptServiceRevenue(apt);
         }
       });
 
