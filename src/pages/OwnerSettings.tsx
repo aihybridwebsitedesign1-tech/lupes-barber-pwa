@@ -114,12 +114,10 @@ export default function OwnerSettings() {
         setShopName(data.shop_name || "Lupe's Barber Shop");
         setAddress(data.address || '');
         setPhone(data.phone || '');
-        // Handle legacy decimal format (0.04) vs new whole number format (4)
-        // If value < 1, it's legacy decimal - multiply by 100 to display as whole %
-        const rawTax = data.tax_rate || 0;
-        const rawCardFee = data.card_processing_fee_rate || 0;
-        setTaxRate((rawTax < 1 ? rawTax * 100 : rawTax).toFixed(2));
-        setCardFeeRate((rawCardFee < 1 ? rawCardFee * 100 : rawCardFee).toFixed(2));
+        // Load raw values exactly as stored in database (no conversion)
+        // Database stores whole percentages: 5.25 = 5.25%
+        setTaxRate(String(data.tax_rate || 0));
+        setCardFeeRate(String(data.card_processing_fee_rate || 0));
         setDaysBookableInAdvance(String(data.days_bookable_in_advance || 30));
         setMinBookAheadHours(String(data.min_book_ahead_hours || 2));
         setMinCancelAheadHours(String(data.min_cancel_ahead_hours || 24));
