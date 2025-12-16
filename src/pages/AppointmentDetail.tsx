@@ -331,23 +331,72 @@ export default function AppointmentDetail() {
       return;
     }
 
-    const confirmMsg = language === 'en'
-      ? `Mark this appointment as paid with ${method}?`
-      : `¿Marcar esta cita como pagada con ${method === 'cash' ? 'efectivo' : 'tarjeta'}?`;
-
-    if (!confirm(confirmMsg)) return;
-
     setSaving(true);
     try {
-      const amountToPay = appointment.amount_due || 0;
+      // Fetch shop settings for tax and card fee rates
+      const { data: shopConfig } = await supabase
+        .from('shop_config')
+        .select('tax_rate, card_processing_fee_rate')
+        .single();
+
+      // Use defaults if config not found (tax_rate and card_fee stored as decimals, e.g., 0.04 = 4%)
+      const taxRate = Number(shopConfig?.tax_rate || 0);
+      const cardFeeRate = Number(shopConfig?.card_processing_fee_rate || 0);
+
+      // Get the base service price (use services_total if set, otherwise use amount_due or service base_price)
+      const basePrice = appointment.services_total > 0 
+        ? appointment.services_total 
+        : (appointment.amount_due || 0);
+      
+      // Calculate totals based on payment method
+      let totalAmount: number;
+      let taxAmount = 0;
+      let cardFeeAmount = 0;
+
+      if (method === 'card') {
+        // Card: Add tax + card processing fee
+        taxAmount = basePrice * taxRate;
+        const subtotalWithTax = basePrice + taxAmount;
+        cardFeeAmount = subtotalWithTax * cardFeeRate;
+        totalAmount = subtotalWithTax + cardFeeAmount;
+      } else {
+        // Cash: Base price only (no tax or fees for cash in-shop)
+        totalAmount = basePrice;
+      }
+
+      // Format amounts for display
+      const formatCurrency = (amt: number) => `$${amt.toFixed(2)}`;
+
+      // Build confirmation message with breakdown
+      let confirmMsg: string;
+      if (method === 'card') {
+        confirmMsg = language === 'en'
+          ? `Mark as paid with card?\n\nService: ${formatCurrency(basePrice)}\nTax (${(taxRate * 100).toFixed(2)}%): ${formatCurrency(taxAmount)}\nCard Fee (${(cardFeeRate * 100).toFixed(2)}%): ${formatCurrency(cardFeeAmount)}\n\nTotal: ${formatCurrency(totalAmount)}`
+          : `¿Marcar como pagado con tarjeta?\n\nServicio: ${formatCurrency(basePrice)}\nImpuesto (${(taxRate * 100).toFixed(2)}%): ${formatCurrency(taxAmount)}\nTarifa tarjeta (${(cardFeeRate * 100).toFixed(2)}%): ${formatCurrency(cardFeeAmount)}\n\nTotal: ${formatCurrency(totalAmount)}`;
+      } else {
+        confirmMsg = language === 'en'
+          ? `Mark as paid with cash?\n\nTotal: ${formatCurrency(totalAmount)}`
+          : `¿Marcar como pagado con efectivo?\n\nTotal: ${formatCurrency(totalAmount)}`;
+      }
+
+      if (!confirm(confirmMsg)) {
+        setSaving(false);
+        return;
+      }
+
       const timestamp = new Date().toISOString();
-      const noteAddition = `\n[Marked as paid offline (${method}) by owner on ${new Date().toLocaleString()}]`;
+      const noteAddition = `\n[Marked as paid offline (${method}) - Total: ${formatCurrency(totalAmount)} by owner on ${new Date().toLocaleString()}]`;
 
       const { error } = await supabase
         .from('appointments')
         .update({
           payment_status: 'paid',
-          amount_paid: amountToPay,
+          amount_paid: totalAmount,
+          amount_due: totalAmount,
+          services_total: basePrice,
+          tax_amount: taxAmount,
+          processing_fee_amount: cardFeeAmount,
+          total_charged: totalAmount,
           payment_method: method,
           paid_at: timestamp,
           stripe_session_id: null,
@@ -357,7 +406,7 @@ export default function AppointmentDetail() {
 
       if (error) throw error;
 
-      alert(language === 'en' ? 'Appointment marked as paid!' : '¡Cita marcada como pagada!');
+      alert(language === 'en' ? `Appointment marked as paid! Total: ${formatCurrency(totalAmount)}` : `¡Cita marcada como pagada! Total: ${formatCurrency(totalAmount)}`);
       loadAppointmentData();
     } catch (error) {
       console.error('Error marking as paid:', error);
