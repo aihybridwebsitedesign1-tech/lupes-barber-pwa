@@ -150,7 +150,7 @@ Deno.serve(async (req: Request) => {
     try {
       const { data: service, error: serviceError } = await supabase
         .from('services')
-        .select('duration_minutes, price')
+        .select('duration_minutes, base_price')
         .eq('id', service_id)
         .single();
 
@@ -158,7 +158,7 @@ Deno.serve(async (req: Request) => {
         console.error('[Create Cash Appointment] ⚠️ Error fetching service, using defaults:', serviceError);
       } else if (service) {
         duration = service.duration_minutes || 60;
-        servicePrice = service.price || 0;
+        servicePrice = service.base_price || 0;
         console.log('[Create Cash Appointment] ✅ Service details:', { duration, servicePrice });
       } else {
         console.error('[Create Cash Appointment] ⚠️ Service not found, using defaults');

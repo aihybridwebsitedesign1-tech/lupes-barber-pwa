@@ -333,7 +333,10 @@ export default function ClientBook() {
         return;
       }
 
-      const dayOfWeek = new Date(selectedDate).getDay();
+      // Fix timezone issue: Parse date with explicit time to avoid UTC offset causing wrong day
+      const [year, month, day] = selectedDate.split('-').map(Number);
+      const localDate = new Date(year, month - 1, day);
+      const dayOfWeek = localDate.getDay();
 
       // Query for ALL appointments on the selected date for this barber
       // Use date range that covers the entire day in shop timezone (America/Chicago)
