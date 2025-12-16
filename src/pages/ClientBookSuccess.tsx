@@ -125,8 +125,8 @@ export default function ClientBookSuccess() {
             const result = await response.json();
             const apt = result.appointment;
 
-            if (apt && apt.payment_status === 'paid') {
-              console.log('✅ PAYMENT CONFIRMED - Appointment found and paid');
+            if (apt && ['booked', 'confirmed', 'scheduled'].includes(apt.status)) {
+              console.log(`✅ APPOINTMENT CONFIRMED - Status: ${apt.status}, Payment: ${apt.payment_status}`);
               setAppointment({
                 ...apt,
                 amount_paid: apt.amount_paid || apt.amount_due,
@@ -137,7 +137,7 @@ export default function ClientBookSuccess() {
               setLoading(false);
               return;
             } else if (apt) {
-              console.log(`⏳ Appointment found but payment_status is: ${apt.payment_status} - continuing to poll...`);
+              console.log(`⏳ Appointment found but status is: ${apt.status} - continuing to poll...`);
             } else {
               console.log('⏳ Appointment not found yet - continuing to poll...');
             }
@@ -399,13 +399,21 @@ export default function ClientBookSuccess() {
           <div style={{ fontSize: '64px', marginBottom: '1rem' }}>✅</div>
 
           <h1 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '0.5rem', color: '#10b981' }}>
-            {language === 'en' ? 'Payment Successful!' : '¡Pago Exitoso!'}
+            {appointment.payment_status === 'paid'
+              ? (language === 'en' ? 'Payment Successful!' : '¡Pago Exitoso!')
+              : (language === 'en' ? 'Booking Confirmed!' : '¡Reserva Confirmada!')
+            }
           </h1>
 
           <p style={{ fontSize: '18px', color: '#666', marginBottom: '2rem' }}>
-            {language === 'en'
-              ? 'Your appointment is confirmed and paid.'
-              : 'Tu cita está confirmada y pagada.'}
+            {appointment.payment_status === 'paid'
+              ? (language === 'en'
+                ? 'Your appointment is confirmed and paid.'
+                : 'Tu cita está confirmada y pagada.')
+              : (language === 'en'
+                ? 'Your appointment is confirmed. You can pay at the shop when you arrive.'
+                : 'Tu cita está confirmada. Puedes pagar en la tienda cuando llegues.')
+            }
           </p>
 
           {appointment && appointmentDate && (
@@ -460,7 +468,10 @@ export default function ClientBookSuccess() {
 
               <div>
                 <div style={{ fontSize: '14px', color: '#666', marginBottom: '0.25rem' }}>
-                  {language === 'en' ? 'Amount Paid' : 'Monto Pagado'}
+                  {appointment.payment_status === 'paid'
+                    ? (language === 'en' ? 'Amount Paid' : 'Monto Pagado')
+                    : (language === 'en' ? 'Amount Due' : 'Monto a Pagar')
+                  }
                 </div>
                 <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#10b981' }}>
                   ${(appointment.amount_paid || appointment.amount_due || 0).toFixed(2)}
