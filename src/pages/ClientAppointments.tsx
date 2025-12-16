@@ -10,6 +10,14 @@ import Footer from '../components/Footer';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
+// Helper to format 24-hour time (HH:MM) to 12-hour AM/PM format
+const formatTimeSlotTo12Hour = (time24: string): string => {
+  const [hours, minutes] = time24.split(':').map(Number);
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const hours12 = hours % 12 || 12;
+  return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
+};
+
 type Appointment = {
   id: string;
   scheduled_start: string;
@@ -419,6 +427,12 @@ export default function ClientAppointments() {
         ? 'Your appointment has been cancelled.'
         : 'Tu cita ha sido cancelada.');
 
+      // For guest mode, reload the page to show updated status
+      if (guestMode) {
+        window.location.reload();
+        return;
+      }
+
       // Close modal
       setShowCancelModal(false);
       setSelectedAppointment(null);
@@ -680,6 +694,12 @@ export default function ClientAppointments() {
       alert(language === 'en'
         ? `Your appointment has been rescheduled to ${dateFormatted} at ${timeFormatted}.`
         : `Tu cita ha sido reprogramada para ${dateFormatted} a las ${timeFormatted}.`);
+
+      // For guest mode, reload the page to show updated status
+      if (guestMode) {
+        window.location.reload();
+        return;
+      }
 
       // Close modal
       setShowRescheduleModal(false);
@@ -1174,7 +1194,7 @@ export default function ClientAppointments() {
                     </option>
                     {timeSlots.map((slot) => (
                       <option key={slot} value={slot}>
-                        {slot}
+                        {formatTimeSlotTo12Hour(slot)}
                       </option>
                     ))}
                   </select>
@@ -1879,7 +1899,7 @@ export default function ClientAppointments() {
                   </option>
                   {timeSlots.map((slot) => (
                     <option key={slot} value={slot}>
-                      {slot}
+                      {formatTimeSlotTo12Hour(slot)}
                     </option>
                   ))}
                 </select>
