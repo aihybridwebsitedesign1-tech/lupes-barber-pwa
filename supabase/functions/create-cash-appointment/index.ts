@@ -146,7 +146,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: service, error: serviceError } = await supabase
       .from('services')
-      .select('duration')
+      .select('duration_minutes')
       .eq('id', service_id)
       .single();
 
@@ -155,7 +155,7 @@ Deno.serve(async (req: Request) => {
       throw serviceError;
     }
 
-    const duration = service?.duration || 60;
+    const duration = service?.duration_minutes || 60;
     const startDate = new Date(scheduled_start);
     const endDate = new Date(startDate.getTime() + duration * 60000);
 
