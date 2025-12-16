@@ -146,7 +146,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: service, error: serviceError } = await supabase
       .from('services')
-      .select('duration_minutes')
+      .select('duration_minutes, price')
       .eq('id', service_id)
       .single();
 
@@ -156,8 +156,11 @@ Deno.serve(async (req: Request) => {
     }
 
     const duration = service?.duration_minutes || 60;
+    const servicePrice = service?.price || 0;
     const startDate = new Date(scheduled_start);
     const endDate = new Date(startDate.getTime() + duration * 60000);
+
+    console.log('[Create Cash Appointment] Service price:', servicePrice);
 
     console.log('[Create Cash Appointment] STEP 3: Creating appointment');
     console.log('[Create Cash Appointment] Appointment details:', {
@@ -181,6 +184,9 @@ Deno.serve(async (req: Request) => {
         payment_status: 'unpaid',
         payment_method: 'cash',
         source: 'client_booking',
+        amount_due: servicePrice,
+        tax_amount: 0,
+        card_fee_amount: 0,
       })
       .select('id')
       .single();

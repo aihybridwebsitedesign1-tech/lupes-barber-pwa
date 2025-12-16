@@ -325,21 +325,44 @@ export default function ClientAppointments() {
 
   // Cancel appointment handler
   const handleCancelAppointment = async () => {
-    if (!selectedAppointment) return;
+    if (!selectedAppointment) {
+      console.error('[Cancel] No appointment selected');
+      return;
+    }
+
+    console.log('[Cancel] Starting cancellation:', {
+      appointmentId: selectedAppointment.id,
+      guestMode,
+      clientPhone: guestMode ? guestClientPhone : phoneNumber
+    });
 
     setCancelling(true);
     try {
       // Determine which phone to use
       const clientPhone = guestMode ? guestClientPhone : phoneNumber;
 
+      if (!clientPhone) {
+        throw new Error('No client phone available');
+      }
+
       // Find client
-      const { data: client } = await supabase
+      const { data: client, error: clientError } = await supabase
         .from('clients')
         .select('id, language')
         .eq('phone', clientPhone)
         .maybeSingle();
 
-      if (!client) throw new Error('Client not found');
+      if (clientError) {
+        console.error('[Cancel] Client lookup error:', clientError);
+        throw clientError;
+      }
+
+      if (!client) {
+        console.error('[Cancel] Client not found for phone:', clientPhone);
+        throw new Error('Client not found');
+      }
+
+      console.log('[Cancel] Client found:', client.id);
 
       // Update appointment status
       const note = cancelReason
@@ -356,7 +379,12 @@ export default function ClientAppointments() {
         })
         .eq('id', selectedAppointment.id);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('[Cancel] Update error:', updateError);
+        throw updateError;
+      }
+
+      console.log('[Cancel] Appointment cancelled successfully');
 
       // Send cancellation notification to client
       const clientLanguage = (client.language || language) as 'en' | 'es';
@@ -448,7 +476,10 @@ export default function ClientAppointments() {
 
   // Reschedule appointment handler
   const handleRescheduleAppointment = async () => {
-    if (!selectedAppointment) return;
+    if (!selectedAppointment) {
+      console.error('[Reschedule] No appointment selected');
+      return;
+    }
 
     if (!rescheduleDate || !rescheduleTime) {
       setRescheduleError(language === 'en'
@@ -457,6 +488,14 @@ export default function ClientAppointments() {
       return;
     }
 
+    console.log('[Reschedule] Starting reschedule:', {
+      appointmentId: selectedAppointment.id,
+      guestMode,
+      clientPhone: guestMode ? guestClientPhone : phoneNumber,
+      newDate: rescheduleDate,
+      newTime: rescheduleTime
+    });
+
     setRescheduling(true);
     setRescheduleError('');
 
@@ -464,37 +503,62 @@ export default function ClientAppointments() {
       // Determine which phone to use
       const clientPhone = guestMode ? guestClientPhone : phoneNumber;
 
+      if (!clientPhone) {
+        throw new Error('No client phone available');
+      }
+
       // Find client
-      const { data: client } = await supabase
+      const { data: client, error: clientError } = await supabase
         .from('clients')
         .select('id, language')
         .eq('phone', clientPhone)
         .maybeSingle();
 
-      if (!client) throw new Error('Client not found');
+      if (clientError) {
+        console.error('[Reschedule] Client lookup error:', clientError);
+        throw clientError;
+      }
+
+      if (!client) {
+        console.error('[Reschedule] Client not found for phone:', clientPhone);
+        throw new Error('Client not found');
+      }
+
+      console.log('[Reschedule] Client found:', client.id);
 
       // Validate booking rules
       const newDateTime = new Date(`${rescheduleDate}T${rescheduleTime}:00`);
       const validationError = await validateBookingRules(newDateTime, 'reschedule');
 
       if (validationError) {
+        console.log('[Reschedule] Validation failed:', validationError);
         setRescheduleError(formatBookingRuleError(validationError, language));
+        setRescheduling(false);
         return;
       }
 
+      console.log('[Reschedule] Validation passed');
+
       // Get service duration
+      const { data: appointmentData } = await supabase
+        .from('appointments')
+        .select('service_id')
+        .eq('id', selectedAppointment.id)
+        .single();
+
       const { data: service } = await supabase
         .from('services')
         .select('duration_minutes')
-        .eq('id', (await supabase
-          .from('appointments')
-          .select('service_id')
-          .eq('id', selectedAppointment.id)
-          .single()).data?.service_id)
+        .eq('id', appointmentData?.service_id)
         .single();
 
       const durationMinutes = service?.duration_minutes || 30;
       const newEndTime = new Date(newDateTime.getTime() + durationMinutes * 60000);
+
+      console.log('[Reschedule] Updating appointment to:', {
+        start: newDateTime.toISOString(),
+        end: newEndTime.toISOString()
+      });
 
       // Update appointment
       const { error: updateError } = await supabase
@@ -508,7 +572,12 @@ export default function ClientAppointments() {
         })
         .eq('id', selectedAppointment.id);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('[Reschedule] Update error:', updateError);
+        throw updateError;
+      }
+
+      console.log('[Reschedule] Appointment rescheduled successfully');
 
       // Send reschedule notification to client
       const clientLanguage = (client.language || language) as 'en' | 'es';
