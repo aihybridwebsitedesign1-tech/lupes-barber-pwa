@@ -9,6 +9,7 @@ dayjs.extend(timezone);
 type ShopConfig = {
   days_bookable_in_advance: number;
   min_book_ahead_hours: number;
+  min_hours_book_ahead?: number;
   min_cancel_ahead_hours: number;
   client_booking_interval_minutes: number;
 };
@@ -53,7 +54,7 @@ type BookingValidationError = {
 export async function getShopConfig(): Promise<ShopConfig | null> {
   const { data, error } = await supabase
     .from('shop_config')
-    .select('days_bookable_in_advance, min_book_ahead_hours, min_cancel_ahead_hours, client_booking_interval_minutes')
+    .select('days_bookable_in_advance, min_book_ahead_hours, min_hours_book_ahead, min_cancel_ahead_hours, client_booking_interval_minutes')
     .single();
 
   if (error) {
