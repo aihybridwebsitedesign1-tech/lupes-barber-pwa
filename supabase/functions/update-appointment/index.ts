@@ -112,10 +112,12 @@ Deno.serve(async (req: Request) => {
       const durationMinutes = service?.duration_minutes || 30;
 
       // Calculate new start and end times
-      const newDateTime = new Date(`${new_date}T${new_time}:00`);
+      // CRITICAL: Interpret incoming date/time as America/Chicago (CST/CDT) timezone
+      // Append -06:00 offset to ensure correct interpretation (CST = UTC-6)
+      const newDateTime = new Date(`${new_date}T${new_time}:00-06:00`);
       const newEndTime = new Date(newDateTime.getTime() + durationMinutes * 60000);
 
-      console.log('[Update Appointment] New schedule:', {
+      console.log('[Update Appointment] New schedule (with CST timezone):', {
         start: newDateTime.toISOString(),
         end: newEndTime.toISOString()
       });

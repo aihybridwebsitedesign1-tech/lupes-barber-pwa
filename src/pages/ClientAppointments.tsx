@@ -430,6 +430,7 @@ export default function ClientAppointments() {
 
     const config = await getShopConfig();
     const intervalMinutes = config?.client_booking_interval_minutes || 15;
+    const minHoursAhead = config?.min_hours_book_ahead || 0;
 
     // Get the appointment's barber and service details
     const { data: appointmentData } = await supabase
@@ -512,6 +513,25 @@ export default function ClientAppointments() {
       console.log('[Reschedule Slots] Using shop hours:', { openHour, openMinute, closeHour, closeMinute });
     }
 
+    // Fetch existing appointments for this barber on this date to check for conflicts
+    const dateStart = `${rescheduleDate}T00:00:00`;
+    const dateEnd = `${rescheduleDate}T23:59:59`;
+
+    const { data: existingAppointments } = await supabase
+      .from('appointments')
+      .select('id, scheduled_start, scheduled_end')
+      .eq('barber_id', barberId)
+      .eq('status', 'booked')
+      .gte('scheduled_start', dateStart)
+      .lte('scheduled_start', dateEnd)
+      .neq('id', selectedAppointment.id); // Exclude current appointment
+
+    console.log('[Reschedule Slots] Existing appointments on this date:', existingAppointments?.length || 0);
+
+    // Calculate minimum booking time based on min_hours_book_ahead
+    const now = new Date();
+    const minBookingTime = new Date(now.getTime() + minHoursAhead * 60 * 60 * 1000);
+
     const slots: string[] = [];
     let currentHour = openHour;
     let currentMinute = openMinute;
@@ -535,7 +555,33 @@ export default function ClientAppointments() {
       }
 
       const timeStr = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`;
-      slots.push(timeStr);
+
+      // Create slot start/end times for conflict checking
+      const slotStart = new Date(year, month - 1, day, currentHour, currentMinute);
+      const slotEnd = new Date(year, month - 1, day, slotEndHour, slotEndMinute);
+
+      // Check 1: Minimum hours before booking rule
+      let isValid = slotStart >= minBookingTime;
+
+      // Check 2: Double booking - check for conflicts with existing appointments
+      if (isValid && existingAppointments) {
+        for (const apt of existingAppointments) {
+          const aptStart = new Date(apt.scheduled_start);
+          const aptEnd = new Date(apt.scheduled_end);
+
+          // Check if slot overlaps with existing appointment
+          // Overlap occurs if: slotStart < aptEnd AND slotEnd > aptStart
+          if (slotStart < aptEnd && slotEnd > aptStart) {
+            console.log('[Reschedule Slots] Slot conflicts with existing appointment:', timeStr);
+            isValid = false;
+            break;
+          }
+        }
+      }
+
+      if (isValid) {
+        slots.push(timeStr);
+      }
 
       currentMinute += intervalMinutes;
       if (currentMinute >= 60) {
@@ -544,7 +590,7 @@ export default function ClientAppointments() {
       }
     }
 
-    console.log('[Reschedule Slots] Generated', slots.length, 'slots');
+    console.log('[Reschedule Slots] Generated', slots.length, 'available slots (after filtering conflicts)');
     setTimeSlots(slots);
   };
 

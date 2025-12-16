@@ -84,8 +84,7 @@ Deno.serve(async (req: Request) => {
       .select("tax_rate, card_processing_fee_rate")
       .single();
 
-    // Note: taxRate is stored as integer (e.g., 8.5 = 8.5%)
-    // Note: cardFeeRate is stored as decimal (e.g., 0.04 = 4%)
+    // Note: Both rates are stored as decimals (e.g., 0.04 = 4%)
     let taxRate = 0;
     let cardFeeRate = 0;
 
@@ -95,7 +94,8 @@ Deno.serve(async (req: Request) => {
     }
 
     const baseCents = Math.round(numericPrice * 100);
-    const taxCents = Math.round(baseCents * (taxRate / 100));
+    // Tax formula: same as processing fee - rate is already decimal (0.04 = 4%)
+    const taxCents = Math.round(baseCents * taxRate);
     const feeCents = Math.round((baseCents + taxCents) * cardFeeRate);
 
     const tipAmountNum = Number(tip_amount || 0);
