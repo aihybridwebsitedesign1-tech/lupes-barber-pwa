@@ -84,17 +84,19 @@ Deno.serve(async (req: Request) => {
       .select("tax_rate, card_processing_fee_rate")
       .single();
 
-    // Note: Both rates are stored as decimals (e.g., 0.04 = 4%)
-    let taxRate = 0;
-    let cardFeeRate = 0;
+    // Note: Both rates are stored as whole percentages (e.g., 4 = 4%), convert to decimal
+    let taxRateRaw = 0;
+    let cardFeeRateRaw = 0;
 
     if (shopConfig) {
-      taxRate = Number(shopConfig.tax_rate || 0);
-      cardFeeRate = Number(shopConfig.card_processing_fee_rate || 0);
+      taxRateRaw = Number(shopConfig.tax_rate || 0);
+      cardFeeRateRaw = Number(shopConfig.card_processing_fee_rate || 0);
     }
 
+    const taxRate = taxRateRaw / 100; // Convert to decimal (4 -> 0.04)
+    const cardFeeRate = cardFeeRateRaw / 100; // Convert to decimal (4 -> 0.04)
+
     const baseCents = Math.round(numericPrice * 100);
-    // Tax formula: same as processing fee - rate is already decimal (0.04 = 4%)
     const taxCents = Math.round(baseCents * taxRate);
     const feeCents = Math.round((baseCents + taxCents) * cardFeeRate);
 
@@ -127,7 +129,7 @@ Deno.serve(async (req: Request) => {
 
     if (taxCents > 0) {
       formData.append(`line_items[${lineItemIndex}][price_data][currency]`, "usd");
-      formData.append(`line_items[${lineItemIndex}][price_data][product_data][name]`, `Tax (${(taxRate * 100).toFixed(2)}%)`);
+      formData.append(`line_items[${lineItemIndex}][price_data][product_data][name]`, `Tax (${taxRateRaw.toFixed(2)}%)`);
       formData.append(`line_items[${lineItemIndex}][price_data][unit_amount]`, taxCents.toString());
       formData.append(`line_items[${lineItemIndex}][quantity]`, "1");
       lineItemIndex++;
@@ -135,7 +137,7 @@ Deno.serve(async (req: Request) => {
 
     if (feeCents > 0) {
       formData.append(`line_items[${lineItemIndex}][price_data][currency]`, "usd");
-      formData.append(`line_items[${lineItemIndex}][price_data][product_data][name]`, `Processing Fee (${(cardFeeRate * 100).toFixed(2)}%)`);
+      formData.append(`line_items[${lineItemIndex}][price_data][product_data][name]`, `Processing Fee (${cardFeeRateRaw.toFixed(2)}%)`);
       formData.append(`line_items[${lineItemIndex}][price_data][unit_amount]`, feeCents.toString());
       formData.append(`line_items[${lineItemIndex}][quantity]`, "1");
       lineItemIndex++;

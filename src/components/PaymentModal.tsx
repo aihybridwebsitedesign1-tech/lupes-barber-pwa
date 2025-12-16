@@ -38,8 +38,9 @@ export default function PaymentModal({
 
       if (error) throw error;
 
-      setTaxRate(Number(data.tax_rate) || 0);
-      setCardFeeRate(Number(data.card_processing_fee_rate) || 0);
+      // Note: rates stored as whole percentages (e.g., 4 = 4%), convert to decimal
+      setTaxRate((Number(data.tax_rate) || 0) / 100);
+      setCardFeeRate((Number(data.card_processing_fee_rate) || 0) / 100);
     } catch (err) {
       console.error('Error loading shop config:', err);
       // No hardcoded fallbacks - use 0 if shop_config unavailable
@@ -50,7 +51,7 @@ export default function PaymentModal({
 
   const calculateTotals = () => {
     const subtotal = servicesTotal + productsTotal;
-    const taxAmount = subtotal * taxRate;
+    const taxAmount = subtotal * taxRate; // taxRate is already decimal (0.04 = 4%)
     const totalBeforeTip = subtotal + taxAmount;
     const tip = parseFloat(tipAmount) || 0;
     const totalBeforeFees = totalBeforeTip + tip;

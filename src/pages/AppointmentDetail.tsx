@@ -339,9 +339,11 @@ export default function AppointmentDetail() {
         .select('tax_rate, card_processing_fee_rate')
         .single();
 
-      // Use defaults if config not found (tax_rate and card_fee stored as decimals, e.g., 0.04 = 4%)
-      const taxRate = Number(shopConfig?.tax_rate || 0);
-      const cardFeeRate = Number(shopConfig?.card_processing_fee_rate || 0);
+      // Note: rates stored as whole percentages (e.g., 4 = 4%), convert to decimal
+      const taxRateRaw = Number(shopConfig?.tax_rate || 0);
+      const cardFeeRateRaw = Number(shopConfig?.card_processing_fee_rate || 0);
+      const taxRate = taxRateRaw / 100;
+      const cardFeeRate = cardFeeRateRaw / 100;
 
       // Get the base service price (use services_total if set, otherwise use amount_due or service base_price)
       const basePrice = appointment.services_total > 0 
@@ -371,8 +373,8 @@ export default function AppointmentDetail() {
       let confirmMsg: string;
       if (method === 'card') {
         confirmMsg = language === 'en'
-          ? `Mark as paid with card?\n\nService: ${formatCurrency(basePrice)}\nTax (${(taxRate * 100).toFixed(2)}%): ${formatCurrency(taxAmount)}\nCard Fee (${(cardFeeRate * 100).toFixed(2)}%): ${formatCurrency(cardFeeAmount)}\n\nTotal: ${formatCurrency(totalAmount)}`
-          : `¿Marcar como pagado con tarjeta?\n\nServicio: ${formatCurrency(basePrice)}\nImpuesto (${(taxRate * 100).toFixed(2)}%): ${formatCurrency(taxAmount)}\nTarifa tarjeta (${(cardFeeRate * 100).toFixed(2)}%): ${formatCurrency(cardFeeAmount)}\n\nTotal: ${formatCurrency(totalAmount)}`;
+          ? `Mark as paid with card?\n\nService: ${formatCurrency(basePrice)}\nTax (${taxRateRaw.toFixed(2)}%): ${formatCurrency(taxAmount)}\nCard Fee (${cardFeeRateRaw.toFixed(2)}%): ${formatCurrency(cardFeeAmount)}\n\nTotal: ${formatCurrency(totalAmount)}`
+          : `¿Marcar como pagado con tarjeta?\n\nServicio: ${formatCurrency(basePrice)}\nImpuesto (${taxRateRaw.toFixed(2)}%): ${formatCurrency(taxAmount)}\nTarifa tarjeta (${cardFeeRateRaw.toFixed(2)}%): ${formatCurrency(cardFeeAmount)}\n\nTotal: ${formatCurrency(totalAmount)}`;
       } else {
         confirmMsg = language === 'en'
           ? `Mark as paid with cash?\n\nTotal: ${formatCurrency(totalAmount)}`

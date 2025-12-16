@@ -602,8 +602,9 @@ export default function ClientBook() {
         }
       } else if (testMode) {
         // TEST MODE: Create appointment directly for testing (no payment)
-        const taxRate = shopSettings?.tax_rate || 0;
-        const feeRate = shopSettings?.card_processing_fee_rate || 0;
+        // Note: taxRate and feeRate are stored as whole percentages (e.g., 4 = 4%)
+        const taxRate = (shopSettings?.tax_rate || 0) / 100;
+        const feeRate = (shopSettings?.card_processing_fee_rate || 0) / 100;
         const subtotal = servicePrice + tipAmount;
         const tax = subtotal * taxRate;
         const stripeFee = (subtotal + tax) * feeRate;
@@ -940,10 +941,12 @@ export default function ClientBook() {
               : (customTip ? parseFloat(customTip) : 0);
 
             // Use dynamic shop settings
-            // Note: taxRate is stored as decimal (e.g., 0.04 = 4%)
-            // Note: feeRate is stored as decimal (e.g., 0.04 = 4%)
-            const taxRate = shopSettings?.tax_rate || 0;
-            const feeRate = shopSettings?.card_processing_fee_rate || 0;
+            // Note: taxRate is stored as whole percentage (e.g., 4 = 4%)
+            // Note: feeRate is stored as whole percentage (e.g., 4 = 4%)
+            const taxRateRaw = shopSettings?.tax_rate || 0;
+            const feeRateRaw = shopSettings?.card_processing_fee_rate || 0;
+            const taxRate = taxRateRaw / 100; // Convert to decimal (4 -> 0.04)
+            const feeRate = feeRateRaw / 100; // Convert to decimal (4 -> 0.04)
             const tipPresets = (Array.isArray(shopSettings?.tip_percentage_presets) ? shopSettings.tip_percentage_presets : [15, 18, 20]);
 
             const subtotal = servicePrice + tipAmount;
@@ -1095,7 +1098,7 @@ export default function ClientBook() {
 
                       {tax > 0 && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                          <span>{language === 'en' ? `Tax (${(taxRate * 100).toFixed(2)}%)` : `Impuesto (${(taxRate * 100).toFixed(2)}%)`}</span>
+                          <span>{language === 'en' ? `Tax (${taxRateRaw.toFixed(2)}%)` : `Impuesto (${taxRateRaw.toFixed(2)}%)`}</span>
                           <span>${tax.toFixed(2)}</span>
                         </div>
                       )}
@@ -1103,7 +1106,7 @@ export default function ClientBook() {
                       {stripeFee > 0 && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', paddingBottom: '0.5rem', borderBottom: '1px solid #ddd' }}>
                           <span style={{ fontSize: '14px', color: '#666' }}>
-                            {language === 'en' ? `Processing Fee (${(feeRate * 100).toFixed(2)}%)` : `Tarifa de Procesamiento (${(feeRate * 100).toFixed(2)}%)`}
+                            {language === 'en' ? `Processing Fee (${feeRateRaw.toFixed(2)}%)` : `Tarifa de Procesamiento (${feeRateRaw.toFixed(2)}%)`}
                           </span>
                           <span style={{ fontSize: '14px', color: '#666' }}>${stripeFee.toFixed(2)}</span>
                         </div>
