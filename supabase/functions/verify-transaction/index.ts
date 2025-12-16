@@ -186,7 +186,7 @@ Deno.serve(async (req: Request) => {
         service_id: serviceId,
         scheduled_start: startTime,
         scheduled_end: endDate.toISOString(),
-        status: 'confirmed',
+        status: 'booked',
         payment_status: 'paid',
         payment_method: 'card',
         payment_intent: session.payment_intent,
