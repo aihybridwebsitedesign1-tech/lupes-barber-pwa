@@ -3,6 +3,7 @@ console.log('!!! FINAL ATTEMPT SCRIPT LOADED !!!');
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
+import { supabase } from '../lib/supabase';
 import ClientHeader from '../components/ClientHeader';
 import Footer from '../components/Footer';
 
@@ -58,17 +59,46 @@ export default function ClientBookSuccess() {
     console.log('STEP 0: loadSuccessScreen called');
     const sessionId = searchParams.get('sid') || searchParams.get('session_id');
     const appointmentId = searchParams.get('appointment_id');
+    const bookingType = searchParams.get('type');
 
     console.log('STEP 1: Session ID:', sessionId);
     console.log('STEP 1B: Appointment ID:', appointmentId);
+    console.log('STEP 1C: Booking Type:', bookingType);
 
-    // Validate session ID
+    // CASH BOOKING MODE: No payment required
+    if (bookingType === 'cash' && appointmentId) {
+      console.log('STEP 2: Cash booking mode - showing success immediately');
+      setGenericSuccess(true);
+      setLoading(false);
+      return;
+    }
+
+    // STRIPE BOOKING MODE: Verify payment
     if (!sessionId) {
-      console.log('STEP 1C: No session ID found, showing error');
+      console.log('STEP 1D: No session ID found, showing error');
       setError(language === 'en' ? 'Invalid payment confirmation link.' : 'Enlace de confirmación de pago inválido.');
       setLoading(false);
       setDebugError('No session_id in URL parameters');
       return;
+    }
+
+    // RESCUE FLOW: Call verify-transaction to ensure appointment exists
+    console.log('STEP 2: Calling verify-transaction to rescue stuck transactions');
+    try {
+      const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-transaction', {
+        body: { session_id: sessionId }
+      });
+
+      if (verifyError) {
+        console.error('STEP 2 ERROR:', verifyError);
+      } else {
+        console.log('STEP 2 SUCCESS:', verifyData);
+        if (verifyData?.appointment_id) {
+          console.log('STEP 2: Appointment rescued/verified:', verifyData.appointment_id);
+        }
+      }
+    } catch (err: any) {
+      console.error('STEP 2 EXCEPTION:', err.message);
     }
 
     // SMART POLLING: Wait for Stripe webhook to complete
@@ -256,6 +286,9 @@ export default function ClientBookSuccess() {
 
   // GENERIC SUCCESS SCREEN: Fail-safe for when appointment details cannot be fetched
   if (genericSuccess) {
+    const bookingType = searchParams.get('type');
+    const isCashBooking = bookingType === 'cash';
+
     return (
       <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5', display: 'flex', flexDirection: 'column' }}>
         <DebugHeader />
@@ -278,9 +311,14 @@ export default function ClientBookSuccess() {
             </h1>
 
             <p style={{ fontSize: '18px', color: '#666', marginBottom: '2rem' }}>
-              {language === 'en'
-                ? 'Your appointment has been confirmed. A confirmation has been sent to your phone with all the details.'
-                : 'Tu cita ha sido confirmada. Se ha enviado una confirmación a tu teléfono con todos los detalles.'}
+              {isCashBooking
+                ? (language === 'en'
+                  ? 'Your appointment has been confirmed. You can pay at the shop when you arrive.'
+                  : 'Tu cita ha sido confirmada. Puedes pagar en la tienda cuando llegues.')
+                : (language === 'en'
+                  ? 'Your appointment has been confirmed. A confirmation has been sent to your phone with all the details.'
+                  : 'Tu cita ha sido confirmada. Se ha enviado una confirmación a tu teléfono con todos los detalles.')
+              }
             </p>
 
             <div

@@ -461,6 +461,45 @@ export default function ClientBook() {
     setStep(step - 1);
   };
 
+  const handleCashBooking = async () => {
+    const isValid = await validateStep(4);
+    if (!isValid) return;
+
+    setSubmitting(true);
+    setError('');
+
+    try {
+      const appointmentStart = selectedTime;
+
+      const { data, error: invokeError } = await supabase.functions.invoke('create-cash-appointment', {
+        body: {
+          barber_id: selectedBarber,
+          service_id: selectedService,
+          scheduled_start: appointmentStart,
+          client_name: clientName,
+          client_phone: clientPhone,
+          client_email: null,
+        }
+      });
+
+      if (invokeError) {
+        throw invokeError;
+      }
+
+      if (!data || !data.success) {
+        throw new Error('Failed to create cash appointment');
+      }
+
+      navigate(`/client/success?appointment_id=${data.appointment_id}&type=cash`);
+    } catch (cashError) {
+      debugError('Cash booking error:', cashError);
+      setError(language === 'en'
+        ? 'Failed to create booking. Please try again.'
+        : 'Error al crear la reserva. Por favor intenta de nuevo.');
+      setSubmitting(false);
+    }
+  };
+
   const handleSubmit = async () => {
     const isValid = await validateStep(4);
     if (!isValid) return;
@@ -1135,6 +1174,29 @@ export default function ClientBook() {
                         ? (language === 'en' ? `Pay $${grandTotal.toFixed(2)}` : `Pagar $${grandTotal.toFixed(2)}`)
                         : (language === 'en' ? 'Confirm Booking' : 'Confirmar Reserva')}
                 </button>
+
+                {stripeEnabled && !testMode && (
+                  <button
+                    onClick={handleCashBooking}
+                    disabled={submitting}
+                    style={{
+                      width: '100%',
+                      padding: '1rem',
+                      backgroundColor: submitting ? '#999' : 'white',
+                      color: submitting ? 'white' : '#e74c3c',
+                      border: '2px solid #e74c3c',
+                      borderRadius: '8px',
+                      cursor: submitting ? 'not-allowed' : 'pointer',
+                      fontSize: '18px',
+                      fontWeight: 'bold',
+                      marginBottom: '0.5rem',
+                    }}
+                  >
+                    {submitting
+                      ? (language === 'en' ? 'Processing...' : 'Procesando...')
+                      : (language === 'en' ? 'Pay at Shop' : 'Pagar en la Tienda')}
+                  </button>
+                )}
               </div>
             );
           })()}
