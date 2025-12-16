@@ -360,66 +360,49 @@ export default function ClientAppointments() {
         throw new Error('No client phone available');
       }
 
-      // Find client
-      const { data: client, error: clientError } = await supabase
+      // Find client for notification
+      const { data: client } = await supabase
         .from('clients')
         .select('id, language')
         .eq('phone', clientPhone)
         .maybeSingle();
 
-      if (clientError) {
-        console.error('[Cancel] Client lookup error:', clientError);
-        throw clientError;
-      }
-
-      if (!client) {
-        console.error('[Cancel] Client not found for phone:', clientPhone);
-        throw new Error('Client not found');
-      }
-
-      console.log('[Cancel] Client found:', client.id);
-
-      // Update appointment status
-      const note = cancelReason
-        ? `Cancelled by client: ${cancelReason}`
-        : 'Cancelled by client self-service';
-
-      const { error: updateError } = await supabase
-        .from('appointments')
-        .update({
-          status: 'cancelled',
-          notes: selectedAppointment.notes
-            ? `${selectedAppointment.notes}\n${note}`
-            : note
-        })
-        .eq('id', selectedAppointment.id);
-
-      if (updateError) {
-        console.error('[Cancel] Update error:', updateError);
-        throw updateError;
-      }
-
-      console.log('[Cancel] Appointment cancelled successfully');
-
-      // Send cancellation notification to client
-      const clientLanguage = (client.language || language) as 'en' | 'es';
-      sendCancellation({
-        appointmentId: selectedAppointment.id,
-        clientId: client.id,
-        phoneNumber: clientPhone,
-        scheduledStart: selectedAppointment.scheduled_start,
-        shopName: shopInfo.shop_name,
-        shopPhone: shopInfo.phone || undefined,
-        language: clientLanguage,
-      }).catch(err => {
-        console.error('Failed to send cancellation SMS:', err);
+      // Call edge function to bypass RLS
+      console.log('[Cancel] Calling update-appointment edge function');
+      const { data, error: invokeError } = await supabase.functions.invoke('update-appointment', {
+        body: {
+          appointment_id: selectedAppointment.id,
+          action: 'cancel',
+          cancel_reason: cancelReason
+        }
       });
 
-      // Reload appointments
-      if (guestMode) {
-        await loadGuestAppointment(selectedAppointment.id);
-      } else {
-        await loadAppointments();
+      if (invokeError) {
+        console.error('[Cancel] Edge function error:', invokeError);
+        throw invokeError;
+      }
+
+      if (data?.error) {
+        console.error('[Cancel] Edge function returned error:', data.error);
+        throw new Error(data.error);
+      }
+
+      console.log('[Cancel] Appointment cancelled successfully via edge function');
+
+      // Send cancellation notification to client
+      if (client) {
+        const clientLanguage = (client.language || language) as 'en' | 'es';
+        sendCancellation({
+          appointmentId: selectedAppointment.id,
+          clientId: client.id,
+          phoneNumber: clientPhone,
+          scheduledStart: selectedAppointment.scheduled_start,
+          shopName: shopInfo.shop_name,
+          shopPhone: shopInfo.phone || undefined,
+          language: clientLanguage,
+        }).catch(err => {
+          console.error('Failed to send cancellation SMS:', err);
+        });
       }
 
       // Show success message
@@ -598,24 +581,12 @@ export default function ClientAppointments() {
         throw new Error('No client phone available');
       }
 
-      // Find client
-      const { data: client, error: clientError } = await supabase
+      // Find client for notification
+      const { data: client } = await supabase
         .from('clients')
         .select('id, language')
         .eq('phone', clientPhone)
         .maybeSingle();
-
-      if (clientError) {
-        console.error('[Reschedule] Client lookup error:', clientError);
-        throw clientError;
-      }
-
-      if (!client) {
-        console.error('[Reschedule] Client not found for phone:', clientPhone);
-        throw new Error('Client not found');
-      }
-
-      console.log('[Reschedule] Client found:', client.id);
 
       // Validate booking rules
       const newDateTime = new Date(`${rescheduleDate}T${rescheduleTime}:00`);
@@ -630,66 +601,44 @@ export default function ClientAppointments() {
 
       console.log('[Reschedule] Validation passed');
 
-      // Get service duration
-      const { data: appointmentData } = await supabase
-        .from('appointments')
-        .select('service_id')
-        .eq('id', selectedAppointment.id)
-        .single();
-
-      const { data: service } = await supabase
-        .from('services')
-        .select('duration_minutes')
-        .eq('id', appointmentData?.service_id)
-        .single();
-
-      const durationMinutes = service?.duration_minutes || 30;
-      const newEndTime = new Date(newDateTime.getTime() + durationMinutes * 60000);
-
-      console.log('[Reschedule] Updating appointment to:', {
-        start: newDateTime.toISOString(),
-        end: newEndTime.toISOString()
+      // Call edge function to bypass RLS
+      console.log('[Reschedule] Calling update-appointment edge function');
+      const { data, error: invokeError } = await supabase.functions.invoke('update-appointment', {
+        body: {
+          appointment_id: selectedAppointment.id,
+          action: 'reschedule',
+          new_date: rescheduleDate,
+          new_time: rescheduleTime
+        }
       });
 
-      // Update appointment
-      const { error: updateError } = await supabase
-        .from('appointments')
-        .update({
-          scheduled_start: newDateTime.toISOString(),
-          scheduled_end: newEndTime.toISOString(),
-          notes: selectedAppointment.notes
-            ? `${selectedAppointment.notes}\nRescheduled by client self-service`
-            : 'Rescheduled by client self-service'
-        })
-        .eq('id', selectedAppointment.id);
-
-      if (updateError) {
-        console.error('[Reschedule] Update error:', updateError);
-        throw updateError;
+      if (invokeError) {
+        console.error('[Reschedule] Edge function error:', invokeError);
+        throw invokeError;
       }
 
-      console.log('[Reschedule] Appointment rescheduled successfully');
+      if (data?.error) {
+        console.error('[Reschedule] Edge function returned error:', data.error);
+        throw new Error(data.error);
+      }
+
+      console.log('[Reschedule] Appointment rescheduled successfully via edge function');
 
       // Send reschedule notification to client
-      const clientLanguage = (client.language || language) as 'en' | 'es';
-      sendReschedule({
-        appointmentId: selectedAppointment.id,
-        clientId: client.id,
-        phoneNumber: clientPhone,
-        newScheduledStart: newDateTime.toISOString(),
-        barberName: selectedAppointment.barber_name || 'our barber',
-        shopName: shopInfo.shop_name,
-        shopPhone: shopInfo.phone || undefined,
-        language: clientLanguage,
-      }).catch(err => {
-        console.error('Failed to send reschedule SMS:', err);
-      });
-
-      // Reload appointments
-      if (guestMode) {
-        await loadGuestAppointment(selectedAppointment.id);
-      } else {
-        await loadAppointments();
+      if (client) {
+        const clientLanguage = (client.language || language) as 'en' | 'es';
+        sendReschedule({
+          appointmentId: selectedAppointment.id,
+          clientId: client.id,
+          phoneNumber: clientPhone,
+          newScheduledStart: newDateTime.toISOString(),
+          barberName: selectedAppointment.barber_name || 'our barber',
+          shopName: shopInfo.shop_name,
+          shopPhone: shopInfo.phone || undefined,
+          language: clientLanguage,
+        }).catch(err => {
+          console.error('Failed to send reschedule SMS:', err);
+        });
       }
 
       // Show success message
