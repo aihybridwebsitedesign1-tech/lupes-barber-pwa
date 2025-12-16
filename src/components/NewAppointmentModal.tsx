@@ -189,15 +189,7 @@ export default function NewAppointmentModal({ onClose, onSuccess }: Props) {
         scheduled_end: endDateTime.toISOString(),
         status: 'booked',
         source: 'owner_manual',
-        amount_due: servicePrice,
-        total_amount: servicePrice,
-        services_total: servicePrice,
-        products_total: 0,
-        tax_amount: 0,
-        tip_amount: 0,
-        processing_fee_amount: 0,
-        total_charged: 0,
-        net_revenue: 0
+        amount_due: servicePrice
       }).select();
 
       if (error) {
