@@ -340,8 +340,9 @@ export default function AppointmentDetail() {
         .single();
 
       // Note: rates stored as whole percentages (e.g., 4 = 4%), convert to decimal
-      const taxRateRaw = Number(shopConfig?.tax_rate || 0);
-      const cardFeeRateRaw = Number(shopConfig?.card_processing_fee_rate || 0);
+      // Default to 4% if shop_config is unavailable
+      const taxRateRaw = Number(shopConfig?.tax_rate ?? 4);
+      const cardFeeRateRaw = Number(shopConfig?.card_processing_fee_rate ?? 4);
       const taxRate = taxRateRaw / 100;
       const cardFeeRate = cardFeeRateRaw / 100;
 

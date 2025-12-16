@@ -274,8 +274,8 @@ export default function ClientBook() {
           }
 
           setShopSettings({
-            tax_rate: Number(shopConfigFull.data.tax_rate || 0),
-            card_processing_fee_rate: Number(shopConfigFull.data.card_processing_fee_rate || 0),
+            tax_rate: Number(shopConfigFull.data.tax_rate || 4), // Default 4%
+            card_processing_fee_rate: Number(shopConfigFull.data.card_processing_fee_rate || 4), // Default 4%
             tip_percentage_presets: Array.isArray(tipPresetsArray) ? tipPresetsArray : [15, 18, 20],
             enable_tipping: shopConfigFull.data.enable_tipping ?? true
           });
@@ -306,6 +306,13 @@ export default function ClientBook() {
           client_booking_interval_minutes: 15,
         };
         setConfig(fallbackConfig);
+        // Set fallback payment settings (4% tax, 4% card fee)
+        setShopSettings({
+          tax_rate: 4,
+          card_processing_fee_rate: 4,
+          tip_percentage_presets: [15, 18, 20],
+          enable_tipping: true
+        });
       }
 
       // ========================================

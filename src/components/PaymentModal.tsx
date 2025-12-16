@@ -43,9 +43,10 @@ export default function PaymentModal({
       setCardFeeRate((Number(data.card_processing_fee_rate) || 0) / 100);
     } catch (err) {
       console.error('Error loading shop config:', err);
-      // No hardcoded fallbacks - use 0 if shop_config unavailable
-      setTaxRate(0);
-      setCardFeeRate(0);
+      // Fallback to standard rates (4% tax, 4% card fee) if shop_config unavailable
+      // Note: values are whole percentages, divided by 100 at load time
+      setTaxRate(4 / 100); // 4% = 0.04
+      setCardFeeRate(4 / 100); // 4% = 0.04
     }
   };
 

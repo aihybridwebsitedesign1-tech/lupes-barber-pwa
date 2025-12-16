@@ -85,12 +85,13 @@ Deno.serve(async (req: Request) => {
       .single();
 
     // Note: Both rates are stored as whole percentages (e.g., 4 = 4%), convert to decimal
-    let taxRateRaw = 0;
-    let cardFeeRateRaw = 0;
+    // Default to 4% if shop_config is unavailable
+    let taxRateRaw = 4;
+    let cardFeeRateRaw = 4;
 
     if (shopConfig) {
-      taxRateRaw = Number(shopConfig.tax_rate || 0);
-      cardFeeRateRaw = Number(shopConfig.card_processing_fee_rate || 0);
+      taxRateRaw = Number(shopConfig.tax_rate ?? 4);
+      cardFeeRateRaw = Number(shopConfig.card_processing_fee_rate ?? 4);
     }
 
     const taxRate = taxRateRaw / 100; // Convert to decimal (4 -> 0.04)
