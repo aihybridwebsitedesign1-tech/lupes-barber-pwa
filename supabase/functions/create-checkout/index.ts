@@ -127,7 +127,7 @@ Deno.serve(async (req: Request) => {
 
     if (taxCents > 0) {
       formData.append(`line_items[${lineItemIndex}][price_data][currency]`, "usd");
-      formData.append(`line_items[${lineItemIndex}][price_data][product_data][name]`, `Tax (${taxRate}%)`);
+      formData.append(`line_items[${lineItemIndex}][price_data][product_data][name]`, `Tax (${(taxRate * 100).toFixed(2)}%)`);
       formData.append(`line_items[${lineItemIndex}][price_data][unit_amount]`, taxCents.toString());
       formData.append(`line_items[${lineItemIndex}][quantity]`, "1");
       lineItemIndex++;

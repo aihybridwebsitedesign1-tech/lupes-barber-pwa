@@ -93,19 +93,22 @@ export async function validateBookingRules(
   barberId?: string | null
 ): Promise<BookingValidationError | null> {
   const config = await getShopConfig();
-  if (!config) {
-    return {
-      field: 'config',
-      message: 'Unable to load booking rules',
-      messageEs: 'No se pudieron cargar las reglas de reserva',
-    };
-  }
+  
+  // Use sensible defaults if config cannot be loaded
+  const defaultConfig = {
+    days_bookable_in_advance: 30,
+    min_book_ahead_hours: 0,
+    min_cancel_ahead_hours: 0,
+    client_booking_interval_minutes: 15,
+  };
+
+  const effectiveConfig = config || defaultConfig;
 
   const barberOverrides = await getBarberOverrides(barberId || null);
 
-  const minBookAheadHours = barberOverrides?.min_hours_before_booking_override ?? config.min_book_ahead_hours;
-  const minCancelAheadHours = barberOverrides?.min_hours_before_cancellation_override ?? config.min_cancel_ahead_hours;
-  const intervalMinutes = barberOverrides?.booking_interval_minutes_override ?? config.client_booking_interval_minutes;
+  const minBookAheadHours = barberOverrides?.min_hours_before_booking_override ?? effectiveConfig.min_book_ahead_hours;
+  const minCancelAheadHours = barberOverrides?.min_hours_before_cancellation_override ?? effectiveConfig.min_cancel_ahead_hours;
+  const intervalMinutes = barberOverrides?.booking_interval_minutes_override ?? effectiveConfig.client_booking_interval_minutes;
 
   const now = new Date();
   const msUntilAppointment = startTime.getTime() - now.getTime();
@@ -113,11 +116,11 @@ export async function validateBookingRules(
   const daysUntilAppointment = msUntilAppointment / (1000 * 60 * 60 * 24);
 
   if (action === 'create' || action === 'reschedule') {
-    if (daysUntilAppointment > config.days_bookable_in_advance) {
+    if (daysUntilAppointment > effectiveConfig.days_bookable_in_advance) {
       return {
         field: 'start_time',
-        message: `Appointments can only be booked up to ${config.days_bookable_in_advance} days in advance`,
-        messageEs: `Las citas solo se pueden reservar con hasta ${config.days_bookable_in_advance} días de anticipación`,
+        message: `Appointments can only be booked up to ${effectiveConfig.days_bookable_in_advance} days in advance`,
+        messageEs: `Las citas solo se pueden reservar con hasta ${effectiveConfig.days_bookable_in_advance} días de anticipación`,
       };
     }
 
