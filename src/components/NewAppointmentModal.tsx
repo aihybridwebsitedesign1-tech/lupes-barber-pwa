@@ -179,6 +179,8 @@ export default function NewAppointmentModal({ onClose, onSuccess }: Props) {
         time: appointmentTime
       });
 
+      const servicePrice = service.base_price || 0;
+      
       const { data, error } = await supabase.from('appointments').insert({
         client_id: selectedClient,
         barber_id: selectedBarber,
@@ -187,7 +189,10 @@ export default function NewAppointmentModal({ onClose, onSuccess }: Props) {
         scheduled_end: endDateTime.toISOString(),
         status: 'booked',
         source: 'owner_manual',
-        services_total: service.base_price,
+        price: servicePrice,
+        amount_due: servicePrice,
+        total_amount: servicePrice,
+        services_total: servicePrice,
         products_total: 0,
         tax_amount: 0,
         tip_amount: 0,
