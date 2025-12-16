@@ -41,17 +41,21 @@ export default function ClientBookSuccess() {
 
   useEffect(() => {
     console.log('SUCCESS PAGE: Component mounted, starting load...');
-    loadSuccessScreen();
 
-    // 5-SECOND ESCAPE HATCH: Force stop loading after 5 seconds
-    const timeoutId = setTimeout(() => {
-      console.log('TIMEOUT: 5 seconds elapsed, forcing loading to stop');
+    // 3-SECOND FAIL-SAFE: Force success display after 3 seconds
+    const failsafeTimeoutId = setTimeout(() => {
+      console.log('⏰ FAIL-SAFE TRIGGERED: 3 seconds elapsed, forcing success display');
       setLoading(false);
-      setDebugError('TIMEOUT: Database or Edge Function took too long to respond (5 seconds).');
-    }, 5000);
+      setGenericSuccess(true);
+    }, 3000);
+
+    loadSuccessScreen().then(() => {
+      // Clear the timeout if loading completes successfully
+      clearTimeout(failsafeTimeoutId);
+    });
 
     return () => {
-      clearTimeout(timeoutId);
+      clearTimeout(failsafeTimeoutId);
     };
   }, []);
 
@@ -296,6 +300,7 @@ export default function ClientBookSuccess() {
   if (genericSuccess) {
     const bookingType = searchParams.get('type');
     const isCashBooking = bookingType === 'cash';
+    const appointmentId = searchParams.get('appointment_id');
 
     return (
       <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5', display: 'flex', flexDirection: 'column' }}>
@@ -346,18 +351,93 @@ export default function ClientBookSuccess() {
               </p>
             </div>
 
+            {appointmentId && (
+              <div
+                style={{
+                  backgroundColor: '#fff8e1',
+                  border: '2px solid #ffc107',
+                  borderRadius: '8px',
+                  padding: '1.5rem',
+                  marginBottom: '2rem',
+                  textAlign: 'left',
+                }}
+              >
+                <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '1rem', color: '#ff6f00' }}>
+                  {language === 'en' ? '📋 Save This Link to Manage Your Appointment' : '📋 Guarda Este Enlace para Gestionar Tu Cita'}
+                </div>
+                <div style={{ fontSize: '14px', color: '#666', marginBottom: '0.75rem' }}>
+                  {language === 'en'
+                    ? 'You will need this link to reschedule or cancel:'
+                    : 'Necesitarás este enlace para reprogramar o cancelar:'}
+                </div>
+                <div
+                  style={{
+                    backgroundColor: 'white',
+                    border: '1px solid #ddd',
+                    borderRadius: '6px',
+                    padding: '0.75rem',
+                    fontSize: '14px',
+                    fontFamily: 'monospace',
+                    wordBreak: 'break-all',
+                    marginBottom: '1rem',
+                    color: '#333',
+                  }}
+                >
+                  {`https://lupesbarbershop.com/client/appointments?id=${appointmentId}`}
+                </div>
+                <button
+                  onClick={() => {
+                    const url = `https://lupesbarbershop.com/client/appointments?id=${appointmentId}`;
+                    navigator.clipboard.writeText(url);
+                    alert(language === 'en' ? 'Link copied to clipboard!' : '¡Enlace copiado al portapapeles!');
+                  }}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    backgroundColor: '#ff6f00',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    width: '100%',
+                  }}
+                >
+                  {language === 'en' ? '📋 Copy Link' : '📋 Copiar Enlace'}
+                </button>
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: '1rem', flexDirection: 'column' }}>
+              {appointmentId && (
+                <button
+                  onClick={() => navigate(`/client/appointments?id=${appointmentId}`)}
+                  style={{
+                    padding: '1rem',
+                    backgroundColor: '#e74c3c',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '16px',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  {language === 'en' ? '🔗 Manage This Appointment' : '🔗 Gestionar Esta Cita'}
+                </button>
+              )}
+
               <button
                 onClick={() => navigate('/client/appointments')}
                 style={{
                   padding: '1rem',
-                  backgroundColor: '#e74c3c',
-                  color: 'white',
-                  border: 'none',
+                  backgroundColor: appointmentId ? 'white' : '#e74c3c',
+                  color: appointmentId ? '#000' : 'white',
+                  border: appointmentId ? '2px solid #ddd' : 'none',
                   borderRadius: '8px',
                   cursor: 'pointer',
                   fontSize: '16px',
-                  fontWeight: 'bold',
+                  fontWeight: appointmentId ? '600' : 'bold',
                 }}
               >
                 {language === 'en' ? 'View My Appointments' : 'Ver Mis Citas'}
