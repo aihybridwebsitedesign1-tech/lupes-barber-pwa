@@ -427,8 +427,8 @@ export default function ClientAppointments() {
         ? 'Your appointment has been cancelled.'
         : 'Tu cita ha sido cancelada.');
 
-      // Force reload to show updated status
-      window.location.reload();
+      // Hard refresh to show updated status
+      window.location.href = window.location.href;
     } catch (error) {
       console.error('Error cancelling appointment:', error);
       alert(language === 'en'
@@ -699,8 +699,8 @@ export default function ClientAppointments() {
         ? `Your appointment has been rescheduled to ${dateFormatted} at ${timeFormatted}.`
         : `Tu cita ha sido reprogramada para ${dateFormatted} a las ${timeFormatted}.`);
 
-      // Force reload to show updated status
-      window.location.reload();
+      // Hard refresh to show updated status
+      window.location.href = window.location.href;
     } catch (error) {
       console.error('Error rescheduling appointment:', error);
       setRescheduleError(language === 'en'
