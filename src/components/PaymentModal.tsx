@@ -39,11 +39,12 @@ export default function PaymentModal({
       if (error) throw error;
 
       setTaxRate(Number(data.tax_rate) || 0);
-      setCardFeeRate(Number(data.card_processing_fee_rate) || 0.04);
+      setCardFeeRate(Number(data.card_processing_fee_rate) || 0);
     } catch (err) {
       console.error('Error loading shop config:', err);
-      setTaxRate(0.08);
-      setCardFeeRate(0.04);
+      // No hardcoded fallbacks - use 0 if shop_config unavailable
+      setTaxRate(0);
+      setCardFeeRate(0);
     }
   };
 
