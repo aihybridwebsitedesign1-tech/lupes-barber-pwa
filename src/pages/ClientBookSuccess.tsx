@@ -125,8 +125,18 @@ export default function ClientBookSuccess() {
             const result = await response.json();
             const apt = result.appointment;
 
-            if (apt && ['booked', 'confirmed', 'scheduled'].includes(apt.status)) {
-              console.log(`✅ APPOINTMENT CONFIRMED - Status: ${apt.status}, Payment: ${apt.payment_status}`);
+            // Show success for ANY appointment that exists (except cancelled/no_show)
+            if (apt) {
+              // Only exclude explicitly failed/cancelled appointments
+              if (['cancelled', 'no_show'].includes(apt.status)) {
+                console.log(`❌ Appointment found but has invalid status: ${apt.status}`);
+                setError(language === 'en' ? 'This appointment has been cancelled.' : 'Esta cita ha sido cancelada.');
+                setLoading(false);
+                return;
+              }
+
+              // For all other statuses, show success immediately
+              console.log(`✅ APPOINTMENT FOUND - Status: ${apt.status}, Payment: ${apt.payment_status}`);
               setAppointment({
                 ...apt,
                 amount_paid: apt.amount_paid || apt.amount_due,
@@ -136,8 +146,6 @@ export default function ClientBookSuccess() {
               });
               setLoading(false);
               return;
-            } else if (apt) {
-              console.log(`⏳ Appointment found but status is: ${apt.status} - continuing to poll...`);
             } else {
               console.log('⏳ Appointment not found yet - continuing to poll...');
             }
