@@ -114,8 +114,12 @@ export default function OwnerSettings() {
         setShopName(data.shop_name || "Lupe's Barber Shop");
         setAddress(data.address || '');
         setPhone(data.phone || '');
-        setTaxRate(((data.tax_rate || 0) * 100).toFixed(2));
-        setCardFeeRate(((data.card_processing_fee_rate || 0) * 100).toFixed(2));
+        // Handle legacy decimal format (0.04) vs new whole number format (4)
+        // If value < 1, it's legacy decimal - multiply by 100 to display as whole %
+        const rawTax = data.tax_rate || 0;
+        const rawCardFee = data.card_processing_fee_rate || 0;
+        setTaxRate((rawTax < 1 ? rawTax * 100 : rawTax).toFixed(2));
+        setCardFeeRate((rawCardFee < 1 ? rawCardFee * 100 : rawCardFee).toFixed(2));
         setDaysBookableInAdvance(String(data.days_bookable_in_advance || 30));
         setMinBookAheadHours(String(data.min_book_ahead_hours || 2));
         setMinCancelAheadHours(String(data.min_cancel_ahead_hours || 24));
@@ -170,8 +174,8 @@ export default function OwnerSettings() {
           shop_name: shopName,
           address: address,
           phone: phone,
-          tax_rate: parseFloat(taxRate) / 100,
-          card_processing_fee_rate: parseFloat(cardFeeRate) / 100,
+          tax_rate: parseFloat(taxRate), // Store as whole number (4 = 4%)
+          card_processing_fee_rate: parseFloat(cardFeeRate), // Store as whole number (4 = 4%)
           shop_hours: businessHours,
           shop_instagram_url: shopInstagramUrl.trim() || null,
           shop_facebook_url: shopFacebookUrl.trim() || null,
