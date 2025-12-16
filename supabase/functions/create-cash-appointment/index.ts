@@ -58,6 +58,10 @@ Deno.serve(async (req: Request) => {
 
     console.log('[Create Cash Appointment] STEP 1: Finding or creating client');
 
+    const nameParts = client_name.trim().split(' ');
+    const firstName = nameParts[0];
+    const lastName = nameParts.slice(1).join(' ') || '';
+
     let clientId: string;
 
     if (client_email) {
@@ -74,7 +78,8 @@ Deno.serve(async (req: Request) => {
         const { data: newClient, error: clientError } = await supabase
           .from('clients')
           .insert({
-            name: client_name,
+            first_name: firstName,
+            last_name: lastName,
             email: client_email,
             phone: client_phone || null,
           })
@@ -103,7 +108,8 @@ Deno.serve(async (req: Request) => {
         const { data: newClient, error: clientError } = await supabase
           .from('clients')
           .insert({
-            name: client_name,
+            first_name: firstName,
+            last_name: lastName,
             phone: client_phone,
           })
           .select('id')
@@ -121,7 +127,8 @@ Deno.serve(async (req: Request) => {
       const { data: newClient, error: clientError } = await supabase
         .from('clients')
         .insert({
-          name: client_name,
+          first_name: firstName,
+          last_name: lastName,
         })
         .select('id')
         .single();
